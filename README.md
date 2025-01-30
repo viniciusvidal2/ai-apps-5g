@@ -9,7 +9,8 @@ To install Anaconda, follow the instructions in the [official website](https://w
 To create our environment to run the code in this repo, use the file ai_environment.yml and call the following command:
 
 ```bash
-conda env create -f /path/to/this/repo/ai_environment.yml
+cd /path/to/this/repo
+conda env create --file=ai_environment.yml
 ```
 
 Cuda and tensorflow versions might need to adapt, but you should be able to run the example scripts after successful installation.

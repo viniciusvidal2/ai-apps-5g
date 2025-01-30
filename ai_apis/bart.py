@@ -45,4 +45,4 @@ if __name__ == "__main__":
     print("This is the input text:\n")
     print(ARTICLE)
     print("\n\nThis is the output summary:")
-    print(summary)
+    print(summary[0]['summary_text'])

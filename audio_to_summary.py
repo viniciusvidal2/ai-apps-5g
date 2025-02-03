@@ -20,7 +20,7 @@ def main():
     print("This is the input text:\n")
     print(text_prompt)
     print("\n\nThis is the output summary:")
-    print(summary[0]['summary_text'])
+    print(summary)
     print(f"\nTime elapsed: {time_elapsed} seconds")
 
 

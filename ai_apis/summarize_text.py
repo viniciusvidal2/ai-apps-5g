@@ -17,7 +17,9 @@ def runBartSummarizer(text_prompt: str, model_id: str, min_length_pct: float, ma
     summarizer = pipeline("summarization", model=model_id)
     min_length = int(min_length_pct * len(text_prompt))
     max_length = int(max_length_pct * len(text_prompt))
-    return summarizer(text_prompt, max_length=max_length, min_length=min_length, do_sample=True)
+    output = summarizer(text_prompt, max_length=max_length,
+                        min_length=min_length, do_sample=True)
+    return output[0]['summary_text']
 
 
 if __name__ == "__main__":
@@ -45,4 +47,4 @@ if __name__ == "__main__":
     print("This is the input text:\n")
     print(ARTICLE)
     print("\n\nThis is the output summary:")
-    print(summary[0]['summary_text'])
+    print(summary)

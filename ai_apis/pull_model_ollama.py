@@ -1,7 +1,7 @@
 from tqdm import tqdm
 from ollama import pull
 
-def pull_model(model_id: str) -> bool:
+def pullModel(model_id: str) -> bool:
     """Pulls the model while showing progress bars.
 
     Args:
@@ -35,5 +35,5 @@ def pull_model(model_id: str) -> bool:
 
 if __name__ == "__main__":
     # Run a sample of the script for demonstration purposes
-    result = pull_model("llama3.2")
+    result = pullModel("llama3.2")
     print(f"Pulling model succeeded: {result}")

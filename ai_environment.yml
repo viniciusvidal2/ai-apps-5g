@@ -214,7 +214,7 @@ dependencies:
       - numpy==1.26.4
       - nvidia-ml-py3==7.352.0
       - nvidia-nccl-cu12==2.24.3
-      - ollama==0.4.7
+      - ollama==0.4.3
       - omegaconf==2.2.3
       - opencensus==0.11.4
       - opencensus-context==0.1.3

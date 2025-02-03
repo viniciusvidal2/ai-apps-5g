@@ -17,3 +17,13 @@ Cuda and tensorflow versions might need to adapt, but you should be able to run 
 
 ## Sample data
 The audio file we are using as an example can be downloaded from [this google drive link](https://drive.google.com/file/d/1Y_76o_JHO1fKb_lL-e-7G7UnnCcN1Ea6/view?usp=drive_link)
+
+## Running the Whisper Interface
+
+After creating and activating the conda environment, you can run the Whisper web interface using Streamlit:
+
+```bash
+streamlit run whisper_app.py
+```
+
+This will launch a web interface where you can upload an audio file (in Portuguese) for transcription using the Whisper model. Note that inference on CPU may be slower.

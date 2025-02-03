@@ -14,3 +14,6 @@ conda env create --file=ai_environment.yml
 ```
 
 Cuda and tensorflow versions might need to adapt, but you should be able to run the example scripts after successful installation.
+
+## Sample data
+The audio file we are using as an example can be downloaded from [this google drive link](https://drive.google.com/file/d/1Y_76o_JHO1fKb_lL-e-7G7UnnCcN1Ea6/view?usp=drive_link)

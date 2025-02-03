@@ -35,5 +35,5 @@ def pull_model(model_id: str) -> bool:
 
 if __name__ == "__main__":
     # Run a sample of the script for demonstration purposes
-    result = pull_model("phi4")
+    result = pull_model("llama3.2")
     print(f"Pulling model succeeded: {result}")

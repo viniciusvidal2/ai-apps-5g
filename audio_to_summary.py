@@ -1,7 +1,7 @@
 import os
 import time
-from ai_apis.bart import runBartSummarizer
-from ai_apis.whisper import runWhisper
+from ai_apis.summarize_text import runBartSummarizer
+from ai_apis.audio_to_text import runWhisper
 
 
 def main():

@@ -17,3 +17,21 @@ Cuda and tensorflow versions might need to adapt, but you should be able to run 
 
 ## Sample data
 The audio file we are using as an example can be downloaded from [this google drive link](https://drive.google.com/file/d/1Y_76o_JHO1fKb_lL-e-7G7UnnCcN1Ea6/view?usp=drive_link)
+
+## Quickstart
+You can test it by running the scripts in the root folder to convert audio to both summary or report. Lets assume you downloaded the [sample audio file from google drive](https://drive.google.com/file/d/1Y_76o_JHO1fKb_lL-e-7G7UnnCcN1Ea6/view?usp=drive_link) and placed it in the **Downloads** folder.
+
+### Generating summary from audio
+```bash
+cd /path/to/this/repo
+conda activate ai
+python audio_to_summary.py --audio_file=/home/user/Downloads/secao_3.mpeg
+```
+
+### Generating report from audio
+
+```bash
+cd /path/to/this/repo
+conda activate ai
+python audio_to_report.py --audio_file=/home/user/Downloads/secao_3.mpeg
+```

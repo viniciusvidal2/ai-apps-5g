@@ -1,6 +1,37 @@
 # ai-apps-5g
 This repository will hold the codes for the AI apps we build in the 5G context
 
+## Prerequisites
+
+### System Updates
+First, update your system packages:
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+### Install Ollama
+The application requires Ollama to be installed and running for LLM functionality:
+
+1. Install curl if not already installed:
+```bash
+sudo apt install curl -y
+```
+
+2. Install Ollama:
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+3. Start the Ollama service:
+```bash
+sudo systemctl start ollama
+```
+
+Note: Keep the Ollama service running while using the application. You can check its status with:
+```bash
+sudo systemctl status ollama
+```
+
 ## Reproducing the AI tools with conda environment
 This instructions should run on a linux machine with a proper NVidia GPU installed. The actual test ran on a laptop i7 12th generation, 3050 RTX GPU.
 
@@ -37,11 +68,10 @@ python audio_to_report.py --audio_file=/home/user/Downloads/secao_3.mpeg
 ```
 
 ## Running the Audio-to-Text Interface
-
-After creating and activating the conda environment, you can run the web interface using Streamlit:
+After creating and activating the conda environment, ensure Ollama service is running, then start the web interface using Streamlit:
 
 ```bash
 streamlit run report_app.py
 ```
 
-This will launch a web interface where you can upload an audio file (in Portuguese) for transcription using the our assistant model. Note that inference on CPU may be slower.
+This will launch a web interface where you can upload an audio file (in Portuguese) for transcription using our assistant model. Note that inference on CPU may be slower.

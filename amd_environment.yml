@@ -37,7 +37,7 @@ dependencies:
     - tokenizers>=0.14,<0.19  # Compatible with transformers
     - sentencepiece==0.2.0
 
-    # LLM and chat
+    # LLMs and chat
     - ollama==0.4.3
     - huggingface-hub==0.27.1
 

@@ -5,7 +5,7 @@ channels:
 dependencies:
   - python=3.9
   - pip
-  - numpy>=1.24.0,<2.0.0  
+  - numpy>=1.24.0,<2.0.0
   - pandas>=2.2.3
   - streamlit=1.37.1
   - pip:
@@ -28,6 +28,7 @@ dependencies:
     # Audio processing
     - librosa==0.10.2
     - soundfile==0.13.0
+    - sounddevice==0.5.1
 
     # Text processing and metrics
     - nltk==3.8.1

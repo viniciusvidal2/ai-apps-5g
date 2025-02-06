@@ -10,4 +10,4 @@ gnupg
 ffmpeg
 libsm6
 libxext6
-ollama==0.5.7
+ollama

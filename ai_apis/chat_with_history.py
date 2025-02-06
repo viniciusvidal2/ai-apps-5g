@@ -11,9 +11,10 @@ class ChatBot:
             model_id (str): the model id of the chatbot
         """
         self.messages = []
+        self.last_response = ""
         self.model_id = model_id
 
-    def chat(self, user_input: str, stream: bool = False) -> Generator[Any, Any, Any]:
+    def chat(self, user_input: str, stream: bool = False) -> str:
         """Insert a user input and get a response from the chatbot using the previous history
 
         Args:
@@ -29,26 +30,22 @@ class ChatBot:
         response = chat(
             model=self.model_id,
             messages=input_message_history,
-            stream=stream
+            stream=False
         )
-
-        if stream:
-            # Stream the response chunk by chunk
-            for chunk in response:
-                yield chunk['message']['content']
-            full_response = "".join(
-                chunk['message']['content'] for chunk in response)
-        else:
-            # Yield the full response in smaller chunks
-            for chunk in full_response.split():
-                yield chunk + " "
-            full_response = response['message']['content']
+        self.last_response = response['message']['content']
 
         # Add the full response to the history
         self.messages += [
             {'role': 'user', 'content': user_input},
-            {'role': 'assistant', 'content': full_response},
+            {'role': 'assistant', 'content': self.last_response},
         ]
+
+        if stream:
+            # Yield the full response in smaller chunks
+            for chunk in self.last_response.split():
+                yield chunk + " "
+        else:
+            yield self.last_response
 
     def clearHistory(self) -> None:
         """Clears the history of the chatbot
@@ -72,6 +69,14 @@ class ChatBot:
         self.messages += [
             {'role': 'assistant', 'content': personality},
         ]
+
+    def getLastResponse(self) -> str:
+        """Returns the last response of the chatbot
+
+        Returns:
+            str: the last response of the chatbot
+        """
+        return self.last_response
 
 
 if __name__ == '__main__':

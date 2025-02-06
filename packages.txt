@@ -1,0 +1,22 @@
+# General dependencies
+curl
+wget
+git
+build-essential
+
+# Python dependencies
+python3
+python3-venv
+python3-pip
+
+# Ollama dependencies
+ca-certificates
+gnupg
+
+# Dependencies for some ML packages (e.g., PyTorch, NumPy)
+ffmpeg
+libsm6
+libxext6
+
+# Ollama
+ollama==0.5.7

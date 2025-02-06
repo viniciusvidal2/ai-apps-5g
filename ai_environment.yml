@@ -77,7 +77,7 @@ dependencies:
   - openh264=2.1.1=h4ff587b_0
   - openjpeg=2.5.2=he7f1fd0_0
   - openssl=3.4.0=h7b32b05_1
-  - pillow=11.0.0=py39hcea889d_1
+  - pillow=10.4.0
   - pysocks=1.7.1=py39h06a4308_0
   - python=3.9.21=he870216_1
   - pytorch=2.5.1=py3.9_cuda11.8_cudnn9.1.0_0

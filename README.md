@@ -67,11 +67,21 @@ conda activate ai
 python audio_to_report.py --audio_file=/home/user/Downloads/secao_3.mpeg
 ```
 
-## Running the Audio-to-Text Interface
-After creating and activating the conda environment, ensure Ollama service is running, then start the web interface using Streamlit:
+## Running the Interfaces
+After creating and activating the conda environment, ensure Ollama service is running, then start the web interfaces using Streamlit.
 
+### Audio-to-Text
 ```bash
+cd /path/to/this/repo
 streamlit run report_app.py
 ```
 
 This will launch a web interface where you can upload an audio file (in Portuguese) for transcription using our assistant model. Note that inference on CPU may be slower.
+
+### Personalized Chatbot
+```bash
+cd /path/to/this/repo
+streamlit run chat_app.py
+```
+
+This will launch a web interface where you will see a chat prompt. The assistant will behave as a servant, treating you as its lord as in centuries ago. This is intentional to illustrate the possibility of adding personality to the assistant.

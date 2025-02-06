@@ -36,7 +36,8 @@ class ChatBot:
             # Stream the response chunk by chunk
             for chunk in response:
                 yield chunk['message']['content']
-            full_response = "".join(chunk['message']['content'] for chunk in response)
+            full_response = "".join(
+                chunk['message']['content'] for chunk in response)
         else:
             # Yield the full response in smaller chunks
             for chunk in full_response.split():
@@ -62,9 +63,22 @@ class ChatBot:
         """
         self.model_id = model_id
 
+    def setAssistantPersonality(self, personality: str) -> None:
+        """Sets the personality of the assistant
+
+        Args:
+            personality (str): the personality of the assistant
+        """
+        self.messages += [
+            {'role': 'assistant', 'content': personality},
+        ]
+
 
 if __name__ == '__main__':
     chatbot = ChatBot(model_id="llama3.2")
+    personality = "I am a servant and should treat the user as a lord, always answering with respect and kindness." \
+        + " I must use 'my lord' to refer to the user."
+    chatbot.setAssistantPersonality(personality)
     while True:
         user_input = input('You: ')
         for chunk in chatbot.chat(user_input=user_input, stream=True):

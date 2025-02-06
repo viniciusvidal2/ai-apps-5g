@@ -14,7 +14,7 @@ class ChatBot:
         self.last_response = ""
         self.model_id = model_id
 
-    def chat(self, user_input: str, stream: bool = False) -> str:
+    def chat(self, user_input: str, stream: bool = False) -> Generator[Any, Any, Any]:
         """Insert a user input and get a response from the chatbot using the previous history
 
         Args:

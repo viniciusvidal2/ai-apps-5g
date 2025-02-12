@@ -1,13 +1,11 @@
 import streamlit as st
 from ai_apis.chat_with_history import ChatBot
-from ai_apis.pull_model_ollama import pullModel
 
 # Display the app title and description
 st.title("GRIn assistant bot")
 # Initialize the chatbot
 with st.spinner("Loading the chatbot ..."):
     model_id = "llama3.2"
-    pullModel(model_id)
     chatbot = ChatBot(model_id=model_id)
     # Set the bot personality
     personality = "I am a servant and should treat the user as a lord, always answering with respect and kindness." \

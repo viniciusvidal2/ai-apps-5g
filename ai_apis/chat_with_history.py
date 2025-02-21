@@ -1,5 +1,6 @@
 from ollama import chat
 from typing import Generator, Any
+import os
 
 
 class ChatBot:
@@ -9,47 +10,49 @@ class ChatBot:
         Args:
             model_id (str): the model id of the chatbot
         """
-        self.messages = []
-        self.last_response = ""
+        self.message_history = []
         self.model_id = model_id
+        self.last_input = ""
+        self.last_response = ""
 
-    def chat(self, user_input: str, stream: bool = False) -> Generator[Any, Any, Any]:
+    def chat(self, user_input: str) -> Generator[Any, Any, Any]:
         """Insert a user input and get a response from the chatbot using the previous history
 
         Args:
             user_input (str): the current query input
-            stream (bool, defaults to False): whether to stream the response or not
 
         Returns:
             str: the output, taking the history into account
         """
         # Add the user input to the messages
-        input_message_history = self.messages + \
+        input_message_history = self.message_history + \
             [{'role': 'user', 'content': user_input}]
         response = chat(
             model=self.model_id,
             messages=input_message_history,
-            stream=False
+            stream=True
         )
-        self.last_response = response['message']['content']
 
-        # Add the full response to the history
-        self.messages += [
+        # Yield the full response in small chunks
+        for chunk in response:
+            yield chunk["message"]["content"]
+
+    def updateHistory(self, user_input: str, assistant_response: str) -> None:
+        """Updates the history of the chatbot with a user input and an assistant response
+
+        Args:
+            user_input (str): the user input
+            assistant_response (str): the assistant response
+        """
+        self.message_history += [
             {'role': 'user', 'content': user_input},
-            {'role': 'assistant', 'content': self.last_response},
+            {'role': 'assistant', 'content': assistant_response},
         ]
-
-        if stream:
-            # Yield the full response in smaller chunks
-            for chunk in self.last_response.split():
-                yield chunk + " "
-        else:
-            yield self.last_response
 
     def clearHistory(self) -> None:
         """Clears the history of the chatbot
         """
-        self.messages = []
+        self.message_history = []
 
     def setModel(self, model_id: str) -> None:
         """Sets the model of the chatbot
@@ -65,26 +68,19 @@ class ChatBot:
         Args:
             personality (str): the personality of the assistant
         """
-        self.messages += [
+        self.message_history += [
             {'role': 'assistant', 'content': personality},
         ]
 
-    def getLastResponse(self) -> str:
-        """Returns the last response of the chatbot
-
-        Returns:
-            str: the last response of the chatbot
-        """
-        return self.last_response
-
 
 if __name__ == '__main__':
-    chatbot = ChatBot(model_id="llama3.2")
-    personality = "I am a servant and should treat the user as a lord, always answering with respect and kindness." \
-        + " I must use 'my lord' to refer to the user."
-    chatbot.setAssistantPersonality(personality)
+    os.environ["OLLAMA_ACCELERATE"] = "gpu"
+    chatbot = ChatBot(model_id="phi4")
     while True:
         user_input = input('You: ')
-        for chunk in chatbot.chat(user_input=user_input, stream=True):
+        assistant_response = ""
+        for chunk in chatbot.chat(user_input=user_input):
+            assistant_response += chunk
             print(chunk, end="", flush=True)  # Fluid printing effect
         print("\n")
+        chatbot.updateHistory(user_input, assistant_response)

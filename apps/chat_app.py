@@ -9,16 +9,12 @@ sys.path.append(root_path)
 from ai_apis.chat_with_history import ChatBot
 
 # Display the app title and description
-st.title("GRIn assistant bot")
+st.title("Assistente de IA da SAE")
 # Initialize the chatbot
-with st.spinner("Loading the chatbot ..."):
-    model_id = "llama3.2"
+with st.spinner("Carregando o chatbot ..."):
+    model_id = "sae-assistant"
     chatbot = ChatBot(model_id=model_id)
-    # Set the bot personality
-    personality = "I am a servant and should treat the user as a lord, always answering with respect and kindness." \
-        + " I must use 'my lord' to refer to the user."
-    chatbot.setAssistantPersonality(personality)
-st.subheader("Hello my lord, how can I assist you today?")
+st.subheader("Converse com o assistente para auxilia-lo em suas tarefas")
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -30,7 +26,7 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # React to user input
-if prompt := st.chat_input("Please write you enquire here - In English!"):
+if prompt := st.chat_input("Digite sua mensagem."):
     # Add user message to chat history in the screen
     with st.chat_message("user"):
         st.markdown(prompt)

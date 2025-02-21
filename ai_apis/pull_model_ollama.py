@@ -35,5 +35,5 @@ def pullModel(model_id: str) -> bool:
 
 if __name__ == "__main__":
     # Run a sample of the script for demonstration purposes
-    result = pullModel("llama3.2")
+    result = pullModel("deepseek-r1:14b")
     print(f"Pulling model succeeded: {result}")

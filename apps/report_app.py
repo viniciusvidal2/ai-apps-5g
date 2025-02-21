@@ -15,12 +15,18 @@ Main features:
 import streamlit as st
 import tempfile
 import os
-from ai_apis.audio_to_text import runWhisper
-from ai_apis.report_generation import generateReportWithModel
-from ai_apis.pull_model_ollama import pullModel
 import sounddevice as sd
 import soundfile as sf
 import numpy as np
+import sys
+
+# Add the parent directory folder to find our modules
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(root_path)
+
+from ai_apis.audio_to_text import runWhisper
+from ai_apis.report_generation import generateReportWithModel
+from ai_apis.pull_model_ollama import pullModel
 
 # Configure page settings
 st.set_page_config(page_title="Audio Report Generator", layout="wide")

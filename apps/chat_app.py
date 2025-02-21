@@ -1,4 +1,11 @@
 import streamlit as st
+import sys
+import os
+
+# Add the parent directory folder to find our modules
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.append(root_path)
+
 from ai_apis.chat_with_history import ChatBot
 
 # Display the app title and description

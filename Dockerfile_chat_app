@@ -22,7 +22,7 @@ RUN pip install -r /app/requirements.txt
 
 # Copy interesting folders and app file
 COPY ai_apis /app/ai_apis
-COPY chat_app.py /app/chat_app.py
+COPY apps/chat_app.py /app/chat_app.py
 COPY ollama_models /app/ollama_models
 
 # Install ollama

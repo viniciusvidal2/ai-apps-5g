@@ -56,7 +56,7 @@ You can test it by running the scripts in the root folder to convert audio to bo
 ```bash
 cd /path/to/this/repo
 conda activate ai
-python audio_to_summary.py --audio_file=/home/user/Downloads/secao_3.mpeg
+python workflows/audio_to_summary.py --audio_file=/home/user/Downloads/secao_3.mpeg
 ```
 
 ### Generating report from audio
@@ -64,7 +64,7 @@ python audio_to_summary.py --audio_file=/home/user/Downloads/secao_3.mpeg
 ```bash
 cd /path/to/this/repo
 conda activate ai
-python audio_to_report.py --audio_file=/home/user/Downloads/secao_3.mpeg
+python workflows/audio_to_report.py --audio_file=/home/user/Downloads/secao_3.mpeg
 ```
 
 ## Running the Interfaces
@@ -73,7 +73,7 @@ After creating and activating the conda environment, ensure Ollama service is ru
 ### Audio-to-Text
 ```bash
 cd /path/to/this/repo
-streamlit run report_app.py
+streamlit run apps/report_app.py
 ```
 
 This will launch a web interface where you can upload an audio file (in Portuguese) for transcription using our assistant model. Note that inference on CPU may be slower.
@@ -81,7 +81,25 @@ This will launch a web interface where you can upload an audio file (in Portugue
 ### Personalized Chatbot
 ```bash
 cd /path/to/this/repo
-streamlit run chat_app.py
+streamlit run apps/chat_app.py
 ```
 
 This will launch a web interface where you will see a chat prompt. The assistant will behave as a servant, treating you as its lord as in centuries ago. This is intentional to illustrate the possibility of adding personality to the assistant.
+
+## Building and running the Docker image
+First of all, copy your ollama models __blobs__ and __manifests__ folders to the **ollama_models** subfolder. This will guarantee they are placed in the Docker images we are building.
+
+Once you have [docker installed in your machine](https://docs.docker.com/engine/install/), you can create the images for your apps.
+
+### Custom chatbot app
+Run the following command to create the docker image:
+
+```bash
+cd /path/to/this/repo
+docker build -f Dockerfile.chatapp -t chat-app:latest .
+```
+
+Use the following command to run the docker container on top of the image
+```bash
+docker run -p 8501:8501 chat-app:latest
+```

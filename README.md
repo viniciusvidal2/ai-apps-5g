@@ -91,6 +91,25 @@ First of all, copy your ollama models __blobs__ and __manifests__ folders to the
 
 Once you have [docker installed in your machine](https://docs.docker.com/engine/install/), you can create the images for your apps.
 
+To run the built images you should have nvidia-container-toolkit installed. Follow the commands to install it:
+
+```bash
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+    && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+    && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt update
+sudo apt install -y nvidia-container-toolkit
+sudo systemctl restart docker
+```
+
+To test the installation run the following command, where you should have the image pulled and your GPU data printed as the correct output:
+
+```bash
+docker run --rm --gpus all nvidia/cuda:12.2.2-base-ubuntu22.04 nvidia-smi
+```
+
 ### Custom chatbot app
 Run the following command to create the docker image:
 
@@ -99,7 +118,13 @@ cd /path/to/this/repo
 docker build -f Dockerfile.chatapp -t chat-app:latest .
 ```
 
+Or instead just pull it from Dockerhub:
+```bash
+docker pull viniciusfvidal/chat-app:latest
+docker tag viniciusfvidal/chat-app:latest chat-app:latest
+```
+
 Use the following command to run the docker container on top of the image
 ```bash
-docker run -p 8501:8501 chat-app:latest
+docker run --gpus all --privileged -it -p 8501:8501 chat-app:latest
 ```

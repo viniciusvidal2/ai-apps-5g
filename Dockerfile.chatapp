@@ -22,7 +22,7 @@ RUN curl -fsSL https://ollama.com/install.sh | sh
 # Copy code to inside the image
 COPY requirements.txt /app/requirements.txt
 RUN pip install setuptools==75.1.0
-RUN pip install -r --no-cache-dir --no-deps /app/requirements.txt
+RUN pip install --no-cache-dir --no-deps -r /app/requirements.txt
 
 # Set the ollama models custom directory
 COPY ollama_models /app/ollama_models

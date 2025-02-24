@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from ollama import pull
 
+
 def pullModel(model_id: str) -> bool:
     """Pulls the model while showing progress bars.
 
@@ -22,7 +23,8 @@ def pullModel(model_id: str) -> bool:
                 continue
 
             if digest not in bars and (total := progress.get('total')):
-                bars[digest] = tqdm(total=total, desc=f'pulling {digest[7:19]}', unit='B', unit_scale=True)
+                bars[digest] = tqdm(
+                    total=total, desc=f'pulling {digest[7:19]}', unit='B', unit_scale=True)
 
             if completed := progress.get('completed'):
                 bars[digest].update(completed - bars[digest].n)
@@ -32,6 +34,7 @@ def pullModel(model_id: str) -> bool:
     except Exception as e:
         print(f"Error pulling model {model_id}: {e}")
         return False
+
 
 if __name__ == "__main__":
     # Run a sample of the script for demonstration purposes

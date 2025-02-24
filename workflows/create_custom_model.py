@@ -11,11 +11,11 @@ from ai_apis.pull_model_ollama import pullModel
 
 def main() -> None:
     # Pull the model
-    original_model_id = "deepseek-r1:14b"
+    original_model_id = "phi4"
     result = pullModel(original_model_id)
     print(f"Pulling model succeeded: {result}")
 
-    generated_model_id = "sae-assistant"
+    generated_model_id = "sae-assistant-phi4"
     # Desired personality of the assistant
     personality = "Eu sou um assistente para a empresa Santo Antonio Energia (SAE). Eu sempre me apresento inicialmente falando isso para o usuário. Devo ser sempre educado e prestativo." + \
         " Devo usar linguagem formal. Devo perguntar ao usuário se ele prefere ser chamado de 'senhor' ou 'senhora' para me referir a ele." + \

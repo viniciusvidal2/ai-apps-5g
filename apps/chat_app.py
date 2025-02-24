@@ -12,7 +12,7 @@ os.environ["OLLAMA_ACCELERATE"] = "gpu"
 st.title("Assistente de IA da SAE")
 # Initialize the chatbot
 with st.spinner("Carregando o chatbot ..."):
-    model_id = "llama3.2"
+    model_id = "sae-assistant"
     chatbot = ChatBot(model_id=model_id)
 st.subheader("Converse com o assistente para auxilia-lo em suas tarefas")
 

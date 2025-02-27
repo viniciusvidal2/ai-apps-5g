@@ -86,11 +86,35 @@ streamlit run apps/chat_app.py
 
 This will launch a web interface where you will see a chat prompt. The assistant will behave as a servant, treating you as its lord as in centuries ago. This is intentional to illustrate the possibility of adding personality to the assistant.
 
-## Building and running the Docker image
-First of all, copy your ollama models __blobs__ and __manifests__ folders to the **ollama_models** subfolder. This will guarantee they are placed in the Docker images we are building.
+## Building the Docker image
+### Chat app
+Run the following command to pull and generate the customizes model we are going to use in the chat app. Make sure you have gone through the __prerequisites__ section and have the conda environment running.
+
+```bash
+conda activate ai
+cd /path/to/this/repo
+python workflows/create_custom_model.py
+```
+
+Copy your ollama customized and original models __blobs__ and __manifests__ folders to the **ollama_models** subfolder. This will guarantee they are placed in the Docker images we are building. The original ollama models folders are usually at __/home/user/.ollama/models__. Make sure you are not copying extra blobs and manifests so that the docker image doesn't get too big.
 
 Once you have [docker installed in your machine](https://docs.docker.com/engine/install/), you can create the images for your apps.
 
+Run the following command to create the docker image:
+
+```bash
+cd /path/to/this/repo
+docker build -f Dockerfile.chatapp -t chat-app:latest .
+```
+
+Or instead just **pull it from Dockerhub**:
+```bash
+docker pull viniciusfvidal/chat-app:latest
+docker tag viniciusfvidal/chat-app:latest chat-app:latest
+```
+
+## Running the Docker image
+### Chat app
 To run the built images you should have nvidia-container-toolkit installed. Follow the commands to install it:
 
 ```bash
@@ -110,21 +134,7 @@ To test the installation run the following command, where you should have the im
 docker run --rm --gpus all nvidia/cuda:12.2.2-base-ubuntu22.04 nvidia-smi
 ```
 
-### Custom chatbot app
-Run the following command to create the docker image:
-
-```bash
-cd /path/to/this/repo
-docker build -f Dockerfile.chatapp -t chat-app:latest .
-```
-
-Or instead just pull it from Dockerhub:
-```bash
-docker pull viniciusfvidal/chat-app:latest
-docker tag viniciusfvidal/chat-app:latest chat-app:latest
-```
-
 Use the following command to run the docker container on top of the image
 ```bash
-docker run --gpus all --privileged -it -p 8501:8501 chat-app:latest
+docker run --gpus all --name chat-app --privileged -it -p 8501:8501 chat-app:latest
 ```

@@ -96,7 +96,7 @@ cd /path/to/this/repo
 python workflows/create_custom_model.py
 ```
 
-Copy your ollama customized and original models __blobs__ and __manifests__ folders to the **ollama_models** subfolder. This will guarantee they are placed in the Docker images we are building. The original ollama models folders are usually at __/home/user/.ollama/models__. Make sure you are not copying extra blobs and manifests so that the docker image doesn't get too big.
+Copy your ollama customized and original models __blobs__ and __manifests__ folders to the **ollama_models** subfolder. This will guarantee they are placed in the Docker images we are building. The original ollama models folders are usually at __/usr/share/ollama/.ollama/models__. Make sure you are not copying extra blobs and manifests so that the docker image doesn't get too big.
 
 Once you have [docker installed in your machine](https://docs.docker.com/engine/install/), you can create the images for your apps.
 

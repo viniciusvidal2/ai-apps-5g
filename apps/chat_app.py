@@ -9,10 +9,10 @@ os.environ["OLLAMA_ACCELERATE"] = "gpu"
 
 
 # Display the app title and description
-st.title("Assistente de IA da SAE")
+st.title("Assistente de IA do GRIn")
 # Initialize the chatbot
 with st.spinner("Carregando o chatbot ..."):
-    model_id = "sae-assistant-phi4"
+    model_id = "grin-assistant-phi4"
     chatbot = ChatBot(model_id=model_id)
 st.subheader("Converse com o assistente para auxilia-lo em suas tarefas")
 

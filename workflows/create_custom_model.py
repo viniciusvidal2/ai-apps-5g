@@ -5,7 +5,7 @@ import sys
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_path)
 
-from ai_apis.customize_model import createPersonalizedModel
+from ai_apis.customize_model import createPersonalizedModel, copyModel
 from ai_apis.pull_model_ollama import pullModel
 
 
@@ -23,8 +23,16 @@ def main() -> None:
         "Reforce na sua apresentacao que o laboratorio desenvolve agora sistemas de IA customizados, citando voce mesmo como um exemplo. " + \
         "Deve falar que o laboratorio esta sempre aberto a novas colaboracoes e que o usuario pode entrar em contato a qualquer momento. "
     # Create and save the model
+    print("Creating and saving the model")
     createPersonalizedModel(original_id=original_model_id,
                             new_id=generated_model_id, personality=personality)
+    # Copy the generated model to our folder
+    print("Copying the model")
+    result = copyModel(generated_model_id)
+    if result:
+        print("Model created and copied successfully")
+    else:
+        print("Model not found in the usual paths")
 
 
 if __name__ == "__main__":

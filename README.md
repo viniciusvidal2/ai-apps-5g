@@ -83,8 +83,14 @@ This will launch a web interface where you can upload an audio file (in Portugue
 cd /path/to/this/repo
 streamlit run apps/chat_app.py
 ```
-
 This will launch a web interface where you will see a chat prompt. The assistant will behave as a servant, treating you as its lord as in centuries ago. This is intentional to illustrate the possibility of adding personality to the assistant.
+
+### Image Chatbot
+```bash
+cd /path/to/this/repo
+streamlit run apps/image_chat_app.py
+```
+This will launch a web interface where you can upload an image and ask the assistant to describe it. The assistant will use a BLIP model to generate a description of the image.
 
 ## Building the Docker image
 ### Chat app

@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var editTextInterval: EditText
     private lateinit var buttonIncrease: Button
     private lateinit var buttonDecrease: Button
+    private lateinit var buttonMqttConfig: Button
     private var measurementInterval: Long = 1 // segundos
     private var lastUpdateTime: Long = 0  // em milissegundos
 
@@ -43,6 +44,9 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewPagerMetrics: ViewPager2
     private lateinit var metricPagerAdapter: MetricPagerAdapter
 
+    // MqttHandler
+    private lateinit var mainApplication: MainApplication
+    
     // BroadcastReceiver para monitorar o nível da bateria
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -92,21 +96,27 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
         checkPermissions()
 
+        // Obter a referência da aplicação
+        mainApplication = application as MainApplication
+
         // Inicializa controles de tempo
         editTextInterval = findViewById(R.id.editTextInterval)
         buttonIncrease = findViewById(R.id.buttonIncrease)
         buttonDecrease = findViewById(R.id.buttonDecrease)
+        buttonMqttConfig = findViewById(R.id.buttonMqttConfig)
 
         buttonIncrease.setOnClickListener {
             measurementInterval++
             editTextInterval.setText(measurementInterval.toString())
         }
+        
         buttonDecrease.setOnClickListener {
             if (measurementInterval > 1) {
                 measurementInterval--
                 editTextInterval.setText(measurementInterval.toString())
             }
         }
+        
         editTextInterval.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 val newInterval = editTextInterval.text.toString().toLongOrNull()
@@ -116,6 +126,12 @@ class MainActivity : ComponentActivity() {
                     editTextInterval.setText(measurementInterval.toString())
                 }
             }
+        }
+        
+        // Configura botão MQTT
+        buttonMqttConfig.setOnClickListener {
+            val intent = Intent(this, MqttConfigActivity::class.java)
+            startActivity(intent)
         }
 
         // Inicializa ViewPager2 e adapter com valores iniciais
@@ -146,10 +162,18 @@ class MainActivity : ComponentActivity() {
 
         // Registra o receptor de bateria
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        
+        // Não iniciar a publicação MQTT automaticamente para evitar falhas
+        // Isso será iniciado após o usuário configurar e conectar o MQTT
     }
 
     override fun onResume() {
         super.onResume()
+        // Verificar status do MQTT e atualizar a UI se necessário
+        if (mainApplication.mqttHandler.isConnected()) {
+            // Se estiver conectado, iniciar a publicação de medições
+            startMqttPublishing()
+        }
     }
 
     override fun onPause() {
@@ -160,6 +184,16 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         // Desregistra o receptor de bateria quando a atividade é destruída
         unregisterReceiver(batteryReceiver)
+    }
+    
+    // Iniciar a publicação periódica de dados MQTT
+    private fun startMqttPublishing() {
+        // Fornecer funções que retornam os dados mais recentes
+        mainApplication.startMqttPublishing(
+            heartRateProvider = { exerciseMetrics.heartRate },
+            batteryLevelProvider = { exerciseMetrics.batteryLevel },
+            secondsMeasureProvider = { measurementInterval }
+        )
     }
 
     private fun checkPermissions() {

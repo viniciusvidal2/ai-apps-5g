@@ -1,7 +1,12 @@
 package com.projetosae5g.app_5g_layout
 
 import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -38,49 +43,39 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewPagerMetrics: ViewPager2
     private lateinit var metricPagerAdapter: MetricPagerAdapter
 
+    // BroadcastReceiver para monitorar o nível da bateria
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_BATTERY_CHANGED) {
+                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+                val batteryPct = level * 100 / scale
+                exerciseMetrics = exerciseMetrics.copy(batteryLevel = batteryPct)
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    // Atualiza a exibição das métricas
+    private fun updateMetricsDisplay() {
+        val metricsList = listOf(
+            "BATIMENTOS CARDÍACOS: ${exerciseMetrics.heartRate ?: "--"} BPM",
+            "NÍVEL DA BATERIA: ${exerciseMetrics.batteryLevel ?: "--"}%"
+        )
+        runOnUiThread {
+            metricPagerAdapter.updateMetrics(metricsList)
+        }
+    }
+
     // Callback de medição
     private val heartRateCallback = object : MeasureCallback {
         override fun onDataReceived(data: DataPointContainer) {
-            // Atualiza os dados já conhecidos (apenas alguns são extraídos da API)
+            // Atualiza os dados de batimentos cardíacos
             exerciseMetrics = exerciseMetrics.update(data)
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
                 lastUpdateTime = currentTime
-                val metricsList = listOf(
-                    "HEART_RATE_BPM: ${exerciseMetrics.heartRate ?: "--"}",
-                    "CALORIAS: ${exerciseMetrics.calories ?: "--"}",
-                    "CALORIES_DAILY: ${exerciseMetrics.caloriesDaily ?: "--"}",
-                    "DISTÂNCIA_DAILY: ${exerciseMetrics.distanceDaily ?: "--"}",
-                    "DECLINE_DIST: ${exerciseMetrics.declineDist ?: "--"}",
-                    "DISTÂNCIA: ${exerciseMetrics.distance ?: "--"}",
-                    "ELEVATION_GAIN: ${exerciseMetrics.elevationGain ?: "--"}",
-                    "ELEVATION_LOSS: ${exerciseMetrics.elevationLoss ?: "--"}",
-                    "FLAT_GROUND_DIST: ${exerciseMetrics.flatGroundDist ?: "--"}",
-                    "Andares: ${exerciseMetrics.floors ?: "--"}",
-                    "FLOORS_DAILY: ${exerciseMetrics.floorsDaily ?: "--"}",
-                    "GOLF_SHOT_COUNT: ${exerciseMetrics.golfShotCount ?: "--"}",
-                    "INCLINE_DIST: ${exerciseMetrics.inclineDist ?: "--"}",
-                    "RITMO: ${exerciseMetrics.ritmo ?: "--"}",
-                    "REP_COUNT: ${exerciseMetrics.repCount ?: "--"}",
-                    "ETAPAS EM EXECUÇÃO: ${exerciseMetrics.executingStages ?: "--"}",
-                    "VELOCIDADE: ${exerciseMetrics.velocity ?: "--"}",
-                    "ETAPAS: ${exerciseMetrics.stages ?: "--"}",
-                    "STEPS_DAILY: ${exerciseMetrics.stepsDaily ?: "--"}",
-                    "ETAPAS_PER_MINUTO: ${exerciseMetrics.stagesPerMinute ?: "--"}",
-                    "SWIMMING_LAP_COUNT: ${exerciseMetrics.swimmingLapCount ?: "--"}",
-                    "SWIMMING_STROKES: ${exerciseMetrics.swimmingStrokes ?: "--"}",
-                    "CALORIES_TOTAL: ${exerciseMetrics.caloriesTotal ?: "--"}",
-                    "WALKING_STEPS: ${exerciseMetrics.walkingSteps ?: "--"}",
-                    "UserActivityInfo: ${exerciseMetrics.userActivityInfo ?: "--"}",
-                    "UserActivityState: ${exerciseMetrics.userActivityState ?: "--"}",
-                    "ACTIVITY_RECOGNITION: ${exerciseMetrics.activityRecognition ?: "--"}",
-                    "VO2_MAX: ${exerciseMetrics.vo2Max ?: "--"}",
-                    "ELEVAÇÃO ABSOLUTA: ${exerciseMetrics.elevationAbsolute ?: "--"}",
-                    "LOCAL: ${exerciseMetrics.local ?: "--"}",
-                )
-                runOnUiThread {
-                    metricPagerAdapter.updateMetrics(metricsList)
-                }
+                updateMetricsDisplay()
             }
         }
 
@@ -123,40 +118,12 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Inicializa ViewPager2 e adapter com valores iniciais (todos “--”)
+        // Inicializa ViewPager2 e adapter com valores iniciais
         viewPagerMetrics = findViewById(R.id.viewPagerMetrics)
         metricPagerAdapter = MetricPagerAdapter(
             listOf(
-                "HEART_RATE_BPM: --",
-                "CALORIAS: --",
-                "CALORIES_DAILY: --",
-                "DISTÂNCIA_DAILY: --",
-                "DECLINE_DIST: --",
-                "DISTÂNCIA: --",
-                "ELEVATION_GAIN: --",
-                "ELEVATION_LOSS: --",
-                "FLAT_GROUND_DIST: --",
-                "Andares: --",
-                "FLOORS_DAILY: --",
-                "GOLF_SHOT_COUNT: --",
-                "INCLINE_DIST: --",
-                "RITMO: --",
-                "REP_COUNT: --",
-                "ETAPAS EM EXECUÇÃO: --",
-                "VELOCIDADE: --",
-                "ETAPAS: --",
-                "STEPS_DAILY: --",
-                "ETAPAS_PER_MINUTO: --",
-                "SWIMMING_LAP_COUNT: --",
-                "SWIMMING_STROKES: --",
-                "CALORIES_TOTAL: --",
-                "WALKING_STEPS: --",
-                "UserActivityInfo: --",
-                "UserActivityState: --",
-                "VO2_MAX: --",
-                "ELEVAÇÃO ABSOLUTA: --",
-                "LOCAL: --",
-                "ACCESS_FINE_LOCATION: --"
+                "BATIMENTOS CARDÍACOS: --",
+                "NÍVEL DA BATERIA: --%"
             )
         )
         viewPagerMetrics.adapter = metricPagerAdapter
@@ -176,6 +143,9 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        // Registra o receptor de bateria
+        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
     }
 
     override fun onResume() {
@@ -184,6 +154,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Desregistra o receptor de bateria quando a atividade é destruída
+        unregisterReceiver(batteryReceiver)
     }
 
     private fun checkPermissions() {

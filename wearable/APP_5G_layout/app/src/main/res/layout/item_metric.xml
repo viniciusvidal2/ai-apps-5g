@@ -2,14 +2,17 @@
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:padding="16dp"
+    android:background="@android:color/black">
 
     <TextView
         android:id="@+id/textViewMetric"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:text="Metric Value"
-        android:textColor="@android:color/holo_red_dark"
-        android:textSize="24sp"
+        android:textColor="@android:color/white"
+        android:textSize="30sp"
+        android:textStyle="bold"
         android:gravity="center" />
 </FrameLayout>

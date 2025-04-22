@@ -151,10 +151,15 @@ class MqttHandler(
         }
         
         try {
+            // Obter hora atual
+            val currentTimestamp = System.currentTimeMillis()
+            
             val jsonPayload = JSONObject().apply {
                 put("heart_rate", heartRate ?: 0)
                 put("battery", batteryLevel ?: 0)
                 put("seconds_measure", secondsMeasure)
+                put("date", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", 
+                    java.util.Locale.getDefault()).format(java.util.Date(currentTimestamp)))
             }
             
             val payload = jsonPayload.toString().toByteArray()

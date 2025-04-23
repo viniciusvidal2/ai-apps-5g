@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     
     <!-- Permissões para conectividade MQTT -->
@@ -15,6 +16,12 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- Permissão para serviço em primeiro plano -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    
+    <!-- Permissão para iniciar automaticamente após reinicialização -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature
         android:name="android.hardware.type.watch"
@@ -35,6 +42,24 @@
         <!-- Serviço MQTT Eclipse Paho -->
         <!-- Removido pois estamos usando MqttAsyncClient ao invés de MqttAndroidClient -->
         <!-- <service android:name="org.eclipse.paho.android.service.MqttService" /> -->
+        
+        <!-- Serviço de monitoramento em segundo plano -->
+        <service 
+            android:name=".MonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+            
+        <!-- Receptor para inicialização do dispositivo -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"

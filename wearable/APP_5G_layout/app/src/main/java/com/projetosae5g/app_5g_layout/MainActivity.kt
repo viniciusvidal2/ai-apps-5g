@@ -12,6 +12,8 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import android.widget.Switch
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.core.app.ActivityCompat
 import androidx.health.services.client.HealthServices
@@ -37,8 +39,10 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonIncrease: Button
     private lateinit var buttonDecrease: Button
     private lateinit var buttonMqttConfig: Button
+    private lateinit var switchBackground: Switch
     private var measurementInterval: Long = 1 // segundos
     private var lastUpdateTime: Long = 0  // em milissegundos
+    private var isServiceRunning = false
 
     // ViewPager2 e adapter para métricas
     private lateinit var viewPagerMetrics: ViewPager2
@@ -46,6 +50,9 @@ class MainActivity : ComponentActivity() {
 
     // MqttHandler
     private lateinit var mainApplication: MainApplication
+    
+    // Código de solicitação de permissão
+    private val PERMISSIONS_REQUEST_CODE = 1001
     
     // BroadcastReceiver para monitorar o nível da bateria
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -104,16 +111,34 @@ class MainActivity : ComponentActivity() {
         buttonIncrease = findViewById(R.id.buttonIncrease)
         buttonDecrease = findViewById(R.id.buttonDecrease)
         buttonMqttConfig = findViewById(R.id.buttonMqttConfig)
+        switchBackground = findViewById(R.id.switchBackground)
+        
+        // Carregar preferências salvas
+        val sharedPreferences = getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+        val savedInterval = sharedPreferences.getLong("measurement_interval", 1)
+        val savedAutoStart = sharedPreferences.getBoolean("service_auto_start", false)
+        
+        // Aplicar preferências carregadas
+        measurementInterval = savedInterval
+        editTextInterval.setText(measurementInterval.toString())
+        switchBackground.isChecked = savedAutoStart
+        
+        // Se o modo de inicialização automática estiver ativado, iniciar o serviço
+        if (savedAutoStart && !isServiceRunning && mainApplication.mqttHandler.isConnected()) {
+            startBackgroundService()
+        }
 
         buttonIncrease.setOnClickListener {
             measurementInterval++
             editTextInterval.setText(measurementInterval.toString())
+            savePreferences()
         }
         
         buttonDecrease.setOnClickListener {
             if (measurementInterval > 1) {
                 measurementInterval--
                 editTextInterval.setText(measurementInterval.toString())
+                savePreferences()
             }
         }
         
@@ -122,6 +147,7 @@ class MainActivity : ComponentActivity() {
                 val newInterval = editTextInterval.text.toString().toLongOrNull()
                 if (newInterval != null && newInterval >= 1) {
                     measurementInterval = newInterval
+                    savePreferences()
                 } else {
                     editTextInterval.setText(measurementInterval.toString())
                 }
@@ -132,6 +158,23 @@ class MainActivity : ComponentActivity() {
         buttonMqttConfig.setOnClickListener {
             val intent = Intent(this, MqttConfigActivity::class.java)
             startActivity(intent)
+        }
+        
+        // Configura switch de serviço em segundo plano
+        switchBackground.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                if (hasRequiredPermissions()) {
+                    startBackgroundService()
+                } else {
+                    // Se não tem permissões, solicitar e reverter o switch
+                    switchBackground.isChecked = false
+                    requestRequiredPermissions()
+                    Toast.makeText(this, "É necessário conceder as permissões primeiro", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                stopBackgroundService()
+            }
+            savePreferences()
         }
 
         // Inicializa ViewPager2 e adapter com valores iniciais
@@ -162,9 +205,95 @@ class MainActivity : ComponentActivity() {
 
         // Registra o receptor de bateria
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    }
+    
+    // Verificar se todas as permissões necessárias foram concedidas
+    private fun hasRequiredPermissions(): Boolean {
+        // Verificar a permissão de FOREGROUND_SERVICE_HEALTH (obrigatória)
+        val hasForegroundServiceHealth = ActivityCompat.checkSelfPermission(
+            this, 
+            Manifest.permission.FOREGROUND_SERVICE_HEALTH
+        ) == PackageManager.PERMISSION_GRANTED
         
-        // Não iniciar a publicação MQTT automaticamente para evitar falhas
-        // Isso será iniciado após o usuário configurar e conectar o MQTT
+        // Verificar pelo menos uma das permissões opcionais
+        val hasActivityRecognition = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACTIVITY_RECOGNITION
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasBodySensors = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.BODY_SENSORS
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasHighSamplingRateSensors = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.HIGH_SAMPLING_RATE_SENSORS
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        // Precisa da permissão obrigatória E pelo menos uma das opcionais
+        return hasForegroundServiceHealth && (hasActivityRecognition || hasBodySensors || hasHighSamplingRateSensors)
+    }
+    
+    // Salvar preferências para inicialização automática
+    private fun savePreferences() {
+        val sharedPreferences = getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
+        sharedPreferences.edit().apply {
+            putLong("measurement_interval", measurementInterval)
+            putBoolean("service_auto_start", switchBackground.isChecked)
+            apply()
+        }
+    }
+    
+    // Método para iniciar o serviço em segundo plano
+    private fun startBackgroundService() {
+        if (!isServiceRunning) {
+            if (mainApplication.mqttHandler.isConnected()) {
+                // Verificar se todas as permissões necessárias foram concedidas
+                if (hasRequiredPermissions()) {
+                    Log.d("MainActivity", "Iniciando serviço em segundo plano...")
+                    
+                    val serviceIntent = Intent(this, MonitorService::class.java).apply {
+                        putExtra("interval", measurementInterval)
+                    }
+                    
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(serviceIntent)
+                        } else {
+                            startService(serviceIntent)
+                        }
+                        
+                        isServiceRunning = true
+                        Toast.makeText(this, "Serviço em segundo plano iniciado", Toast.LENGTH_SHORT).show()
+                    } catch (e: Exception) {
+                        Log.e("MainActivity", "Erro ao iniciar serviço", e)
+                        Toast.makeText(this, "Erro ao iniciar serviço: ${e.message}", Toast.LENGTH_LONG).show()
+                        switchBackground.isChecked = false
+                        savePreferences()
+                    }
+                } else {
+                    switchBackground.isChecked = false
+                    savePreferences()
+                    requestRequiredPermissions()
+                    Toast.makeText(this, "É necessário conceder as permissões para executar em segundo plano", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                switchBackground.isChecked = false
+                savePreferences()
+                Toast.makeText(this, "Conecte ao servidor MQTT primeiro", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    
+    // Método para parar o serviço em segundo plano
+    private fun stopBackgroundService() {
+        if (isServiceRunning) {
+            Log.d("MainActivity", "Parando serviço em segundo plano...")
+            stopService(Intent(this, MonitorService::class.java))
+            isServiceRunning = false
+            Toast.makeText(this, "Serviço em segundo plano parado", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onResume() {
@@ -195,19 +324,81 @@ class MainActivity : ComponentActivity() {
             secondsMeasureProvider = { measurementInterval }
         )
     }
-
-    private fun checkPermissions() {
-        val permissionsNeeded = mutableListOf<String>()
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) != PackageManager.PERMISSION_GRANTED) {
-            permissionsNeeded.add(Manifest.permission.BODY_SENSORS)
+    
+    // Solicitar todas as permissões necessárias
+    private fun requestRequiredPermissions() {
+        val permissionsToRequest = mutableListOf<String>()
+        
+        // Verificar a permissão obrigatória
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_HEALTH) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE_HEALTH)
         }
+        
+        // Verificar permissões de sensores
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.BODY_SENSORS)
+        }
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
-                permissionsNeeded.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
             }
         }
-        if (permissionsNeeded.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, permissionsNeeded.toTypedArray(), 1001)
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) 
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
         }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS_BACKGROUND) 
+                != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.BODY_SENSORS_BACKGROUND)
+            }
+        }
+        
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this, 
+                permissionsToRequest.toTypedArray(), 
+                PERMISSIONS_REQUEST_CODE
+            )
+        }
+    }
+
+    // Gerenciar o resultado da solicitação de permissões
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                // Todas as permissões foram concedidas
+                if (switchBackground.isChecked) {
+                    startBackgroundService()
+                }
+            } else {
+                // Alguma permissão foi negada
+                Toast.makeText(
+                    this,
+                    "As permissões são necessárias para executar o serviço em segundo plano",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                // Desmarcar o switch se estiver marcado
+                switchBackground.isChecked = false
+                savePreferences()
+            }
+        }
+    }
+    
+    private fun checkPermissions() {
+        requestRequiredPermissions()
     }
 }

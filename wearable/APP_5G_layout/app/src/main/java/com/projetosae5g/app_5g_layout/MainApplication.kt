@@ -51,7 +51,7 @@ class MainApplication : Application() {
             }
             
             // Agendar próxima publicação em 60 segundos
-            publishHandler.postDelayed(mqttPublishRunnable!!, 60 * 1000)
+            publishHandler.postDelayed(mqttPublishRunnable!!, 10 * 1000)
         }
         
         // Iniciar o ciclo de publicação

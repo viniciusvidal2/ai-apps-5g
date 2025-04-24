@@ -10,6 +10,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Switch
@@ -40,9 +41,11 @@ class MainActivity : ComponentActivity() {
     private lateinit var buttonDecrease: Button
     private lateinit var buttonMqttConfig: Button
     private lateinit var switchBackground: Switch
+    private lateinit var switchKeepScreenOn: Switch
     private var measurementInterval: Long = 1 // segundos
     private var lastUpdateTime: Long = 0  // em milissegundos
     private var isServiceRunning = false
+    private var keepScreenOn = false // flag para tela sempre ligada
 
     // ViewPager2 e adapter para métricas
     private lateinit var viewPagerMetrics: ViewPager2
@@ -112,16 +115,27 @@ class MainActivity : ComponentActivity() {
         buttonDecrease = findViewById(R.id.buttonDecrease)
         buttonMqttConfig = findViewById(R.id.buttonMqttConfig)
         switchBackground = findViewById(R.id.switchBackground)
+        switchKeepScreenOn = findViewById(R.id.switchKeepScreenOn)
         
         // Carregar preferências salvas
         val sharedPreferences = getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
         val savedInterval = sharedPreferences.getLong("measurement_interval", 1)
         val savedAutoStart = sharedPreferences.getBoolean("service_auto_start", false)
+        val savedKeepScreenOn = sharedPreferences.getBoolean("keep_screen_on", false)
         
         // Aplicar preferências carregadas
         measurementInterval = savedInterval
         editTextInterval.setText(measurementInterval.toString())
         switchBackground.isChecked = savedAutoStart
+        switchKeepScreenOn.isChecked = savedKeepScreenOn
+        
+        // Aplicar configuração de tela ligada se necessário
+        keepScreenOn = savedKeepScreenOn
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
         
         // Se o modo de inicialização automática estiver ativado, iniciar o serviço
         if (savedAutoStart && !isServiceRunning && mainApplication.mqttHandler.isConnected()) {
@@ -173,6 +187,21 @@ class MainActivity : ComponentActivity() {
                 }
             } else {
                 stopBackgroundService()
+            }
+            savePreferences()
+        }
+
+        // Configura switch para manter a tela ligada
+        switchKeepScreenOn.setOnCheckedChangeListener { _, isChecked ->
+            keepScreenOn = isChecked
+            if (isChecked) {
+                // Manter a tela sempre ligada
+                window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Toast.makeText(this, "Tela sempre ligada ativada", Toast.LENGTH_SHORT).show()
+            } else {
+                // Permitir que a tela apague normalmente
+                window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                Toast.makeText(this, "Tela sempre ligada desativada", Toast.LENGTH_SHORT).show()
             }
             savePreferences()
         }
@@ -241,6 +270,7 @@ class MainActivity : ComponentActivity() {
         sharedPreferences.edit().apply {
             putLong("measurement_interval", measurementInterval)
             putBoolean("service_auto_start", switchBackground.isChecked)
+            putBoolean("keep_screen_on", keepScreenOn)
             apply()
         }
     }
@@ -298,6 +328,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Aplicar configuração de tela ligada, caso tenha mudado
+        if (keepScreenOn) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        
         // Verificar status do MQTT e atualizar a UI se necessário
         if (mainApplication.mqttHandler.isConnected()) {
             // Se estiver conectado, iniciar a publicação de medições
@@ -327,43 +364,55 @@ class MainActivity : ComponentActivity() {
     
     // Solicitar todas as permissões necessárias
     private fun requestRequiredPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
+        val requiredPermissions = mutableListOf<String>()
         
-        // Verificar a permissão obrigatória
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_HEALTH) 
-            != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.FOREGROUND_SERVICE_HEALTH)
+        // Verificar e adicionar as permissões necessárias
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_HEALTH) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.FOREGROUND_SERVICE_HEALTH)
         }
         
-        // Verificar permissões de sensores
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) 
-            != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.BODY_SENSORS)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.BODY_SENSORS)
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) 
-                != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.ACTIVITY_RECOGNITION)
-            }
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
         }
         
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) 
-            != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS_BACKGROUND) 
-                != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.BODY_SENSORS_BACKGROUND)
-            }
+        // Permissões para Wi-Fi
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
         
-        if (permissionsToRequest.isNotEmpty()) {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_WIFI_STATE) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.CHANGE_WIFI_STATE)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_NETWORK_STATE) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.CHANGE_NETWORK_STATE)
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+        
+        if (requiredPermissions.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 this, 
-                permissionsToRequest.toTypedArray(), 
+                requiredPermissions.toTypedArray(),
                 PERMISSIONS_REQUEST_CODE
             )
         }

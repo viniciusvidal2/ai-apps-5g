@@ -26,7 +26,7 @@ class MonitorService : Service() {
     
     private lateinit var measureClient: MeasureClient
     private var exerciseMetrics = ExerciseMetrics()
-    private var measurementInterval: Long = 10 // segundos (padrão para envio)
+    private var measurementInterval: Long = 60 // segundos (padrão para envio)
     private val serviceScope = CoroutineScope(Dispatchers.Default)
     
     private lateinit var mainApplication: MainApplication

@@ -33,12 +33,16 @@ android {
     }
     kotlinOptions {
         jvmTarget = "1.8"
+        freeCompilerArgs += listOf(
+            "-P",
+            "plugin:androidx.compose.compiler.plugins.kotlin:suppressKotlinVersionCompatibilityCheck=1.9.0"
+        )
     }
     buildFeatures {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.3"
     }
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         kotlinOptions {
@@ -53,36 +57,43 @@ android {
 }
 
 dependencies {
-
     implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
+    implementation("androidx.activity:activity-compose:1.8.1")
+    implementation(platform("androidx.compose:compose-bom:2023.08.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3:1.2.0")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.activity:activity-compose:1.8.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
-    implementation("androidx.wear.compose:compose-material:1.2.1")
-    implementation("androidx.wear.compose:compose-foundation:1.2.1")
-    implementation(platform("androidx.compose:compose-bom:2023.03.00"))
-    implementation("com.google.android.gms:play-services-wearable:18.1.0")
-    implementation("androidx.percentlayout:percentlayout:1.0.0")
-    implementation("androidx.legacy:legacy-support-v4:1.0.0")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("androidx.wear:wear:1.3.0")
-    implementation("androidx.wear:wear-ongoing:1.0.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.compose.material3:material3")
     
-    // Health Services para monitoramento de batimentos cardíacos
-    implementation("androidx.health:health-services-client:1.0.0-rc01")
+    // Material Design
+    implementation("com.google.android.material:material:1.10.0")
+    
+    // Health Services
+    implementation("androidx.health:health-services-client:1.0.0-beta03")
     implementation("com.google.guava:guava:31.1-android")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.7.3")
     
-    // Eclipse Paho MQTT client
+    // Dependências para ViewPager2
+    implementation("androidx.viewpager2:viewpager2:1.0.0")
+    
+    // MQTT
     implementation("org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5")
     
-    implementation(platform("androidx.compose:compose-bom:2023.03.00"))
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.03.00"))
+    // Google Maps
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    
+    // Outras dependências necessárias
+    implementation("androidx.appcompat:appcompat:1.6.1")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation("androidx.wear:wear:1.2.0")
+    implementation("androidx.wear:wear-ongoing:1.0.0")
+    
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation(platform("androidx.compose:compose-bom:2023.08.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

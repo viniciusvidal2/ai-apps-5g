@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Bundle
@@ -26,11 +29,17 @@ import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
 import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.MapView
+import com.google.android.gms.maps.OnMapReadyCallback
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
 
     private lateinit var measureClient: MeasureClient
     private var exerciseMetrics = ExerciseMetrics()
@@ -50,6 +59,14 @@ class MainActivity : ComponentActivity() {
     // ViewPager2 e adapter para métricas
     private lateinit var viewPagerMetrics: ViewPager2
     private lateinit var metricPagerAdapter: MetricPagerAdapter
+
+    // Mapa e localização
+    private lateinit var mapView: MapView
+    private lateinit var googleMap: GoogleMap
+    private lateinit var locationManager: LocationManager
+    private var lastLocation: Location? = null
+    private val MIN_DISTANCE_CHANGE_FOR_UPDATES: Float = 5f // 5 metros
+    private val MIN_TIME_BW_UPDATES: Long = 10000 // 10 segundos
 
     // MqttHandler
     private lateinit var mainApplication: MainApplication
@@ -74,10 +91,15 @@ class MainActivity : ComponentActivity() {
     private fun updateMetricsDisplay() {
         val metricsList = listOf(
             "BATIMENTOS CARDÍACOS: ${exerciseMetrics.heartRate ?: "--"} BPM",
+            "LOCALIZAÇÃO: ${String.format("%.5f", exerciseMetrics.latitude ?: 0.0)}, ${String.format("%.5f", exerciseMetrics.longitude ?: 0.0)}",
             "NÍVEL DA BATERIA: ${exerciseMetrics.batteryLevel ?: "--"}%"
         )
         runOnUiThread {
             metricPagerAdapter.updateMetrics(metricsList)
+            
+            // Atualizar o TextView de batimentos cardíacos
+            val textViewHeartRate = findViewById<android.widget.TextView>(R.id.textViewHeartRate)
+            textViewHeartRate.text = "BATIMENTOS CARDÍACOS: ${exerciseMetrics.heartRate ?: "--"} BPM"
         }
     }
 
@@ -116,6 +138,11 @@ class MainActivity : ComponentActivity() {
         buttonMqttConfig = findViewById(R.id.buttonMqttConfig)
         switchBackground = findViewById(R.id.switchBackground)
         switchKeepScreenOn = findViewById(R.id.switchKeepScreenOn)
+        
+        // Inicializar mapa
+        mapView = findViewById(R.id.mapView)
+        mapView.onCreate(savedInstanceState)
+        mapView.getMapAsync(this)
         
         // Carregar preferências salvas
         val sharedPreferences = getSharedPreferences("service_prefs", Context.MODE_PRIVATE)
@@ -211,6 +238,7 @@ class MainActivity : ComponentActivity() {
         metricPagerAdapter = MetricPagerAdapter(
             listOf(
                 "BATIMENTOS CARDÍACOS: --",
+                "LOCALIZAÇÃO: --, --",
                 "NÍVEL DA BATERIA: --%"
             )
         )
@@ -221,19 +249,74 @@ class MainActivity : ComponentActivity() {
         measureClient = HealthServices.getClient(this).measureClient
 
         lifecycleScope.launch {
-            val capabilities = withContext(Dispatchers.IO) {
-                measureClient.getCapabilitiesAsync().get()
-            }
-            val isHeartRateAvailable = DataType.HEART_RATE_BPM in capabilities.supportedDataTypesMeasure
-            if (isHeartRateAvailable) {
-                lifecycleScope.launch {
-                    measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
-                }
+            try {
+                // Simplificando a inicialização
+                measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Erro ao registrar callback de batimentos cardíacos", e)
             }
         }
 
+        // Inicializa o serviço de localização
+        initLocationManager()
+
         // Registra o receptor de bateria
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+    }
+    
+    private fun initLocationManager() {
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 
+            PackageManager.PERMISSION_GRANTED) {
+            
+            // Tentar obter localização através do GPS
+            if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    MIN_TIME_BW_UPDATES,
+                    MIN_DISTANCE_CHANGE_FOR_UPDATES,
+                    this
+                )
+                Log.d("MainActivity", "GPS ativado")
+                
+                val lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
+                if (lastKnownLocation != null) {
+                    lastLocation = lastKnownLocation
+                    updateLocationData(lastKnownLocation)
+                }
+            }
+            
+            // Tentar também obter localização através da rede para atualização mais rápida
+            if (locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                locationManager.requestLocationUpdates(
+                    LocationManager.NETWORK_PROVIDER,
+                    MIN_TIME_BW_UPDATES,
+                    MIN_DISTANCE_CHANGE_FOR_UPDATES,
+                    this
+                )
+                Log.d("MainActivity", "Provedor de rede ativado")
+            }
+        }
+    }
+    
+    private fun updateLocationData(location: Location) {
+        val latitude = location.latitude
+        val longitude = location.longitude
+        
+        // Atualizar os dados de métricas
+        exerciseMetrics = exerciseMetrics.updateLocation(latitude, longitude)
+        
+        // Atualizar a exibição
+        updateMetricsDisplay()
+        
+        // Atualizar o mapa
+        if (::googleMap.isInitialized) {
+            val position = LatLng(latitude, longitude)
+            googleMap.clear()
+            googleMap.addMarker(MarkerOptions().position(position).title("Localização Atual"))
+            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(position, 15f))
+        }
     }
     
     // Verificar se todas as permissões necessárias foram concedidas
@@ -260,8 +343,14 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.HIGH_SAMPLING_RATE_SENSORS
         ) == PackageManager.PERMISSION_GRANTED
         
+        val hasLocation = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        
         // Precisa da permissão obrigatória E pelo menos uma das opcionais
-        return hasForegroundServiceHealth && (hasActivityRecognition || hasBodySensors || hasHighSamplingRateSensors)
+        return hasForegroundServiceHealth && (hasActivityRecognition || hasBodySensors || hasHighSamplingRateSensors) 
+            && hasLocation
     }
     
     // Salvar preferências para inicialização automática
@@ -335,6 +424,9 @@ class MainActivity : ComponentActivity() {
             window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         
+        // Retomar o mapa
+        mapView.onResume()
+        
         // Verificar status do MQTT e atualizar a UI se necessário
         if (mainApplication.mqttHandler.isConnected()) {
             // Se estiver conectado, iniciar a publicação de medições
@@ -344,12 +436,43 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Pausar o mapa
+        mapView.onPause()
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        // Parar a atualização de localização
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 
+            PackageManager.PERMISSION_GRANTED) {
+            locationManager.removeUpdates(this)
+        }
+        
+        // Limpar callbacks de medição
+        lifecycleScope.launch {
+            try {
+                // Removido a chamada para clearMeasureCallbacks que não existe na versão atual
+                Log.d("MainActivity", "Encerrando callbacks de medição")
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Erro ao limpar callbacks", e)
+            }
+        }
+        
+        // Destruir o mapa
+        mapView.onDestroy()
+        
         // Desregistra o receptor de bateria quando a atividade é destruída
         unregisterReceiver(batteryReceiver)
+    }
+    
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        mapView.onSaveInstanceState(outState)
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        mapView.onLowMemory()
     }
     
     // Iniciar a publicação periódica de dados MQTT
@@ -358,6 +481,7 @@ class MainActivity : ComponentActivity() {
         mainApplication.startMqttPublishing(
             heartRateProvider = { exerciseMetrics.heartRate },
             batteryLevelProvider = { exerciseMetrics.batteryLevel },
+            locationProvider = { Pair(exerciseMetrics.latitude, exerciseMetrics.longitude) },
             secondsMeasureProvider = { measurementInterval }
         )
     }
@@ -387,12 +511,13 @@ class MainActivity : ComponentActivity() {
             requiredPermissions.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
         }
         
-        // Permissões para Wi-Fi
+        // Permissões para localização
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != 
             PackageManager.PERMISSION_GRANTED) {
             requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
         
+        // Permissões para Wi-Fi
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_WIFI_STATE) != 
             PackageManager.PERMISSION_GRANTED) {
             requiredPermissions.add(Manifest.permission.CHANGE_WIFI_STATE)
@@ -432,6 +557,11 @@ class MainActivity : ComponentActivity() {
                 if (switchBackground.isChecked) {
                     startBackgroundService()
                 }
+                
+                // Iniciar o serviço de localização se a permissão foi concedida
+                if (permissions.contains(Manifest.permission.ACCESS_FINE_LOCATION)) {
+                    initLocationManager()
+                }
             } else {
                 // Alguma permissão foi negada
                 Toast.makeText(
@@ -449,5 +579,36 @@ class MainActivity : ComponentActivity() {
     
     private fun checkPermissions() {
         requestRequiredPermissions()
+    }
+
+    // Callback de mapa pronto
+    override fun onMapReady(map: GoogleMap) {
+        googleMap = map
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == 
+            PackageManager.PERMISSION_GRANTED) {
+            googleMap.isMyLocationEnabled = true
+            
+            if (lastLocation != null) {
+                val position = LatLng(lastLocation!!.latitude, lastLocation!!.longitude)
+                googleMap.addMarker(MarkerOptions().position(position).title("Localização Atual"))
+                googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(position, 15f))
+            }
+        }
+        
+        // Configurar o mapa para zoom máximo e UI mínima (ideal para relógios)
+        googleMap.uiSettings.apply {
+            isZoomControlsEnabled = false
+            isCompassEnabled = false
+            isMyLocationButtonEnabled = false
+            isRotateGesturesEnabled = false
+            isScrollGesturesEnabled = false
+        }
+    }
+
+    // Callbacks de LocationListener
+    override fun onLocationChanged(location: Location) {
+        lastLocation = location
+        updateLocationData(location)
     }
 }

@@ -81,8 +81,6 @@
             app:layout_constraintTop_toBottomOf="@id/buttonMqttConfig" />
             
         <!-- Switch para manter a tela sempre ligada -->
-
-        <!-- ViewPager2 para exibir as métricas -->
         <Switch
             android:id="@+id/switchKeepScreenOn"
             android:layout_width="wrap_content"
@@ -95,13 +93,43 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/switchBackground" />
 
+        <!-- MapView para exibição da localização atual -->
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            app:layout_constraintTop_toBottomOf="@id/switchKeepScreenOn"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- TextView para exibir os batimentos cardíacos logo abaixo do mapa -->
+        <TextView
+            android:id="@+id/textViewHeartRate"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:textColor="@android:color/white"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:textAlignment="center"
+            android:text="BATIMENTOS CARDÍACOS: -- BPM"
+            app:layout_constraintTop_toBottomOf="@id/mapView"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- ViewPager2 para exibir as métricas com rolagem vertical -->
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/viewPagerMetrics"
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_marginTop="8dp"
             android:layout_marginBottom="16dp"
-            app:layout_constraintTop_toBottomOf="@id/switchKeepScreenOn"
+            app:layout_constraintTop_toBottomOf="@id/textViewHeartRate"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />

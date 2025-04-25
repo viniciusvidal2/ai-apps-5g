@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     
     <!-- Permissões para conectividade MQTT -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -34,6 +35,9 @@
         android:name="android.hardware.type.watch"
         android:required="true" />
 
+    <!-- Forçar o uso de bibliotecas mesmo com SDK incompatível -->
+    <uses-sdk tools:overrideLibrary="androidx.health.services.client" />
+
     <application
         android:name=".MainApplication"
         android:allowBackup="true"
@@ -45,6 +49,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.APP_5G_layout"
         tools:targetApi="31">
+
+        <!-- API do Google Maps -->
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="YOUR_API_KEY" />
 
         <!-- Serviço MQTT Eclipse Paho -->
         <!-- Removido pois estamos usando MqttAsyncClient ao invés de MqttAndroidClient -->

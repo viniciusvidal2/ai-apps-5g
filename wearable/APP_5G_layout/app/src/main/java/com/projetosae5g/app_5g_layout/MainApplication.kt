@@ -111,7 +111,12 @@ class MainApplication : Application() {
     }
     
     // Iniciar a publicação periódica de medições (chamado pela MainActivity)
-    fun startMqttPublishing(heartRateProvider: () -> Double?, batteryLevelProvider: () -> Int?, secondsMeasureProvider: () -> Long) {
+    fun startMqttPublishing(
+        heartRateProvider: () -> Double?,
+        batteryLevelProvider: () -> Int?,
+        locationProvider: () -> Pair<Double?, Double?>?,
+        secondsMeasureProvider: () -> Long
+    ) {
         // Parar qualquer publicação existente
         stopMqttPublishing()
         
@@ -128,11 +133,12 @@ class MainApplication : Application() {
                     // Obter os dados mais recentes
                     val heartRate = heartRateProvider()
                     val batteryLevel = batteryLevelProvider()
+                    val location = locationProvider()
                     val secondsMeasure = secondsMeasureProvider()
                     
                     // Publicar os dados
-                    mqttHandler.publishMeasurements(heartRate, batteryLevel, secondsMeasure)
-                    Log.d("MainApplication", "Dados MQTT publicados: HR=$heartRate, Bateria=$batteryLevel, Intervalo=$secondsMeasure")
+                    mqttHandler.publishMeasurements(heartRate, batteryLevel, location?.first, location?.second, secondsMeasure)
+                    Log.d("MainApplication", "Dados MQTT publicados: HR=$heartRate, Bateria=$batteryLevel, Lat=${location?.first}, Lon=${location?.second}, Intervalo=$secondsMeasure")
                 } else {
                     // Tentar reconectar o MQTT sem interferir na conexão Wi-Fi atual
                     Log.d("MainApplication", "Wi-Fi conectado, mas MQTT desconectado. Reconectando MQTT...")
@@ -144,8 +150,9 @@ class MainApplication : Application() {
                 }
             }
             
-            // Agendar próxima publicação em 60 segundos
-            publishHandler.postDelayed(mqttPublishRunnable!!, 60 * 1000)
+            // Agendar próxima publicação baseado no intervalo de medição
+            val intervalMillis = secondsMeasureProvider() * 1000
+            publishHandler.postDelayed(mqttPublishRunnable!!, intervalMillis)
         }
         
         // Iniciar o ciclo de publicação

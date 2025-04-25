@@ -6,17 +6,22 @@ import androidx.health.services.client.data.DataType
 
 data class ExerciseMetrics(
     val heartRate: Double? = null,
-    val batteryLevel: Int? = null
+    val batteryLevel: Int? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 ) {
-    fun update(latestMetrics: DataPointContainer): ExerciseMetrics {
-        // Extrai apenas os dados de batimentos cardíacos
-        val heartRateData = latestMetrics.getData(DataType.HEART_RATE_BPM)
-        val newHeartRate = heartRateData.lastOrNull()?.value ?: heartRate
-        Log.d("ExerciseMetrics", "heartRateData: $heartRateData, newHeartRate: $newHeartRate")
-
-        return copy(
-            heartRate = newHeartRate
-            // O nível da bateria será atualizado separadamente
-        )
+    fun update(data: DataPointContainer): ExerciseMetrics {
+        // Processa apenas os dados de batimentos cardíacos
+        val points = data.getData(DataType.HEART_RATE_BPM)
+        return if (points.isNotEmpty()) {
+            copy(heartRate = points[0].value)
+        } else {
+            this
+        }
+    }
+    
+    // Método para atualizar as coordenadas GPS
+    fun updateLocation(lat: Double?, lon: Double?): ExerciseMetrics {
+        return copy(latitude = lat, longitude = lon)
     }
 }

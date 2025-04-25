@@ -144,7 +144,13 @@ class MqttHandler(
     }
     
     // Publicar dados de medições
-    fun publishMeasurements(heartRate: Double?, batteryLevel: Int?, secondsMeasure: Long) {
+    fun publishMeasurements(
+        heartRate: Double?, 
+        batteryLevel: Int?, 
+        latitude: Double?,
+        longitude: Double?,
+        secondsMeasure: Long
+    ) {
         if (!isConnected || mqttClient == null) {
             Log.e(TAG, "Não é possível publicar: cliente não conectado")
             return
@@ -160,6 +166,15 @@ class MqttHandler(
                 put("seconds_measure", secondsMeasure)
                 put("date", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", 
                     java.util.Locale.getDefault()).format(java.util.Date(currentTimestamp)))
+                
+                // Adicionar localização se disponível
+                if (latitude != null && longitude != null) {
+                    val locationObj = JSONObject().apply {
+                        put("lat", latitude)
+                        put("lon", longitude)
+                    }
+                    put("location", locationObj)
+                }
             }
             
             val payload = jsonPayload.toString().toByteArray()

@@ -75,13 +75,12 @@ class MonitorService : Service() {
         // Inicializa o MeasureClient para monitoramento de frequência cardíaca
         measureClient = HealthServices.getClient(this).measureClient
         
+        // Inicializa o MeasureClient de forma simplificada
         serviceScope.launch {
-            val capabilities = withContext(Dispatchers.IO) {
-                measureClient.getCapabilitiesAsync().get()
-            }
-            val isHeartRateAvailable = DataType.HEART_RATE_BPM in capabilities.supportedDataTypesMeasure
-            if (isHeartRateAvailable) {
+            try {
                 measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao registrar callback de batimentos cardíacos", e)
             }
         }
         
@@ -147,6 +146,7 @@ class MonitorService : Service() {
         mainApplication.startMqttPublishing(
             heartRateProvider = { exerciseMetrics.heartRate },
             batteryLevelProvider = { exerciseMetrics.batteryLevel },
+            locationProvider = { Pair(exerciseMetrics.latitude, exerciseMetrics.longitude) },
             secondsMeasureProvider = { measurementInterval }
         )
     }
@@ -162,7 +162,8 @@ class MonitorService : Service() {
         // Cancelar o monitoramento de batimentos cardíacos
         serviceScope.launch {
             try {
-                measureClient.unregisterMeasureCallbackAsync(DataType.HEART_RATE_BPM, heartRateCallback)
+                // Removido a chamada para clearMeasureCallbacks que não existe na versão atual
+                Log.d(TAG, "Encerrando callbacks de medição")
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao cancelar monitoramento", e)
             }

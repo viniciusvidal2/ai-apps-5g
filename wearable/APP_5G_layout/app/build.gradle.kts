@@ -84,6 +84,9 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
     
+    // Recording API for step counting
+    implementation("com.google.android.gms:play-services-fitness:21.2.0")
+    
     // Outras dependências necessárias
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")

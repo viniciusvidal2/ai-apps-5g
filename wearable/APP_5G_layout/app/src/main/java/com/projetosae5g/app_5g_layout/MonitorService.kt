@@ -30,6 +30,7 @@ class MonitorService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Default)
     
     private lateinit var mainApplication: MainApplication
+    private lateinit var stepCounterService: StepCounterService
     
     // BroadcastReceiver para monitorar o nível da bateria
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -46,17 +47,79 @@ class MonitorService : Service() {
     
     // Callback de medição de frequência cardíaca
     private val heartRateCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de frequência cardíaca alterada: $availability")
+        }
+
         override fun onDataReceived(data: DataPointContainer) {
-            // Atualiza os dados de batimentos cardíacos
             exerciseMetrics = exerciseMetrics.update(data)
             updateNotification()
         }
+    }
+    
+    private val stepsCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de passos alterada: $availability")
+        }
 
-        override fun onAvailabilityChanged(
-            dataType: DeltaDataType<*, *>,
-            availability: Availability
-        ) {
-            Log.d(TAG, "onAvailabilityChanged: dataType=$dataType, availability=$availability")
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
+        }
+    }
+
+    private val distanceCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de distância alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
+        }
+    }
+
+    private val caloriesCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de calorias alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
+        }
+    }
+
+    private val speedCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de velocidade alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
+        }
+    }
+
+    private val elevationCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de elevação alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
+        }
+    }
+
+    private val paceCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de ritmo alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            updateNotification()
         }
     }
     
@@ -66,26 +129,78 @@ class MonitorService : Service() {
         
         mainApplication = application as MainApplication
         
+        // Inicializa o serviço de contagem de passos
+        stepCounterService = StepCounterService(this)
+        
+        // Inicia a subscrição para contagem de passos com a Recording API
+        serviceScope.launch {
+            if (stepCounterService.isGooglePlayServicesAvailable()) {
+                val success = stepCounterService.subscribeToStepCount()
+                if (success) {
+                    Log.d(TAG, "Subscrição para contagem de passos iniciada com sucesso")
+                    
+                    // Agenda atualizações periódicas da contagem de passos
+                    startStepCountUpdates()
+                } else {
+                    Log.e(TAG, "Falha ao iniciar subscrição para contagem de passos")
+                }
+            } else {
+                Log.w(TAG, "Google Play Services não disponível na versão necessária")
+            }
+        }
+        
         // Registra o receptor de bateria
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         
         // Cria o canal de notificação (para Android 8.0+)
         createNotificationChannel()
         
-        // Inicializa o MeasureClient para monitoramento de frequência cardíaca
+        // Inicializa o MeasureClient para monitoramento de métricas de saúde
         measureClient = HealthServices.getClient(this).measureClient
         
-        // Inicializa o MeasureClient de forma simplificada
+        // Registra todos os callbacks de métricas
         serviceScope.launch {
             try {
+                // Registrar callbacks de medição (exceto passos, que usará Recording API)
                 measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
+                // Mantemos o callback da Health Services API como fallback
+                measureClient.registerMeasureCallback(DataType.STEPS, stepsCallback)
+                measureClient.registerMeasureCallback(DataType.DISTANCE, distanceCallback)
+                measureClient.registerMeasureCallback(DataType.CALORIES, caloriesCallback)
+                measureClient.registerMeasureCallback(DataType.SPEED, speedCallback)
+                measureClient.registerMeasureCallback(DataType.ELEVATION_GAIN, elevationCallback)
+                measureClient.registerMeasureCallback(DataType.PACE, paceCallback)
+                
+                Log.d(TAG, "Todos os callbacks de medição registrados com sucesso")
             } catch (e: Exception) {
-                Log.e(TAG, "Erro ao registrar callback de batimentos cardíacos", e)
+                Log.e(TAG, "Erro ao registrar callbacks de medição", e)
+                e.printStackTrace()
             }
         }
         
         // Inicia a publicação MQTT se houver conexão
         startPublishingData()
+    }
+    
+    private fun startStepCountUpdates() {
+        serviceScope.launch {
+            while (true) {
+                try {
+                    val steps = stepCounterService.readStepCountData()
+                    if (steps > 0) {
+                        // Atualiza passos e calcula distância e calorias com base neles
+                        exerciseMetrics = exerciseMetrics.updateSteps(steps)
+                            .calculateDistanceFromSteps()
+                            .calculateCaloriesFromSteps()
+                        
+                        updateNotification()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao ler contagem de passos", e)
+                }
+                delay(60000) // Atualiza a cada minuto
+            }
+        }
     }
     
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -126,13 +241,19 @@ class MonitorService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Cria a notificação
+        // Cria a notificação com mais informações
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Monitorando Saúde")
-            .setContentText("FC: ${exerciseMetrics.heartRate ?: "--"} BPM | Bateria: ${exerciseMetrics.batteryLevel ?: "--"}%")
+            .setContentText("""
+                FC: ${exerciseMetrics.heartRate ?: "--"} BPM
+                Passos: ${exerciseMetrics.steps ?: "--"}
+                Distância: ${String.format("%.1f", exerciseMetrics.distance ?: 0.0)}m
+                Bateria: ${exerciseMetrics.batteryLevel ?: "--"}%
+            """.trimIndent())
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setStyle(NotificationCompat.BigTextStyle())
             .build()
     }
     
@@ -159,13 +280,18 @@ class MonitorService : Service() {
         super.onDestroy()
         Log.d(TAG, "Serviço destruído")
         
-        // Cancelar o monitoramento de batimentos cardíacos
+        // Cancelar o monitoramento de métricas
         serviceScope.launch {
             try {
-                // Removido a chamada para clearMeasureCallbacks que não existe na versão atual
-                Log.d(TAG, "Encerrando callbacks de medição")
+                // A API atual não suporta unregisterMeasureCallback
+                // Uma alternativa é cancelar as coroutines, o que faremos abaixo
+                Log.d(TAG, "Encerrando monitoramento de métricas")
+                
+                // Cancelar subscrição para contagem de passos
+                stepCounterService.unsubscribeFromStepCount()
             } catch (e: Exception) {
                 Log.e(TAG, "Erro ao cancelar monitoramento", e)
+                e.printStackTrace()
             }
         }
         
@@ -179,7 +305,7 @@ class MonitorService : Service() {
         // Parar a publicação MQTT
         mainApplication.stopMqttPublishing()
         
-        // Cancelar todas as coroutines
+        // Cancelar todas as coroutines (isso efetivamente interrompe o processamento dos callbacks)
         serviceScope.cancel()
     }
 } 

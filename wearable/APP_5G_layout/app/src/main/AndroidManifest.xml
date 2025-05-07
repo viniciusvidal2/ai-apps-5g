@@ -89,6 +89,10 @@
         <activity
             android:name=".MqttConfigActivity"
             android:exported="false" />
+            
+        <activity
+            android:name=".MetricsActivity"
+            android:exported="false" />
 
     </application>
 

@@ -28,7 +28,6 @@ import androidx.health.services.client.data.DataPointContainer
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
 import androidx.lifecycle.lifecycleScope
-import androidx.viewpager2.widget.ViewPager2
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
@@ -36,13 +35,19 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.appcompat.app.AlertDialog
+import androidx.viewpager2.widget.ViewPager2
 
 class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
+    private val TAG = "MainActivity"
 
     private lateinit var measureClient: MeasureClient
     private var exerciseMetrics = ExerciseMetrics()
+    private lateinit var viewPager: ViewPager2
+    private val stepCounterService by lazy { StepCounterService(this) }
 
     // Controles de tempo
     private lateinit var editTextInterval: EditText
@@ -51,14 +56,11 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
     private lateinit var buttonMqttConfig: Button
     private lateinit var switchBackground: Switch
     private lateinit var switchKeepScreenOn: Switch
+    private lateinit var buttonViewMetrics: Button
     private var measurementInterval: Long = 1 // segundos
     private var lastUpdateTime: Long = 0  // em milissegundos
     private var isServiceRunning = false
     private var keepScreenOn = false // flag para tela sempre ligada
-
-    // ViewPager2 e adapter para métricas
-    private lateinit var viewPagerMetrics: ViewPager2
-    private lateinit var metricPagerAdapter: MetricPagerAdapter
 
     // Mapa e localização
     private lateinit var mapView: MapView
@@ -89,24 +91,19 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
 
     // Atualiza a exibição das métricas
     private fun updateMetricsDisplay() {
-        val metricsList = listOf(
-            "BATIMENTOS CARDÍACOS: ${exerciseMetrics.heartRate ?: "--"} BPM",
-            "LOCALIZAÇÃO: ${String.format("%.5f", exerciseMetrics.latitude ?: 0.0)}, ${String.format("%.5f", exerciseMetrics.longitude ?: 0.0)}",
-            "NÍVEL DA BATERIA: ${exerciseMetrics.batteryLevel ?: "--"}%"
-        )
+        // Atualizar apenas o LiveData para a MetricsActivity
         runOnUiThread {
-            metricPagerAdapter.updateMetrics(metricsList)
-            
-            // Atualizar o TextView de batimentos cardíacos
-            val textViewHeartRate = findViewById<android.widget.TextView>(R.id.textViewHeartRate)
-            textViewHeartRate.text = "BATIMENTOS CARDÍACOS: ${exerciseMetrics.heartRate ?: "--"} BPM"
+            MetricsActivity.metricsLiveData.postValue(exerciseMetrics)
         }
     }
 
     // Callback de medição
     private val heartRateCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de frequência cardíaca alterada: $availability")
+        }
+
         override fun onDataReceived(data: DataPointContainer) {
-            // Atualiza os dados de batimentos cardíacos
             exerciseMetrics = exerciseMetrics.update(data)
             val currentTime = System.currentTimeMillis()
             if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
@@ -114,12 +111,95 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
                 updateMetricsDisplay()
             }
         }
+    }
 
-        override fun onAvailabilityChanged(
-            dataType: DeltaDataType<*, *>,
-            availability: Availability
-        ) {
-            Log.d("MainActivity", "onAvailabilityChanged: dataType=$dataType, availability=$availability")
+    private val stepsCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de passos alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    private val distanceCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de distância alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    private val caloriesCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de calorias alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    private val speedCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de velocidade alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    private val elevationCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de elevação alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
+        }
+    }
+
+    private val paceCallback = object : MeasureCallback {
+        override fun onAvailabilityChanged(dataType: DeltaDataType<*, *>, availability: Availability) {
+            Log.d(TAG, "Disponibilidade do sensor de ritmo alterada: $availability")
+        }
+
+        override fun onDataReceived(data: DataPointContainer) {
+            exerciseMetrics = exerciseMetrics.update(data)
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - lastUpdateTime >= measurementInterval * 1000) {
+                lastUpdateTime = currentTime
+                updateMetricsDisplay()
+            }
         }
     }
 
@@ -131,13 +211,18 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
         // Obter a referência da aplicação
         mainApplication = application as MainApplication
 
-        // Inicializa controles de tempo
+        // Inicializar cliente de medição
+        val healthClient = HealthServices.getClient(this)
+        measureClient = healthClient.measureClient
+
+        // Inicializar controles de tempo
         editTextInterval = findViewById(R.id.editTextInterval)
         buttonIncrease = findViewById(R.id.buttonIncrease)
         buttonDecrease = findViewById(R.id.buttonDecrease)
         buttonMqttConfig = findViewById(R.id.buttonMqttConfig)
         switchBackground = findViewById(R.id.switchBackground)
         switchKeepScreenOn = findViewById(R.id.switchKeepScreenOn)
+        buttonViewMetrics = findViewById(R.id.buttonViewMetrics)
         
         // Inicializar mapa
         mapView = findViewById(R.id.mapView)
@@ -233,27 +318,19 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
             savePreferences()
         }
 
-        // Inicializa ViewPager2 e adapter com valores iniciais
-        viewPagerMetrics = findViewById(R.id.viewPagerMetrics)
-        metricPagerAdapter = MetricPagerAdapter(
-            listOf(
-                "BATIMENTOS CARDÍACOS: --",
-                "LOCALIZAÇÃO: --, --",
-                "NÍVEL DA BATERIA: --%"
-            )
-        )
-        viewPagerMetrics.adapter = metricPagerAdapter
-        viewPagerMetrics.orientation = ViewPager2.ORIENTATION_VERTICAL
-
         // Inicializa o MeasureClient
-        measureClient = HealthServices.getClient(this).measureClient
-
         lifecycleScope.launch {
             try {
-                // Simplificando a inicialização
+                // Registrar todos os callbacks de medição necessários
                 measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
+                measureClient.registerMeasureCallback(DataType.STEPS, stepsCallback)
+                measureClient.registerMeasureCallback(DataType.DISTANCE, distanceCallback)
+                measureClient.registerMeasureCallback(DataType.CALORIES, caloriesCallback)
+                measureClient.registerMeasureCallback(DataType.SPEED, speedCallback)
+                measureClient.registerMeasureCallback(DataType.ELEVATION_GAIN, elevationCallback)
+                measureClient.registerMeasureCallback(DataType.PACE, paceCallback)
             } catch (e: Exception) {
-                Log.e("MainActivity", "Erro ao registrar callback de batimentos cardíacos", e)
+                Log.e(TAG, "Erro ao registrar callbacks de medição", e)
             }
         }
 
@@ -262,6 +339,30 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
 
         // Registra o receptor de bateria
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+
+        // Inicializar botão de visualização de métricas
+        buttonViewMetrics.setOnClickListener {
+            // Atualizar o LiveData com as métricas atuais
+            MetricsActivity.metricsLiveData.value = exerciseMetrics
+            // Iniciar a atividade de métricas
+            startActivity(Intent(this, MetricsActivity::class.java))
+        }
+        
+        // Inicializar contagem de passos
+        lifecycleScope.launch {
+            try {
+                if (stepCounterService.isGooglePlayServicesAvailable()) {
+                    val success = stepCounterService.subscribeToStepCount()
+                    if (success) {
+                        startStepCountUpdates()
+                    } else {
+                        Log.e(TAG, "Falha ao iniciar subscrição para contagem de passos")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao configurar contagem de passos", e)
+            }
+        }
     }
     
     private fun initLocationManager() {
@@ -319,6 +420,40 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
         }
     }
     
+    private fun checkPermissions() {
+        // Verificar todas as permissões necessárias logo no início
+        if (!hasRequiredPermissions()) {
+            // Mostrar explicação sobre a importância das permissões
+            showPermissionsExplanationDialog()
+        }
+    }
+
+    // Mostrar diálogo explicando por que as permissões são necessárias
+    private fun showPermissionsExplanationDialog() {
+        AlertDialog.Builder(this)
+            .setTitle("Permissões Necessárias")
+            .setMessage("Este aplicativo precisa das seguintes permissões para funcionar corretamente:\n\n" +
+                    "• Sensores Corporais: Para monitorar batimentos cardíacos\n" +
+                    "• Sensores em Segundo Plano: Para continuar monitorando quando o app estiver fechado\n" +
+                    "• Reconhecimento de Atividade: Para contar passos e detectar movimento\n" +
+                    "• Localização: Para registrar seu percurso\n" +
+                    "• Serviço em Primeiro Plano: Para manter o app funcionando em segundo plano\n\n" +
+                    "Sem essas permissões, o aplicativo não conseguirá monitorar suas métricas de saúde.")
+            .setPositiveButton("Solicitar Permissões") { _, _ ->
+                requestRequiredPermissions()
+            }
+            .setNegativeButton("Cancelar") { dialog, _ ->
+                dialog.dismiss()
+                Toast.makeText(
+                    this,
+                    "Sem as permissões, alguns recursos não funcionarão corretamente",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            .setCancelable(false)
+            .show()
+    }
+
     // Verificar se todas as permissões necessárias foram concedidas
     private fun hasRequiredPermissions(): Boolean {
         // Verificar a permissão de FOREGROUND_SERVICE_HEALTH (obrigatória)
@@ -327,15 +462,24 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
             Manifest.permission.FOREGROUND_SERVICE_HEALTH
         ) == PackageManager.PERMISSION_GRANTED
         
-        // Verificar pelo menos uma das permissões opcionais
-        val hasActivityRecognition = ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACTIVITY_RECOGNITION
-        ) == PackageManager.PERMISSION_GRANTED
-        
+        // Verificar permissões de sensores
         val hasBodySensors = ActivityCompat.checkSelfPermission(
             this,
             Manifest.permission.BODY_SENSORS
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        val hasBodySensorsBackground = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.BODY_SENSORS_BACKGROUND
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true // Versões anteriores não precisam dessa permissão específica
+        }
+        
+        val hasActivityRecognition = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACTIVITY_RECOGNITION
         ) == PackageManager.PERMISSION_GRANTED
         
         val hasHighSamplingRateSensors = ActivityCompat.checkSelfPermission(
@@ -348,9 +492,204 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         
-        // Precisa da permissão obrigatória E pelo menos uma das opcionais
-        return hasForegroundServiceHealth && (hasActivityRecognition || hasBodySensors || hasHighSamplingRateSensors) 
-            && hasLocation
+        val hasForegroundService = ActivityCompat.checkSelfPermission(
+            this,
+            Manifest.permission.FOREGROUND_SERVICE
+        ) == PackageManager.PERMISSION_GRANTED
+        
+        // Para o aplicativo funcionar minimamente, precisamos:
+        // 1. Permissão para serviço em primeiro plano de saúde
+        // 2. Permissão para sensores corporais
+        // 3. Permissão para reconhecimento de atividade
+        // 4. Permissão para localização
+        return hasForegroundServiceHealth && hasBodySensors && 
+               hasActivityRecognition && hasLocation && 
+               hasForegroundService && hasBodySensorsBackground
+    }
+    
+    // Solicitar todas as permissões necessárias
+    private fun requestRequiredPermissions() {
+        val requiredPermissions = mutableListOf<String>()
+        
+        // Verificar e adicionar as permissões necessárias
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.FOREGROUND_SERVICE)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_HEALTH) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.FOREGROUND_SERVICE_HEALTH)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.BODY_SENSORS)
+        }
+        
+        // Permissão para sensores em segundo plano (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && 
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS_BACKGROUND) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.BODY_SENSORS_BACKGROUND)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
+        }
+        
+        // Permissões para localização
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
+        
+        // Permissão para localização em segundo plano (Android 10+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != 
+            PackageManager.PERMISSION_GRANTED) {
+            requiredPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+        
+        if (requiredPermissions.isNotEmpty()) {
+            ActivityCompat.requestPermissions(
+                this, 
+                requiredPermissions.toTypedArray(),
+                PERMISSIONS_REQUEST_CODE
+            )
+            
+            // Para permissões que precisam ser solicitadas especialmente no Android 11+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && 
+                requiredPermissions.contains(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+                // Esse é um caso especial a partir do Android 11
+                // Mostramos instruções para o usuário
+                showBackgroundLocationInstructionsDialog()
+            }
+        } else {
+            // Todas as permissões já estão concedidas
+            Toast.makeText(this, "Todas as permissões necessárias já estão concedidas", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    // Mostrar instruções para permissão de localização em segundo plano (Android 11+)
+    private fun showBackgroundLocationInstructionsDialog() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            AlertDialog.Builder(this)
+                .setTitle("Permissão Adicional Necessária")
+                .setMessage("Para monitorar sua localização em segundo plano, é necessário conceder uma permissão adicional nas configurações do aplicativo.\n\n" +
+                        "Siga o caminho:\n" +
+                        "1. Configurações > Apps > APP_5G_layout\n" +
+                        "2. Permissões > Localização\n" +
+                        "3. Selecione \"Permitir o tempo todo\"")
+                .setPositiveButton("Ir para Configurações") { _, _ ->
+                    try {
+                        // Abrir configurações do aplicativo
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:$packageName")
+                        )
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Erro ao abrir configurações", e)
+                        Toast.makeText(this, "Não foi possível abrir as configurações", Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .setNegativeButton("Depois") { dialog, _ ->
+                    dialog.dismiss()
+                }
+                .show()
+        }
+    }
+
+    // Gerenciar o resultado da solicitação de permissões
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        
+        if (requestCode == PERMISSIONS_REQUEST_CODE) {
+            val deniedPermissions = mutableListOf<String>()
+            
+            for (i in permissions.indices) {
+                if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
+                    deniedPermissions.add(permissions[i])
+                }
+            }
+            
+            if (deniedPermissions.isEmpty()) {
+                // Todas as permissões foram concedidas
+                Toast.makeText(this, "Todas as permissões concedidas!", Toast.LENGTH_SHORT).show()
+                
+                // Verificar se o serviço deve ser iniciado
+                if (switchBackground.isChecked) {
+                    startBackgroundService()
+                }
+                
+                // Iniciar o serviço de localização
+                initLocationManager()
+            } else {
+                // Algumas permissões foram negadas
+                Toast.makeText(
+                    this,
+                    "Algumas permissões foram negadas. Certos recursos podem não funcionar corretamente.",
+                    Toast.LENGTH_LONG
+                ).show()
+                
+                // Verificar se há permissões que podemos explicar novamente
+                val shouldShowRationale = deniedPermissions.any { 
+                    ActivityCompat.shouldShowRequestPermissionRationale(this, it)
+                }
+                
+                if (shouldShowRationale) {
+                    // O usuário negou mas não selecionou "Não perguntar novamente"
+                    AlertDialog.Builder(this)
+                        .setTitle("Permissões Importantes")
+                        .setMessage("As permissões negadas são essenciais para o funcionamento completo do aplicativo. Deseja solicitar novamente?")
+                        .setPositiveButton("Sim") { _, _ ->
+                            requestRequiredPermissions()
+                        }
+                        .setNegativeButton("Não") { dialog, _ ->
+                            dialog.dismiss()
+                            // Desmarcar o switch se estiver marcado
+                            switchBackground.isChecked = false
+                            savePreferences()
+                        }
+                        .show()
+                } else {
+                    // O usuário negou e selecionou "Não perguntar novamente"
+                    AlertDialog.Builder(this)
+                        .setTitle("Permissões Necessárias")
+                        .setMessage("Você negou algumas permissões permanentemente. Para que o aplicativo funcione corretamente, é necessário habilitar essas permissões nas configurações do sistema.")
+                        .setPositiveButton("Ir para Configurações") { _, _ ->
+                            val intent = Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.parse("package:$packageName")
+                            )
+                            startActivity(intent)
+                        }
+                        .setNegativeButton("Cancelar") { dialog, _ ->
+                            dialog.dismiss()
+                            // Desmarcar o switch se estiver marcado
+                            switchBackground.isChecked = false
+                            savePreferences()
+                        }
+                        .show()
+                }
+            }
+        }
     }
     
     // Salvar preferências para inicialização automática
@@ -485,101 +824,6 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
             secondsMeasureProvider = { measurementInterval }
         )
     }
-    
-    // Solicitar todas as permissões necessárias
-    private fun requestRequiredPermissions() {
-        val requiredPermissions = mutableListOf<String>()
-        
-        // Verificar e adicionar as permissões necessárias
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_HEALTH) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.FOREGROUND_SERVICE_HEALTH)
-        }
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BODY_SENSORS) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.BODY_SENSORS)
-        }
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
-        }
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.HIGH_SAMPLING_RATE_SENSORS) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.HIGH_SAMPLING_RATE_SENSORS)
-        }
-        
-        // Permissões para localização
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        
-        // Permissões para Wi-Fi
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_WIFI_STATE) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.CHANGE_WIFI_STATE)
-        }
-        
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CHANGE_NETWORK_STATE) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.CHANGE_NETWORK_STATE)
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != 
-            PackageManager.PERMISSION_GRANTED) {
-            requiredPermissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-        }
-        
-        if (requiredPermissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(
-                this, 
-                requiredPermissions.toTypedArray(),
-                PERMISSIONS_REQUEST_CODE
-            )
-        }
-    }
-
-    // Gerenciar o resultado da solicitação de permissões
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        
-        if (requestCode == PERMISSIONS_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                // Todas as permissões foram concedidas
-                if (switchBackground.isChecked) {
-                    startBackgroundService()
-                }
-                
-                // Iniciar o serviço de localização se a permissão foi concedida
-                if (permissions.contains(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                    initLocationManager()
-                }
-            } else {
-                // Alguma permissão foi negada
-                Toast.makeText(
-                    this,
-                    "As permissões são necessárias para executar o serviço em segundo plano",
-                    Toast.LENGTH_LONG
-                ).show()
-                
-                // Desmarcar o switch se estiver marcado
-                switchBackground.isChecked = false
-                savePreferences()
-            }
-        }
-    }
-    
-    private fun checkPermissions() {
-        requestRequiredPermissions()
-    }
 
     // Callback de mapa pronto
     override fun onMapReady(map: GoogleMap) {
@@ -610,5 +854,34 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
     override fun onLocationChanged(location: Location) {
         lastLocation = location
         updateLocationData(location)
+    }
+
+    private fun startStepCountUpdates() {
+        lifecycleScope.launch {
+            while (true) {
+                try {
+                    val steps = stepCounterService.readStepCountData()
+                    if (steps > 0) {
+                        // Atualiza passos e calcula distância e calorias com base neles
+                        exerciseMetrics = exerciseMetrics.updateSteps(steps)
+                            .calculateDistanceFromSteps()
+                            .calculateCaloriesFromSteps()
+                        
+                        // Atualizar a interface (ViewPager, etc)
+                        updateMetrics()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erro ao ler contagem de passos", e)
+                }
+                delay(60000) // Atualiza a cada minuto
+            }
+        }
+    }
+
+    private fun updateMetrics() {
+        // Atualizar o LiveData para a MetricsActivity
+        runOnUiThread {
+            MetricsActivity.metricsLiveData.postValue(exerciseMetrics)
+        }
     }
 }

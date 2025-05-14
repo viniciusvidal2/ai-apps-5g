@@ -12,7 +12,19 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.work.Configuration
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.projetosae5g.app_5g_layout.data.AppDatabase
+import com.projetosae5g.app_5g_layout.data.Repository
+import com.projetosae5g.app_5g_layout.worker.StepCounterWorker
+import java.util.concurrent.TimeUnit
 
+private const val TAG = "PulseApplication"
+
+@RequiresApi(Build.VERSION_CODES.S)
 class MainApplication : Application() {
     
     lateinit var mqttHandler: MqttHandler
@@ -23,8 +35,43 @@ class MainApplication : Application() {
     private val WIFI_SSID = "Grin"
     private val WIFI_PASSWORD = "grin1020"
     
+    // Dependências para injeção manual
+    lateinit var database: AppDatabase
+    lateinit var repository: Repository
+    lateinit var stepCounterService: StepCounterService
+    
     override fun onCreate() {
         super.onCreate()
+        Log.d(TAG, "Aplicação iniciando")
+        
+        // Inicializar dependências
+        database = AppDatabase.getDatabase(this)
+        val stepsDao = database.stepsDao()
+        repository = Repository(stepsDao)
+        stepCounterService = StepCounterService(this)
+        
+        // Configurar trabalho periódico para monitoramento de passos
+        val stepCountWork = PeriodicWorkRequestBuilder<StepCounterWorker>(
+            15, TimeUnit.MINUTES
+        ).build()
+        
+        // Inicializar WorkManager com a configuração padrão
+        WorkManager.initialize(
+            this,
+            Configuration.Builder()
+                .setMinimumLoggingLevel(android.util.Log.DEBUG)
+                .build()
+        )
+        
+        // Agendar trabalho único
+        WorkManager.getInstance(this)
+            .enqueueUniquePeriodicWork(
+                "StepCounterWork",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                stepCountWork
+            )
+            
+        Log.d(TAG, "Trabalho de contagem de passos agendado")
         
         // Inicializar o handler MQTT com o IP salvo
         val sharedPreferences = getSharedPreferences("mqtt_settings", Context.MODE_PRIVATE)

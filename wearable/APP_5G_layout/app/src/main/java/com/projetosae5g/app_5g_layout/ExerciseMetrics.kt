@@ -22,87 +22,164 @@ data class ExerciseMetrics(
         
         try {
             // Processar batimentos cardíacos
-            data.getData(DataType.HEART_RATE_BPM)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val heartRateValue = (dataPoints[0] as? SampleDataPoint<Double>)?.value
-                    heartRateValue?.let {
-                        updatedMetrics = updatedMetrics.copy(heartRate = it)
-                        Log.d("ExerciseMetrics", "Batimentos cardíacos atualizados: $it")
-                    }
-                }
-            }
+            processHeartRate(data)?.let { updatedMetrics = updatedMetrics.copy(heartRate = it) }
             
             // Processar passos
-            data.getData(DataType.STEPS)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val stepsValue = dataPoints[0].value as? Long
-                    stepsValue?.let {
-                        updatedMetrics = updatedMetrics.copy(steps = it.toInt())
-                        Log.d("ExerciseMetrics", "Passos atualizados: $it")
-                    }
-                }
-            }
+            processSteps(data)?.let { updatedMetrics = updatedMetrics.copy(steps = it) }
             
             // Processar distância
-            data.getData(DataType.DISTANCE)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val distanceValue = dataPoints[0].value as? Double
-                    distanceValue?.let {
-                        updatedMetrics = updatedMetrics.copy(distance = it)
-                        Log.d("ExerciseMetrics", "Distância atualizada: $it")
-                    }
-                }
-            }
+            processDistance(data)?.let { updatedMetrics = updatedMetrics.copy(distance = it) }
             
             // Processar calorias
-            data.getData(DataType.CALORIES)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val caloriesValue = dataPoints[0].value as? Double
-                    caloriesValue?.let {
-                        updatedMetrics = updatedMetrics.copy(calories = it)
-                        Log.d("ExerciseMetrics", "Calorias atualizadas: $it")
-                    }
-                }
-            }
+            processCalories(data)?.let { updatedMetrics = updatedMetrics.copy(calories = it) }
             
             // Processar velocidade
-            data.getData(DataType.SPEED)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val speedValue = (dataPoints[0] as? SampleDataPoint<Double>)?.value
-                    speedValue?.let {
-                        updatedMetrics = updatedMetrics.copy(speed = it)
-                        Log.d("ExerciseMetrics", "Velocidade atualizada: $it")
-                    }
-                }
-            }
+            processSpeed(data)?.let { updatedMetrics = updatedMetrics.copy(speed = it) }
             
             // Processar elevação
-            data.getData(DataType.ELEVATION_GAIN)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val elevationValue = dataPoints[0].value as? Double
-                    elevationValue?.let {
-                        updatedMetrics = updatedMetrics.copy(elevation = it)
-                        Log.d("ExerciseMetrics", "Elevação atualizada: $it")
-                    }
-                }
-            }
+            processElevation(data)?.let { updatedMetrics = updatedMetrics.copy(elevation = it) }
             
             // Processar ritmo
-            data.getData(DataType.PACE)?.let { dataPoints ->
-                if (dataPoints.isNotEmpty()) {
-                    val paceValue = (dataPoints[0] as? SampleDataPoint<Double>)?.value
-                    paceValue?.let {
-                        updatedMetrics = updatedMetrics.copy(pace = it)
-                        Log.d("ExerciseMetrics", "Ritmo atualizado: $it")
-                    }
-                }
-            }
+            processPace(data)?.let { updatedMetrics = updatedMetrics.copy(pace = it) }
+            
         } catch (e: Exception) {
             Log.e("ExerciseMetrics", "Erro ao processar dados: ${e.message}")
             e.printStackTrace()
         }
         
         return updatedMetrics
+    }
+    
+    private fun processHeartRate(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.HEART_RATE_BPM)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val dataPoint = dataPoints.first()
+                if (dataPoint is SampleDataPoint<*>) {
+                    val value = dataPoint.value as? Double
+                    if (value != null) {
+                        Log.d("ExerciseMetrics", "Batimentos cardíacos atualizados: $value")
+                        return value
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar batimentos cardíacos: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processSteps(data: DataPointContainer): Int? {
+        try {
+            // Tentar STEPS primeiro
+            val stepsDataPoints = data.getData(DataType.STEPS)
+            if (stepsDataPoints != null && !stepsDataPoints.isEmpty()) {
+                val value = stepsDataPoints.first().value as? Long
+                if (value != null) {
+                    Log.d("ExerciseMetrics", "Passos (STEPS) atualizados: $value")
+                    return value.toInt()
+                }
+            }
+            
+            // Depois tentar STEPS_DAILY
+            val stepsDailyDataPoints = data.getData(DataType.STEPS_DAILY)
+            if (stepsDailyDataPoints != null && !stepsDailyDataPoints.isEmpty()) {
+                val value = stepsDailyDataPoints.first().value as? Long
+                if (value != null) {
+                    Log.d("ExerciseMetrics", "Passos (STEPS_DAILY) atualizados: $value")
+                    return value.toInt()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar passos: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processDistance(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.DISTANCE)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val value = dataPoints.first().value as? Double
+                if (value != null) {
+                    Log.d("ExerciseMetrics", "Distância atualizada: $value")
+                    return value
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar distância: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processCalories(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.CALORIES)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val value = dataPoints.first().value as? Double
+                if (value != null) {
+                    Log.d("ExerciseMetrics", "Calorias atualizadas: $value")
+                    return value
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar calorias: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processSpeed(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.SPEED)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val dataPoint = dataPoints.first()
+                if (dataPoint is SampleDataPoint<*>) {
+                    val value = dataPoint.value as? Double
+                    if (value != null) {
+                        Log.d("ExerciseMetrics", "Velocidade atualizada: $value")
+                        return value
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar velocidade: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processElevation(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.ELEVATION_GAIN)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val value = dataPoints.first().value as? Double
+                if (value != null) {
+                    Log.d("ExerciseMetrics", "Elevação atualizada: $value")
+                    return value
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar elevação: ${e.message}")
+        }
+        return null
+    }
+    
+    private fun processPace(data: DataPointContainer): Double? {
+        try {
+            val dataPoints = data.getData(DataType.PACE)
+            if (dataPoints != null && !dataPoints.isEmpty()) {
+                val dataPoint = dataPoints.first()
+                if (dataPoint is SampleDataPoint<*>) {
+                    val value = dataPoint.value as? Double
+                    if (value != null) {
+                        Log.d("ExerciseMetrics", "Ritmo atualizado: $value")
+                        return value
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("ExerciseMetrics", "Erro ao processar ritmo: ${e.message}")
+        }
+        return null
     }
     
     // Método para atualizar as coordenadas GPS
@@ -141,3 +218,4 @@ data class ExerciseMetrics(
         return this
     }
 }
+

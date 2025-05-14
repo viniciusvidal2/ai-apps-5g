@@ -706,40 +706,34 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
     // Método para iniciar o serviço em segundo plano
     private fun startBackgroundService() {
         if (!isServiceRunning) {
-            if (mainApplication.mqttHandler.isConnected()) {
-                // Verificar se todas as permissões necessárias foram concedidas
-                if (hasRequiredPermissions()) {
-                    Log.d("MainActivity", "Iniciando serviço em segundo plano...")
-                    
-                    val serviceIntent = Intent(this, MonitorService::class.java).apply {
-                        putExtra("interval", measurementInterval)
+            // Verificar se todas as permissões necessárias foram concedidas
+            if (hasRequiredPermissions()) {
+                Log.d("MainActivity", "Iniciando serviço em segundo plano...")
+                
+                val serviceIntent = Intent(this, MonitorService::class.java).apply {
+                    putExtra("interval", measurementInterval)
+                }
+                
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(serviceIntent)
+                    } else {
+                        startService(serviceIntent)
                     }
                     
-                    try {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            startForegroundService(serviceIntent)
-                        } else {
-                            startService(serviceIntent)
-                        }
-                        
-                        isServiceRunning = true
-                        Toast.makeText(this, "Serviço em segundo plano iniciado", Toast.LENGTH_SHORT).show()
-                    } catch (e: Exception) {
-                        Log.e("MainActivity", "Erro ao iniciar serviço", e)
-                        Toast.makeText(this, "Erro ao iniciar serviço: ${e.message}", Toast.LENGTH_LONG).show()
-                        switchBackground.isChecked = false
-                        savePreferences()
-                    }
-                } else {
+                    isServiceRunning = true
+                    Toast.makeText(this, "Serviço em segundo plano iniciado", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("MainActivity", "Erro ao iniciar serviço", e)
+                    Toast.makeText(this, "Erro ao iniciar serviço: ${e.message}", Toast.LENGTH_LONG).show()
                     switchBackground.isChecked = false
                     savePreferences()
-                    requestRequiredPermissions()
-                    Toast.makeText(this, "É necessário conceder as permissões para executar em segundo plano", Toast.LENGTH_LONG).show()
                 }
             } else {
                 switchBackground.isChecked = false
                 savePreferences()
-                Toast.makeText(this, "Conecte ao servidor MQTT primeiro", Toast.LENGTH_LONG).show()
+                requestRequiredPermissions()
+                Toast.makeText(this, "É necessário conceder as permissões para executar em segundo plano", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -860,14 +854,22 @@ class MainActivity : ComponentActivity(), OnMapReadyCallback, LocationListener {
         lifecycleScope.launch {
             while (true) {
                 try {
+                    // Ler a contagem de passos usando o sensor
                     val steps = stepCounterService.readStepCountData()
                     if (steps > 0) {
+                        // Armazenar os passos no banco de dados
+                        val mainApp = application as MainApplication
+                        mainApp.repository.storeSteps(steps.toLong())
+                        
+                        // Carregar os passos de hoje para exibição
+                        val todaySteps = mainApp.repository.loadTodaySteps()
+                        
                         // Atualiza passos e calcula distância e calorias com base neles
-                        exerciseMetrics = exerciseMetrics.updateSteps(steps)
+                        exerciseMetrics = exerciseMetrics.updateSteps(todaySteps.toInt())
                             .calculateDistanceFromSteps()
                             .calculateCaloriesFromSteps()
                         
-                        // Atualizar a interface (ViewPager, etc)
+                        // Atualizar a interface
                         updateMetrics()
                     }
                 } catch (e: Exception) {

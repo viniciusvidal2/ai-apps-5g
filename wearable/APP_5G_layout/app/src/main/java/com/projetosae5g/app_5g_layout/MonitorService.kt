@@ -163,8 +163,11 @@ class MonitorService : Service() {
             try {
                 // Registrar callbacks de medição (exceto passos, que usará Recording API)
                 measureClient.registerMeasureCallback(DataType.HEART_RATE_BPM, heartRateCallback)
-                // Mantemos o callback da Health Services API como fallback
+                
+                // Registrar todos os tipos de callbacks para passos
                 measureClient.registerMeasureCallback(DataType.STEPS, stepsCallback)
+                measureClient.registerMeasureCallback(DataType.STEPS_DAILY, stepsCallback)
+                
                 measureClient.registerMeasureCallback(DataType.DISTANCE, distanceCallback)
                 measureClient.registerMeasureCallback(DataType.CALORIES, caloriesCallback)
                 measureClient.registerMeasureCallback(DataType.SPEED, speedCallback)
@@ -186,19 +189,34 @@ class MonitorService : Service() {
         serviceScope.launch {
             while (true) {
                 try {
+                    Log.d(TAG, "Obtendo dados de passos...")
+                    // Ler a contagem de passos usando o sensor
                     val steps = stepCounterService.readStepCountData()
+                    Log.d(TAG, "Dados de passos recebidos: $steps")
+                    
                     if (steps > 0) {
+                        // Armazenar os passos no banco de dados
+                        val mainApp = application as MainApplication
+                        mainApp.repository.storeSteps(steps.toLong())
+                        
+                        // Carregar os passos de hoje para exibição
+                        val todaySteps = mainApp.repository.loadTodaySteps()
+                        
                         // Atualiza passos e calcula distância e calorias com base neles
-                        exerciseMetrics = exerciseMetrics.updateSteps(steps)
+                        exerciseMetrics = exerciseMetrics.updateSteps(todaySteps.toInt())
                             .calculateDistanceFromSteps()
                             .calculateCaloriesFromSteps()
                         
+                        Log.d(TAG, "Métricas atualizadas: passos=${exerciseMetrics.steps}, distância=${exerciseMetrics.distance}, calorias=${exerciseMetrics.calories}")
                         updateNotification()
+                    } else {
+                        Log.d(TAG, "Nenhum passo novo detectado")
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "Erro ao ler contagem de passos", e)
+                    e.printStackTrace()
                 }
-                delay(60000) // Atualiza a cada minuto
+                delay(15000) // Atualiza a cada 15 segundos
             }
         }
     }

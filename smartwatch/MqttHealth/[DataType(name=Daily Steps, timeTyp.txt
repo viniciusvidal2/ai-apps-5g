@@ -1,0 +1,19 @@
+ [DataType(name=Daily Steps, timeType=INTERVAL, class=Long, isAggregate=false), 
+DataType(name=Steps, timeType=INTERVAL, class=Long, isAggregate=false), 
+DataType(name=Daily Distance, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Distance, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Daily Calories, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Calories, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Daily Floors, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Floors, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Daily Elevation Gain, timeType=INTERVAL, class=Double, isAggregate=false), 
+DataType(name=Elevation Gain, timeType=INTERVAL, class=Double, isAggregate=false),
+ DataType(name=HeartRate, timeType=SAMPLE, class=Double, isAggregate=false)]
+
+            DataType.CALORIES,        // calorias
+            DataType.DISTANCE,        // distância (m)
+            DataType.ELEVATION_GAIN,
+            DataType.FLOORS,
+            DataType.DISTANCE_DAILY,
+            DataType.STEPS,
+            DataType.HEART_RATE_BPM  // batimentos

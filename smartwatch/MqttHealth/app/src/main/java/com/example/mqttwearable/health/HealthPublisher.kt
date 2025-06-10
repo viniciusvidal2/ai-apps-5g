@@ -130,6 +130,109 @@ public class HealthPublisher(
         senderJob = null
     }
 
+    /**
+     * Publica dados de pressão arterial via MQTT
+     * @param bloodPressureData Dados de pressão arterial do Samsung Health SDK
+     */
+    fun publishBloodPressureData(bloodPressureData: BloodPressureManager.BloodPressureData) {
+        val context = passiveMonitoringClient as Context
+        val data = mutableMapOf<String, Any>().apply {
+            put("systolic", bloodPressureData.systolic)
+            put("diastolic", bloodPressureData.diastolic)
+            put("meanArterialPressure", bloodPressureData.mean)
+            put("measurementTime", formatIsoUtc(bloodPressureData.timestamp))
+            put("deviceType", "Samsung Watch")
+            put("dataSource", "Samsung Health SDK")
+            
+            // Campos opcionais
+            bloodPressureData.pulse?.let { put("pulse", it) }
+            bloodPressureData.comment?.let { put("comment", it) }
+            
+            // Interpretação médica
+            val interpretation = when {
+                bloodPressureData.systolic < 120 && bloodPressureData.diastolic < 80 -> "Normal"
+                bloodPressureData.systolic < 130 && bloodPressureData.diastolic < 80 -> "Elevada"
+                bloodPressureData.systolic < 140 || bloodPressureData.diastolic < 90 -> "Hipertensão Estágio 1"
+                bloodPressureData.systolic < 180 || bloodPressureData.diastolic < 120 -> "Hipertensão Estágio 2"
+                else -> "Crise Hipertensiva - Procure atendimento médico imediato"
+            }
+            put("interpretation", interpretation)
+            
+            // Categoria de risco
+            val riskLevel = when {
+                interpretation.contains("Normal") -> "LOW"
+                interpretation.contains("Elevada") -> "MEDIUM"
+                interpretation.contains("Hipertensão Estágio 1") -> "HIGH"
+                interpretation.contains("Hipertensão Estágio 2") -> "VERY_HIGH"
+                else -> "CRITICAL"
+            }
+            put("riskLevel", riskLevel)
+        }
+        
+        val json = mapToJson(data)
+        Log.d("HealthPublisher", "Publishing blood pressure data via MQTT: $json")
+        
+        // Publica no tópico específico de pressão arterial
+        mqttHandler.publish("health/blood_pressure", json)
+        
+        // Também atualiza no tópico geral de dados de saúde
+        latestData["lastBloodPressure"] = mapOf(
+            "systolic" to bloodPressureData.systolic,
+            "diastolic" to bloodPressureData.diastolic,
+            "timestamp" to formatIsoUtc(bloodPressureData.timestamp),
+            "interpretation" to when {
+                bloodPressureData.systolic < 120 && bloodPressureData.diastolic < 80 -> "Normal"
+                bloodPressureData.systolic < 130 && bloodPressureData.diastolic < 80 -> "Elevada"
+                bloodPressureData.systolic < 140 || bloodPressureData.diastolic < 90 -> "Hipertensão Estágio 1"
+                bloodPressureData.systolic < 180 || bloodPressureData.diastolic < 120 -> "Hipertensão Estágio 2"
+                else -> "Crise Hipertensiva - Procure atendimento médico imediato"
+            }
+        )
+    }
+
+    /**
+     * Publica alerta de pressão arterial crítica
+     */
+    fun publishBloodPressureAlert(bloodPressureData: BloodPressureManager.BloodPressureData) {
+        val interpretation = when {
+            bloodPressureData.systolic < 120 && bloodPressureData.diastolic < 80 -> "Normal"
+            bloodPressureData.systolic < 130 && bloodPressureData.diastolic < 80 -> "Elevada"
+            bloodPressureData.systolic < 140 || bloodPressureData.diastolic < 90 -> "Hipertensão Estágio 1"
+            bloodPressureData.systolic < 180 || bloodPressureData.diastolic < 120 -> "Hipertensão Estágio 2"
+            else -> "Crise Hipertensiva - Procure atendimento médico imediato"
+        }
+        
+        if (interpretation.contains("Crise Hipertensiva")) {
+            val alertData = mapOf(
+                "alertType" to "BLOOD_PRESSURE_CRISIS",
+                "severity" to "CRITICAL",
+                "systolic" to bloodPressureData.systolic,
+                "diastolic" to bloodPressureData.diastolic,
+                "timestamp" to formatIsoUtc(bloodPressureData.timestamp),
+                "message" to "Crise hipertensiva detectada - Procure atendimento médico imediato",
+                "deviceId" to "samsung_watch",
+                "recommendedAction" to "SEEK_IMMEDIATE_MEDICAL_ATTENTION"
+            )
+            
+            val json = mapToJson(alertData)
+            Log.w("HealthPublisher", "CRITICAL ALERT - Blood pressure crisis: $json")
+            
+            // Publica no tópico de alertas críticos
+            mqttHandler.publish("health/alerts/critical", json)
+        }
+    }
+
+    /**
+     * Obtém os dados mais recentes incluindo pressão arterial
+     */
+    fun getLatestHealthData(): Map<String, Any> {
+        val data = latestData.toMutableMap()
+        lastUpdateTimestamp?.let {
+            data["lastUpdateTime"] = formatIsoUtc(it)
+        }
+        return data
+    }
+
     private fun listToJson(list: List<Map<String, Any>>): String {
         return "" // não será mais usado
     }

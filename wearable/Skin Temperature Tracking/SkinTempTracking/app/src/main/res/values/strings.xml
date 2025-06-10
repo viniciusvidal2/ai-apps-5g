@@ -1,0 +1,31 @@
+<resources>
+    <!--    Skin Temperature Activity -->
+    <string name="app_name">Skin Temp Tracking</string>
+    <string name="header_label_default">Press Measure to start tracker.</string>
+    <string name="header_label_measuring">Tracker performing measurement.</string>
+    <string name="header_label_measurement_done">Tracker stopped.</string>
+    <string name="ambient_temperature_label">Ambient\nTemperature</string>
+    <string name="ambient_temperature_default_value">--</string>
+    <string name="wrist_skin_temperature_label">Wrist skin\nTemperature</string>
+    <string name="wrist_skin_temperature_default_value">--</string>
+    <string name="symbol_degree">°</string>
+    <string name="permission_denied_permanently">Permissions denied. Grant permissions in watch settings and start application again.</string>
+    <string name="permission_denied_rationale">Body Sensors permission is required to make Skin Temperature Measurement.</string>
+    <string name="button_default_value">Measure</string>
+    <string name="button_measuring">Measuring…</string>
+    <string name="body_sensors">android.permissions.BODY_SENSORS</string>
+    <!--    Alert Messages  -->
+    <string name="no_connection_title">Disconnected</string>
+    <string name="no_connection_message">"No connection to Health Tracking Service. Check error log.</string>
+    <string name="no_skin_temperature_available_title">Sensor error</string>
+    <string name="no_skin_temperature_available_message">Skin temperature measurement not available on the device.</string>
+    <string name="no_permission_title">No permission</string>
+    <string name="no_permission_message">Body Sensors permission is required. Grant permission in App settings.</string>
+    <string name="sdk_policy_error_title">SDK Policy Error</string>
+    <string name="sdk_policy_error_message">Health Platform has to be set in DEV mode to use this app.</string>
+    <!--    Connection Manager -->
+    <string name="connected_to_health_services">Connected to Health Tracking Service.</string>
+    <string name="no_skin_temperature_support">Skin temperature is not supported on this device.</string>
+    <string name="no_valid_health_platform">Health Platform version is outdated or not installed.</string>
+    <string name="connection_error">Could not connect to Health Tracking Service. Check error log.</string>
+</resources>

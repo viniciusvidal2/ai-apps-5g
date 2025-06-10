@@ -10,18 +10,10 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
-    <uses-permission
-        android:name="android.permission.ACTIVITY_RECOGNITION"
-        tools:ignore="CoarseFineLocation" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE_HEALTH"
-        tools:ignore="CoarseFineLocation" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <application
@@ -78,6 +70,14 @@
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />
+            
+        <!-- Samsung Health permissions -->
+        <meta-data 
+            android:name="com.samsung.android.health.permission.read"
+            android:value="com.samsung.health.blood_pressure" />
+        <meta-data 
+            android:name="com.samsung.android.health.permission.write"
+            android:value="com.samsung.health.blood_pressure" />
 
         <activity
             android:name=".presentation.MainActivity"
@@ -90,6 +90,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        
+        <activity
+            android:name=".presentation.BloodPressureActivity"
+            android:exported="true"
+            android:theme="@style/MainActivityTheme.Starting"
+            android:label="Medidor de Pressão" />
     </application>
 
 </manifest>

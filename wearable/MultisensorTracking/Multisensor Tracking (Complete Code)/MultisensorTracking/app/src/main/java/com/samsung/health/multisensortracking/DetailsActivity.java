@@ -47,6 +47,11 @@ public class DetailsActivity extends FragmentActivity {
         }
 
         @Override
+        public void onPpgTrackerDataChanged(PpgData ppgData) {
+            // Não fazemos nada com dados PPG na tela de detalhes
+        }
+
+        @Override
         public void onError(int errorResourceId) {
             runOnUiThread(() ->
                     Toast.makeText(getApplicationContext(), getString(errorResourceId), Toast.LENGTH_LONG));

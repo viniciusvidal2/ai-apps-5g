@@ -47,6 +47,10 @@ public class TrackerDataNotifier {
         observers.forEach(observer -> observer.onSpO2TrackerDataChanged(status, spO2Value));
     }
 
+    public void notifyPpgTrackerObservers(PpgData ppgData) {
+        observers.forEach(observer -> observer.onPpgTrackerDataChanged(ppgData));
+    }
+
     public void notifyError(int errorResourceId) {
         observers.forEach(observer -> observer.onError(errorResourceId));
     }

@@ -34,7 +34,17 @@
 
     <string name="NoSpo2Support">SpO2 no supported on this device.</string>
     <string name="NoHrSupport">Heart Rate no supported on this device.</string>
+    <string name="NoPpgSupport">PPG no supported on this device.</string>
     <string name="BodySensors">android.permission.BODY_SENSORS</string>
+    
+    <string name="PPG">PPG</string>
+    <string name="StartPpgLabel">Capturar PPG</string>
+    <string name="StopPpgLabel">Parar PPG</string>
+    <string name="PpgStatus">Status PPG</string>
+    <string name="PpgStatusDefaultValue">Pressione Capturar PPG para iniciar.</string>
+    <string name="PpgStatusRecording">Capturando dados PPG...</string>
+    <string name="PpgStatusStopped">Captura PPG parada.</string>
+    <string name="PpgDataSaved">Dados PPG salvos em: </string>
 
     <string name="ExtraHr">Hr</string>
     <string name="ExtraHrStatus">HrStatus</string>

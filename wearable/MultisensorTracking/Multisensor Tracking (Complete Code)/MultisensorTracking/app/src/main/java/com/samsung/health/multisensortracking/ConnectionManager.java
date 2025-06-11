@@ -48,6 +48,10 @@ public class ConnectionManager {
                 Log.i(TAG, "Device does not support Heart Rate tracking");
                 connectionObserver.onConnectionResult(R.string.NoHrSupport);
             }
+            if (!isPpgAvailable(healthTrackingService)) {
+                Log.i(TAG, "Device does not support PPG tracking");
+                connectionObserver.onConnectionResult(R.string.NoPpgSupport);
+            }
         }
 
         @Override
@@ -89,6 +93,34 @@ public class ConnectionManager {
         setHandlerForBaseListener(heartRateListener);
     }
 
+    public void initPpg(PpgListener ppgListener) {
+        try {
+            HealthTracker healthTracker = null;
+            // Tentar usar a nova API com PpgType primeiro
+            try {
+                healthTracker = healthTrackingService.getHealthTracker(HealthTrackerType.PPG_CONTINUOUS);
+                Log.i(TAG, "Using PPG_CONTINUOUS");
+            } catch (Exception e) {
+                Log.w(TAG, "PPG_CONTINUOUS not available, trying deprecated PPG_GREEN");
+                // Fallback para API antiga
+                try {
+                    healthTracker = healthTrackingService.getHealthTracker(HealthTrackerType.PPG_GREEN);
+                    Log.i(TAG, "Using PPG_GREEN");
+                } catch (Exception e2) {
+                    Log.e(TAG, "Neither PPG_CONTINUOUS nor PPG_GREEN available");
+                    return;
+                }
+            }
+            
+            if (healthTracker != null) {
+                ppgListener.setHealthTracker(healthTracker);
+                setHandlerForBaseListener(ppgListener);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize PPG: " + e.getMessage());
+        }
+    }
+
     private void setHandlerForBaseListener(BaseListener baseListener) {
         baseListener.setHandler(new Handler(Looper.getMainLooper()));
     }
@@ -101,5 +133,15 @@ public class ConnectionManager {
     private boolean isHeartRateAvailable(@NonNull HealthTrackingService healthTrackingService) {
         final List<HealthTrackerType> availableTrackers = healthTrackingService.getTrackingCapability().getSupportHealthTrackerTypes();
         return availableTrackers.contains(HealthTrackerType.HEART_RATE_CONTINUOUS);
+    }
+
+    private boolean isPpgAvailable(@NonNull HealthTrackingService healthTrackingService) {
+        final List<HealthTrackerType> availableTrackers = healthTrackingService.getTrackingCapability().getSupportHealthTrackerTypes();
+        // Verificar se PPG_CONTINUOUS está disponível (versão nova)
+        if (availableTrackers.contains(HealthTrackerType.PPG_CONTINUOUS)) {
+            return true;
+        }
+        // Fallback para versões antigas - verificar PPG_GREEN
+        return availableTrackers.contains(HealthTrackerType.PPG_GREEN);
     }
 }

@@ -98,9 +98,6 @@ dependencies {
 
     implementation("androidx.health:health-services-client:1.1.0-alpha05")
 
-    // Samsung Health SDK
-    implementation(files("../libs/samsung-health-data-1.5.1.aar"))
-
 
 
 }

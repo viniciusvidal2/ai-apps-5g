@@ -21,5 +21,7 @@ public interface TrackerDataObserver {
 
     void onSpO2TrackerDataChanged(int status, int spO2Value);
 
+    void onPpgTrackerDataChanged(PpgData ppgData);
+
     void onError(int errorResourceId);
 }

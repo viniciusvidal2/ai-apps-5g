@@ -54,6 +54,7 @@ public class MainActivity extends Activity {
     private ConnectionManager connectionManager;
     private HeartRateListener heartRateListener = null;
     private SpO2Listener spO2Listener = null;
+    private PpgListener ppgListener = null;
     private boolean connected = false;
     private boolean permissionGranted = false;
     private int previousStatus = SpO2Status.INITIAL_STATUS;
@@ -61,8 +62,12 @@ public class MainActivity extends Activity {
     private TextView txtHeartRate;
     private TextView txtStatus;
     private TextView txtSpo2;
+    private TextView txtPpgStatus;
     private Button butStart;
+    private Button butPpg;
     private CircularProgressIndicator measurementProgress = null;
+    private PpgDataSaver ppgDataSaver;
+    private boolean isPpgRecording = false;
     final CountDownTimer countDownTimer = new CountDownTimer(MEASUREMENT_DURATION, MEASUREMENT_TICK) {
         @Override
         public void onTick(long timeLeft) {
@@ -151,6 +156,16 @@ public class MainActivity extends Activity {
         }
 
         @Override
+        public void onPpgTrackerDataChanged(PpgData ppgData) {
+            if (isPpgRecording && ppgDataSaver != null) {
+                ppgDataSaver.addPpgData(ppgData);
+                MainActivity.this.runOnUiThread(() -> {
+                    txtPpgStatus.setText(getString(R.string.PpgStatusRecording) + " (" + ppgDataSaver.getDataCount() + " amostras)");
+                });
+            }
+        }
+
+        @Override
         public void onError(int errorResourceId) {
             runOnUiThread(() ->
                     Toast.makeText(getApplicationContext(), getString(errorResourceId), Toast.LENGTH_LONG).show());
@@ -172,9 +187,11 @@ public class MainActivity extends Activity {
 
             spO2Listener = new SpO2Listener();
             heartRateListener = new HeartRateListener();
+            ppgListener = new PpgListener();
 
             connectionManager.initSpO2(spO2Listener);
             connectionManager.initHeartRate(heartRateListener);
+            connectionManager.initPpg(ppgListener);
 
             heartRateListener.startTracker();
         }
@@ -205,9 +222,13 @@ public class MainActivity extends Activity {
         txtHeartRate = binding.txtHeartRate;
         txtStatus = binding.txtStatus;
         txtSpo2 = binding.txtSpO2;
+        txtPpgStatus = binding.txtPpgStatus;
         butStart = binding.butStart;
+        butPpg = binding.butPpg;
         measurementProgress = binding.progressBar;
         adjustProgressBar(measurementProgress);
+        
+        ppgDataSaver = new PpgDataSaver(this);
 
         if (ActivityCompat.checkSelfPermission(getApplicationContext(), getString(R.string.BodySensors)) == PackageManager.PERMISSION_DENIED)
             requestPermissions(new String[]{Manifest.permission.BODY_SENSORS}, 0);
@@ -225,6 +246,8 @@ public class MainActivity extends Activity {
             heartRateListener.stopTracker();
         if (spO2Listener != null)
             spO2Listener.stopTracker();
+        if (ppgListener != null)
+            ppgListener.stopTracker();
         TrackerDataNotifier.getInstance().removeObserver(trackerDataObserver);
         if (connectionManager != null) {
             connectionManager.disconnect();
@@ -294,6 +317,43 @@ public class MainActivity extends Activity {
                         butStart.setEnabled(true);
                     }, MEASUREMENT_TICK * 2
             );
+        }
+    }
+
+    public void performPpgMeasurement(View view) {
+        if (isPermissionsOrConnectionInvalid()) {
+            return;
+        }
+
+        if (!isPpgRecording) {
+            // Iniciar captura PPG
+            isPpgRecording = true;
+            butPpg.setText(R.string.StopPpgLabel);
+            txtPpgStatus.setText(R.string.PpgStatusRecording);
+            ppgDataSaver.clearData();
+            ppgListener.startTracker();
+            Log.i(APP_TAG, "PPG recording started");
+        } else {
+            // Parar captura PPG e salvar dados
+            isPpgRecording = false;
+            butPpg.setText(R.string.StartPpgLabel);
+            ppgListener.stopTracker();
+            
+            // Salvar dados em arquivo
+            String filePath = ppgDataSaver.saveToFile();
+            if (filePath != null) {
+                txtPpgStatus.setText(R.string.PpgStatusStopped);
+                Toast.makeText(getApplicationContext(), 
+                    getString(R.string.PpgDataSaved) + filePath, 
+                    Toast.LENGTH_LONG).show();
+                Log.i(APP_TAG, "PPG recording stopped and saved to: " + filePath);
+            } else {
+                txtPpgStatus.setText("Erro ao salvar dados PPG");
+                Toast.makeText(getApplicationContext(), 
+                    "Erro ao salvar dados PPG", 
+                    Toast.LENGTH_SHORT).show();
+                Log.e(APP_TAG, "Failed to save PPG data");
+            }
         }
     }
 

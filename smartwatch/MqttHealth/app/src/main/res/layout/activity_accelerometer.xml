@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="8dp">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sensores do Relógio"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textAlignment="center"
+                android:layout_marginBottom="8dp" />
+
+            <TextView
+                android:id="@+id/txtSensorStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Verificando sensores..."
+                android:textSize="10sp"
+                android:textAlignment="center"
+                android:layout_marginBottom="12dp" />
+
+            <TextView
+                android:id="@+id/txtAccelerometer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Acelerômetro:\nX: 0.00\nY: 0.00\nZ: 0.00"
+                android:textSize="12sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtGyroscope"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Giroscópio:\nX: 0.00\nY: 0.00\nZ: 0.00"
+                android:textSize="12sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtMagnetometer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Magnetômetro:\nX: 0.00\nY: 0.00\nZ: 0.00"
+                android:textSize="12sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtLinearAccel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Aceleração Linear:\nX: 0.00\nY: 0.00\nZ: 0.00"
+                android:textSize="12sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/txtRotationVector"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Vetor Rotação:\nX: 0.00\nY: 0.00\nZ: 0.00\nW: 0.00"
+                android:textSize="12sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="8dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnVoltar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Voltar"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout> 

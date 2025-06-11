@@ -16,9 +16,11 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.view.GestureDetector
+import android.view.MotionEvent
+import android.view.View
 import android.os.Build
 import android.os.Bundle
-import android.renderscript.Element
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -91,6 +93,9 @@ class MainActivity : ComponentActivity() {
     // 2) Crie o launcher que vai pedir essas permissões
     private lateinit var permissionsLauncher: ActivityResultLauncher<Array<String>>
 
+    // Detector de gestos para capturar o swipe down
+    private lateinit var gestureDetector: GestureDetector
+
 
 
 //    val activeTypes: Set<DeltaDataType<*, *>> = setOf(
@@ -127,8 +132,12 @@ class MainActivity : ComponentActivity() {
 
         setContentView(R.layout.activity_main)
 
+        // Configurar detector de gestos
+        setupGestureDetector()
+
         val edtIp = findViewById<EditText>(R.id.edtIp)
         val btnConectar = findViewById<Button>(R.id.btnConectar)
+        val btnAcc = findViewById<Button>(R.id.btnAcc)
         val txtStatus = findViewById<TextView?>(R.id.txtStatus)
         txtStatus?.text = "Desconectado"
         var isConnected = false
@@ -149,6 +158,12 @@ class MainActivity : ComponentActivity() {
                 btnConectar.text = "Conectar"
                 txtStatus?.text = "Desconectado"
             }
+        }
+
+        btnAcc.setOnClickListener {
+            // Navegar para a tela de acelerômetro
+            val intent = Intent(this, AccelerometerActivity::class.java)
+            startActivity(intent)
         }
 
         permissionsLauncher = registerForActivityResult(RequestMultiplePermissions()) { results ->
@@ -206,5 +221,50 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+    }
+
+    private fun setupGestureDetector() {
+        gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            private val SWIPE_THRESHOLD = 100
+            private val SWIPE_VELOCITY_THRESHOLD = 100
+
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                if (e1 == null) return false
+                
+                val diffY = e2.y - e1.y
+                val diffX = e2.x - e1.x
+                
+                if (Math.abs(diffY) > Math.abs(diffX)) {
+                    if (Math.abs(diffY) > SWIPE_THRESHOLD && Math.abs(velocityY) > SWIPE_VELOCITY_THRESHOLD) {
+                        if (diffY > 0) {
+                            // Swipe para baixo - abrir tela de acelerômetro
+                            onSwipeDown()
+                            return true
+                        }
+                    }
+                }
+                return false
+            }
+        })
+
+        // Aplicar o detector de gestos à view raiz
+        findViewById<View>(android.R.id.content).setOnTouchListener { _, event ->
+            gestureDetector.onTouchEvent(event)
+        }
+    }
+
+    private fun onSwipeDown() {
+        // Navegar para a tela de acelerômetro
+        val intent = Intent(this, AccelerometerActivity::class.java)
+        startActivity(intent)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
     }
 }

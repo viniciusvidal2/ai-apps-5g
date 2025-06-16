@@ -41,6 +41,10 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     private lateinit var layoutFallAlert: LinearLayout
     private lateinit var txtCountdown: TextView
     private lateinit var btnCancelAlert: Button
+    private lateinit var txtDebugInfo: TextView
+    private lateinit var layoutFallAlertOverlay: LinearLayout
+    private lateinit var txtCountdownBig: TextView
+    private lateinit var btnCancelFallAlert: Button
     
     // Detector de gestos para capturar o swipe up
     private lateinit var gestureDetector: GestureDetector
@@ -52,6 +56,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     private var alertHandler: Handler? = null
     private var alertCountdown = 5
     private var isAlertActive = false
+
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,6 +74,10 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         layoutFallAlert = findViewById(R.id.layoutFallAlert)
         txtCountdown = findViewById(R.id.txtCountdown)
         btnCancelAlert = findViewById(R.id.btnCancelAlert)
+        txtDebugInfo = findViewById(R.id.txtDebugInfo)
+        layoutFallAlertOverlay = findViewById(R.id.layoutFallAlertOverlay)
+        txtCountdownBig = findViewById(R.id.txtCountdownBig)
+        btnCancelFallAlert = findViewById(R.id.btnCancelFallAlert)
         
         // Configurar SensorManager
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
@@ -259,10 +268,24 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
                     startFallAlert()
                 }
             }
+            
+            override fun onStateChanged(state: String, magnitude: Float) {
+                runOnUiThread {
+                    val debugText = "Magnitude: ${String.format("%.2f", magnitude)}\n${fallDetector.getDebugInfo()}"
+                    txtDebugInfo.text = debugText
+                }
+            }
+            
+
         })
         
         // Configurar botão de cancelar alerta
         btnCancelAlert.setOnClickListener {
+            cancelFallAlert()
+        }
+        
+        // Configurar botão de cancelar alerta na tela vermelha
+        btnCancelFallAlert.setOnClickListener {
             cancelFallAlert()
         }
     }
@@ -273,9 +296,9 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         isAlertActive = true
         alertCountdown = 5
         
-        // Mostrar UI de alerta
-        layoutFallAlert.visibility = View.VISIBLE
-        txtCountdown.text = alertCountdown.toString()
+        // Mostrar tela vermelha completa
+        layoutFallAlertOverlay.visibility = View.VISIBLE
+        txtCountdownBig.text = alertCountdown.toString()
         
         // Iniciar vibração e countdown
         startVibrationAndCountdown()
@@ -292,8 +315,8 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
                         vibrator.vibrate(500) // Vibra por 500ms
                     }
                     
-                    // Atualizar countdown
-                    txtCountdown.text = alertCountdown.toString()
+                    // Atualizar countdown na tela vermelha
+                    txtCountdownBig.text = alertCountdown.toString()
                     alertCountdown--
                     
                     // Agendar próxima vibração
@@ -312,8 +335,8 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         // Enviar mensagem MQTT
         mqttHandler.publish("fall/alert", "fall alert")
         
-        // Esconder UI de alerta
-        layoutFallAlert.visibility = View.GONE
+        // Esconder tela vermelha
+        layoutFallAlertOverlay.visibility = View.GONE
         isAlertActive = false
         
         // Parar vibração
@@ -328,8 +351,8 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         isAlertActive = false
         alertHandler?.removeCallbacksAndMessages(null)
         
-        // Esconder UI de alerta
-        layoutFallAlert.visibility = View.GONE
+        // Esconder tela vermelha
+        layoutFallAlertOverlay.visibility = View.GONE
         
         // Parar vibração
         vibrator.cancel()
@@ -338,4 +361,6 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         txtFallStatus.text = "Alerta CANCELADO - Monitorando"
         txtFallStatus.setBackgroundColor(getColor(android.R.color.darker_gray))
     }
+    
+
 } 

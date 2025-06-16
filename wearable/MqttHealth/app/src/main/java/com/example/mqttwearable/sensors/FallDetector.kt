@@ -5,10 +5,12 @@ import kotlin.math.sqrt
 class FallDetector {
     
     // Constantes para detecção de queda
-    private val FREE_FALL_THRESHOLD = 2.0f  // m/s² - quase 0g
-    private val IMPACT_THRESHOLD = 20.0f    // m/s² - 2g
-    private val FREE_FALL_DURATION_MS = 200L
-    private val DETECTION_WINDOW_MS = 2000L
+    private val FREE_FALL_THRESHOLD = 4.0f  // m/s² - valor menos restritivo
+    private val IMPACT_THRESHOLD = 15.0f    // m/s² - valor menos restritivo
+    private val FREE_FALL_DURATION_MS = 100L // duração menor para testes
+    private val DETECTION_WINDOW_MS = 3000L  // janela maior para testes
+    
+
     
     // Estado da detecção
     private var isInFreeFall = false
@@ -23,6 +25,7 @@ class FallDetector {
     
     interface FallDetectionListener {
         fun onFallDetected()
+        fun onStateChanged(state: String, magnitude: Float)
     }
     
     private var listener: FallDetectionListener? = null
@@ -31,11 +34,16 @@ class FallDetector {
         this.listener = listener
     }
     
+
+    
     fun processSensorData(x: Float, y: Float, z: Float): Boolean {
         val magnitude = calculateMagnitude(x, y, z)
         val smoothedMagnitude = addToBufferAndSmooth(magnitude)
         
         val currentTime = System.currentTimeMillis()
+        
+        // Notificar estado atual
+        listener?.onStateChanged(getDetectionState(), smoothedMagnitude)
         
         // Detectar início de queda livre
         if (!isInFreeFall && smoothedMagnitude < FREE_FALL_THRESHOLD) {
@@ -83,6 +91,8 @@ class FallDetector {
         return false
     }
     
+
+    
     private fun calculateMagnitude(x: Float, y: Float, z: Float): Float {
         return sqrt(x * x + y * y + z * z)
     }
@@ -114,5 +124,13 @@ class FallDetector {
     
     fun isCurrentlyDetecting(): Boolean {
         return isInFreeFall || hasImpactOccurred
+    }
+    
+    fun getDebugInfo(): String {
+        return """
+            Thresholds: Queda=${FREE_FALL_THRESHOLD} | Impacto=${IMPACT_THRESHOLD}
+            Estado: ${getDetectionState()}
+            Tempo queda livre: ${freeFallDuration}ms
+        """.trimIndent()
     }
 } 

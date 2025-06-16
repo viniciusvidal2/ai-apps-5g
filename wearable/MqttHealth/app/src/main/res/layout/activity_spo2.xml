@@ -14,8 +14,8 @@
 
     <Button
         android:id="@+id/butStart"
-        android:layout_width="80dp"
-        android:layout_height="28dp"
+        android:layout_width="63dp"
+        android:layout_height="30dp"
         android:background="@drawable/button_rounded"
         android:text="Medir"
         android:textColor="#ffffff"
@@ -29,17 +29,17 @@
 
     <TextView
         android:id="@+id/txtStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Pressione Medir para iniciar medição de SpO2."
+        android:layout_width="76dp"
+        android:layout_height="29dp"
+        android:text="Aperte Medir para SpO2."
         android:textAlignment="center"
-        android:textSize="11sp"
         android:textColor="@android:color/white"
+        android:textSize="11sp"
         app:layout_constrainedWidth="true"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintHorizontal_bias="0.5"
         app:layout_constraintEnd_toEndOf="@id/guideline_right"
-        app:layout_constraintStart_toEndOf="@id/guideline_left"
+        app:layout_constraintHorizontal_bias="0.5"
+        app:layout_constraintStart_toStartOf="@+id/guideline_left"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintVertical_bias="0.15" />
 
@@ -148,13 +148,13 @@
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="200dp"
-        android:layout_height="200dp"
+        android:layout_width="234dp"
+        android:layout_height="213dp"
         android:indeterminate="false"
         android:max="140"
         android:progress="0"
-        android:visibility="visible"
         android:progressDrawable="@drawable/circular_progress"
+        android:visibility="visible"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -162,16 +162,18 @@
 
     <Button
         android:id="@+id/btnBack"
-        android:layout_width="70dp"
-        android:layout_height="28dp"
+        android:layout_width="45dp"
+        android:layout_height="27dp"
+        android:background="@drawable/button_rounded_red"
         android:text="Voltar"
         android:textColor="#ffffff"
-        android:background="@drawable/button_rounded_red"
         android:textSize="10sp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.496"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintVertical_bias="0.90" />
+        app:layout_constraintTop_toBottomOf="@+id/butStart"
+        app:layout_constraintVertical_bias="0.0" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 </androidx.wear.widget.BoxInsetLayout> 

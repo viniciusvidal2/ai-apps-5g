@@ -42,7 +42,23 @@
                 android:textStyle="bold"
                 android:background="@android:color/darker_gray"
                 android:padding="6dp"
-                android:layout_marginBottom="12dp" />
+                android:layout_marginBottom="8dp" />
+
+
+
+            <TextView
+                android:id="@+id/txtDebugInfo"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="120dp"
+                android:text="📊 Detector de queda ativo!\n\nMonitorando movimentos para detectar quedas automaticamente."
+                android:textSize="10sp"
+                android:textAlignment="center"
+                android:background="@android:color/darker_gray"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp"
+                android:scrollbars="vertical"
+                android:maxLines="15" />
 
             <!-- Alerta de Queda (inicialmente oculto) -->
             <LinearLayout
@@ -153,4 +169,68 @@
 
         </LinearLayout>
     </ScrollView>
+    
+    <!-- Overlay do Alerta de Queda (inicialmente oculto) -->
+    <LinearLayout
+        android:id="@+id/layoutFallAlertOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="@android:color/holo_red_dark"
+        android:visibility="gone"
+        android:padding="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⚠️"
+            android:textSize="64sp"
+            android:textColor="@android:color/white"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="QUEDA DETECTADA!"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:textAlignment="center"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Alerta será enviado em:"
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            android:textAlignment="center"
+            android:layout_marginBottom="32dp" />
+
+        <TextView
+            android:id="@+id/txtCountdownBig"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:text="5"
+            android:textSize="48sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/holo_red_dark"
+            android:textAlignment="center"
+            android:background="@drawable/circle_countdown"
+            android:gravity="center"
+            android:layout_marginBottom="48dp" />
+
+        <Button
+            android:id="@+id/btnCancelFallAlert"
+            android:layout_width="240dp"
+            android:layout_height="80dp"
+            android:text="ESTOU BEM\nCANCELAR ALERTA"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:background="@drawable/button_cancel_round"
+            android:textColor="@android:color/holo_red_dark" />
+
+    </LinearLayout>
+
 </FrameLayout> 

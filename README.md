@@ -110,7 +110,7 @@ Run the following command to create the docker image:
 
 ```bash
 cd /path/to/this/repo
-docker build -f Dockerfile.chatapp -t chat-app:latest .
+docker build -f dockerfiles/Dockerfile.chatapp -t chat-app:latest .
 ```
 
 Or instead just **pull it from Dockerhub**:

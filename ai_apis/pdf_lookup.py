@@ -3,33 +3,36 @@ import fitz  # PyMuPDF
 import io
 from PIL import Image
 import ollama
+import io
 
 
 class PdfLookup:
     def __init__(self) -> None:
         """Initializes a PdfLookup object to handle PDF extraction and processing.
         """
-        self.pdf_path = None
         self.pdf_text = None
         self.pdf_images_info = None
         self.pdf_data_prompt = None
-
-    def set_pdf_path(self, path: str) -> None:
-        """Sets the path to the PDF file to be processed.
+        self.pdf_bytes = None
+        
+    def set_pdf_bytes(self, pdf_bytes: bytes) -> None:
+        """Sets the PDF file content as bytes to be processed.
 
         Args:
-            path (str): The file path to the PDF document.
+            pdf_bytes (bytes): The byte content of the PDF document.
         """
-        self.pdf_path = path
+        self.pdf_bytes = pdf_bytes
 
     def load_pdf(self) -> None:
         """Loads the PDF file, extracts text and images, and prepares the data for inference.
         """
-        if not self.pdf_path:
-            raise ValueError("PDF path is not set.")
+        if not self.pdf_bytes:
+            raise ValueError("PDF bytes are not set. Please set the PDF bytes before loading.")
+        self.pdf_stream = io.BytesIO(self.pdf_bytes)
+        self.pdf_stream.seek(0)
         # Load the PDF text using the plumber library
         self.pdf_text = ""
-        with pdfplumber.open(self.pdf_path) as pdf:
+        with pdfplumber.open(self.pdf_stream) as pdf:
             for page_num, page in enumerate(pdf.pages, start=1):
                 text = page.extract_text()
                 if text:
@@ -37,15 +40,15 @@ class PdfLookup:
                 else:
                     self.pdf_text += f"\n\n--- Page {page_num} ---\n[No text found]"
         # Load the PDF images using the fitz library (PyMuPDF)
-        doc = fitz.open(self.pdf_path)
+        self.pdf_stream.seek(0)  # Reset the stream position
+        doc = fitz.open(stream=self.pdf_stream, filetype="pdf")
         self.pdf_images_info = []
         for page_num, page in enumerate(doc, start=1):
             image_list = page.get_images(full=True)
-            for img_index, img in enumerate(image_list, start=1):
+            for _, img in enumerate(image_list, start=1):
                 xref = img[0]
                 base_image = doc.extract_image(xref)
                 image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
                 image = Image.open(io.BytesIO(image_bytes))
                 # Add the image information to the list
                 self.pdf_images_info.append({
@@ -95,7 +98,14 @@ class PdfInference:
         Args:
             path (str): The file path to the PDF document.
         """
-        self.pdf_lookup.set_pdf_path(path)
+        # Read the pdf into bytes
+        try:
+            with open(path, "rb") as pdf_file:
+                self.pdf_lookup.set_pdf_bytes(pdf_file.read())
+        except FileNotFoundError:
+            raise ValueError(f"PDF file not found at path: {path}")
+        except Exception as e:
+            raise ValueError(f"An error occurred while reading the PDF file: {e}")
 
     def set_inference_prompt(self, prompt: str) -> None:
         """Sets the inference prompt to be used with the PDF data.
@@ -111,8 +121,6 @@ class PdfInference:
         Returns:
             str: The response from the LLM after processing the PDF data and inference prompt.
         """
-        if not self.pdf_lookup.pdf_path:
-            raise ValueError("PDF path is not set.")
         # Load the PDF and build the data prompt
         print("Loading PDF and building data prompt...")
         self.pdf_lookup.load_pdf()

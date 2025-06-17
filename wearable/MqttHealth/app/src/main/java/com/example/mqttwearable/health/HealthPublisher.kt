@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.mqttwearable.mqtt.MqttHandler
+import com.example.mqttwearable.location.LocationManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -27,7 +28,7 @@ import java.util.Locale
 import java.util.TimeZone
 
 public class HealthPublisher(
-    context: Context,
+    private val context: Context,
     private val mqttHandler: MqttHandler
 ) {
     private val passiveMonitoringClient: PassiveMonitoringClient =
@@ -36,11 +37,18 @@ public class HealthPublisher(
     private val measureClient: MeasureClient =
         HealthServices.getClient(context).measureClient
 
+    // LocationManager para obter GPS
+    private val locationManager = LocationManager(context)
+    
     // Buffer para armazenar o último valor de cada tipo de dado
     private val latestData = mutableMapOf<String, Any>()
     private var senderJob: Job? = null
     // Timestamp da última atualização do listener
     private var lastUpdateTimestamp: Long? = null
+    
+    // Localização atual
+    private var currentLatitude: Double? = null
+    private var currentLongitude: Double? = null
 
     // Intervalo de envio em milissegundos
     var sendIntervalMs: Long = 5000L
@@ -85,6 +93,22 @@ public class HealthPublisher(
 
     /** Registra o listener para os tipos de dados desejados. */
     suspend fun startPassiveMeasure() {
+        // Configurar listener de localização
+        locationManager.setLocationUpdateListener(object : LocationManager.LocationUpdateListener {
+            override fun onLocationUpdate(latitude: Double, longitude: Double) {
+                currentLatitude = latitude
+                currentLongitude = longitude
+                Log.d("HealthPublisher", "Localização atualizada: $latitude, $longitude")
+            }
+            
+            override fun onLocationError(error: String) {
+                Log.e("HealthPublisher", "Erro de localização: $error")
+            }
+        })
+        
+        // Iniciar atualizações de localização
+        locationManager.startLocationUpdates()
+        
         val types = setOf(
             DataType.CALORIES_DAILY,      // calorias diárias
             DataType.DISTANCE_DAILY,      // distância diária (m)
@@ -113,6 +137,13 @@ public class HealthPublisher(
                         lastUpdateTimestamp?.let {
                             toSend["lastUpdateTime"] = formatIsoUtc(it)
                         }
+                        
+                        // Adicionar localização se disponível
+                        if (currentLatitude != null && currentLongitude != null) {
+                            toSend["latitude"] = currentLatitude!!
+                            toSend["longitude"] = currentLongitude!!
+                        }
+                        
                         val json = mapToJson(toSend)
                         Log.d("HealthPublisher", "Sending latest via MQTT: $json")
                         mqttHandler.publish("health/data", json)
@@ -125,6 +156,7 @@ public class HealthPublisher(
     /** Cancela o listener */
     fun stopPassiveMeasure() {
         passiveMonitoringClient.clearPassiveListenerCallbackAsync()
+        locationManager.stopLocationUpdates()
         Log.d("HealthPublisher", "PassiveListener unregistered")
         senderJob?.cancel()
         senderJob = null
@@ -138,5 +170,14 @@ public class HealthPublisher(
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(Date(timestamp))
+    }
+    
+    /** Obter localização atual */
+    fun getCurrentLocation(): Pair<Double, Double>? {
+        return if (currentLatitude != null && currentLongitude != null) {
+            Pair(currentLatitude!!, currentLongitude!!)
+        } else {
+            locationManager.getCurrentLocation()
+        }
     }
 }

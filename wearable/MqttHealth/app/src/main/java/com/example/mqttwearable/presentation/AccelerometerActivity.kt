@@ -20,6 +20,7 @@ import androidx.activity.ComponentActivity
 import com.example.mqttwearable.R
 import com.example.mqttwearable.sensors.FallDetector
 import com.example.mqttwearable.mqtt.MqttHandler
+import com.example.mqttwearable.location.LocationManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -57,10 +58,15 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     private lateinit var fallDetector: FallDetector
     private lateinit var vibrator: Vibrator
     private lateinit var mqttHandler: MqttHandler
+    private lateinit var locationManager: LocationManager
     private var alertHandler: Handler? = null
     private var alertCountdown = 10 // Alterado de 5 para 10 segundos
     private var isAlertActive = false
     private var brokerIp: String? = null
+    
+    // Localização atual
+    private var currentLatitude: Double? = null
+    private var currentLongitude: Double? = null
 
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -161,6 +167,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
             cancelFallAlert()
         }
         alertHandler?.removeCallbacksAndMessages(null)
+        locationManager.stopLocationUpdates()
     }
     
     @SuppressLint("DefaultLocale")
@@ -281,6 +288,27 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         // Inicializar componentes
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         mqttHandler = MqttHandler(applicationContext)
+        locationManager = LocationManager(applicationContext)
+        
+        // Configurar listener de localização
+        locationManager.setLocationUpdateListener(object : LocationManager.LocationUpdateListener {
+            override fun onLocationUpdate(latitude: Double, longitude: Double) {
+                currentLatitude = latitude
+                currentLongitude = longitude
+                runOnUiThread {
+                    txtDebugInfo.text = "${txtDebugInfo.text}\nGPS: $latitude, $longitude"
+                }
+            }
+            
+            override fun onLocationError(error: String) {
+                runOnUiThread {
+                    txtDebugInfo.text = "${txtDebugInfo.text}\nGPS Erro: $error"
+                }
+            }
+        })
+        
+        // Iniciar atualizações de localização
+        locationManager.startLocationUpdates()
         
         // Configurar detector de queda
         fallDetector = FallDetector()
@@ -358,7 +386,13 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         val currentTime = sdf.format(Date())
-        val fallMessage = """{"time":"$currentTime","fall":1}"""
+        
+        // Criar JSON com localização
+        val fallMessage = if (currentLatitude != null && currentLongitude != null) {
+            """{"time":"$currentTime","fall":1,"latitude":$currentLatitude,"longitude":$currentLongitude}"""
+        } else {
+            """{"time":"$currentTime","fall":1}"""
+        }
         
         // Conectar ao MQTT e enviar mensagem se o IP estiver disponível
         brokerIp?.let { ip ->

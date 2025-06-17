@@ -87,7 +87,8 @@ class MainActivity : ComponentActivity() {
     private val requiredPermissions = arrayOf(
         android.Manifest.permission.ACTIVITY_RECOGNITION,
         android.Manifest.permission.BODY_SENSORS,
-        android.Manifest.permission.ACCESS_FINE_LOCATION
+        android.Manifest.permission.ACCESS_FINE_LOCATION,
+        android.Manifest.permission.ACCESS_COARSE_LOCATION
     )
 
     // 2) Crie o launcher que vai pedir essas permissões

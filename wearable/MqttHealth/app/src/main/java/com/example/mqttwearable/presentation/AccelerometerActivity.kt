@@ -21,6 +21,7 @@ import com.example.mqttwearable.R
 import com.example.mqttwearable.sensors.FallDetector
 import com.example.mqttwearable.mqtt.MqttHandler
 import com.example.mqttwearable.location.LocationManager
+import com.example.mqttwearable.data.DeviceIdManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -72,6 +73,9 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_accelerometer)
+        
+        // Inicializar o DeviceIdManager
+        DeviceIdManager.initializeDeviceId(this)
         
         // Receber o IP do broker MQTT via Intent
         brokerIp = intent.getStringExtra("BROKER_IP")
@@ -387,11 +391,19 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         val currentTime = sdf.format(Date())
         
-        // Criar JSON com localização
-        val fallMessage = if (currentLatitude != null && currentLongitude != null) {
-            """{"time":"$currentTime","fall":1,"latitude":$currentLatitude,"longitude":$currentLongitude}"""
-        } else {
-            """{"time":"$currentTime","fall":1}"""
+        // Criar JSON com Device ID, localização e dados de queda
+        val fallMessage = buildString {
+            append("{")
+            append("\"time\":\"$currentTime\",")
+            append("\"fall\":1,")
+            append("\"id\":\"${DeviceIdManager.getDeviceId()}\"")
+            
+            // Adicionar localização se disponível
+            if (currentLatitude != null && currentLongitude != null) {
+                append(",\"latitude\":$currentLatitude,\"longitude\":$currentLongitude")
+            }
+            
+            append("}")
         }
         
         // Conectar ao MQTT e enviar mensagem se o IP estiver disponível
@@ -399,8 +411,8 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
             val brokerUrl = "tcp://$ip:1883"
             mqttHandler.connect(brokerUrl, "fall-alert-${System.currentTimeMillis()}") { connected ->
                 if (connected) {
-                    // Enviar mensagem MQTT para o tópico /Fall
-                    mqttHandler.publish("/Fall", fallMessage) { success ->
+                    // Enviar mensagem MQTT para o tópico /fall
+                    mqttHandler.publish("/fall", fallMessage) { success ->
                         runOnUiThread {
                             if (success) {
                                 txtFallStatus.text = "Alerta de Queda ENVIADO!"

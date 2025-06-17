@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import com.example.mqttwearable.mqtt.MqttHandler
 import com.example.mqttwearable.location.LocationManager
 import com.example.mqttwearable.data.SpO2DataManager
+import com.example.mqttwearable.data.DeviceIdManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,6 +57,11 @@ public class HealthPublisher(
 
     // Intervalo de envio em milissegundos
     var sendIntervalMs: Long = 5000L
+
+    init {
+        // Garantir que o DeviceIdManager está inicializado
+        DeviceIdManager.initializeDeviceId(context)
+    }
 
     // Callback que recebe os lotes de dados enquanto o app está rodando em foreground
     private val passiveListener = object : PassiveListenerCallback {
@@ -153,6 +159,9 @@ public class HealthPublisher(
                         lastUpdateTimestamp?.let {
                             toSend["lastUpdateTime"] = formatIsoUtc(it)
                         }
+                        
+                        // Adicionar Device ID
+                        toSend["id"] = DeviceIdManager.getDeviceId()
                         
                         // Adicionar localização se disponível
                         if (currentLatitude != null && currentLongitude != null) {

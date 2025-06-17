@@ -74,6 +74,8 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.text.InputFilter
+import android.provider.Settings
+import com.example.mqttwearable.data.DeviceIdManager
 
 
 class MainActivity : ComponentActivity() {
@@ -116,6 +118,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Inicializar o DeviceIdManager
+        DeviceIdManager.initializeDeviceId(this)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationManagerCompat.from(this).createNotificationChannel(
                 NotificationChannel(
@@ -136,11 +141,16 @@ class MainActivity : ComponentActivity() {
         // Configurar detector de gestos
         setupGestureDetector()
 
+        val txtAndroidId = findViewById<TextView>(R.id.txtAndroidId)
         val edtIp = findViewById<EditText>(R.id.edtIp)
         val btnConectar = findViewById<Button>(R.id.btnConectar)
         val btnAcc = findViewById<Button>(R.id.btnAcc)
         val btnSpO2 = findViewById<Button>(R.id.btnSpO2)
         val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+        
+        // Obter e exibir o ANDROID_ID usando o DeviceIdManager
+        txtAndroidId.text = DeviceIdManager.getDeviceId()
+        
         txtStatus?.text = "Desconectado"
         var isConnected = false
         btnConectar.text = "Conectar"

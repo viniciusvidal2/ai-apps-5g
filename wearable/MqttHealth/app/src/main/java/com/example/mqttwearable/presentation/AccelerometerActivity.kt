@@ -20,6 +20,10 @@ import androidx.activity.ComponentActivity
 import com.example.mqttwearable.R
 import com.example.mqttwearable.sensors.FallDetector
 import com.example.mqttwearable.mqtt.MqttHandler
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     
@@ -54,13 +58,17 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     private lateinit var vibrator: Vibrator
     private lateinit var mqttHandler: MqttHandler
     private var alertHandler: Handler? = null
-    private var alertCountdown = 5
+    private var alertCountdown = 10 // Alterado de 5 para 10 segundos
     private var isAlertActive = false
+    private var brokerIp: String? = null
 
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_accelerometer)
+        
+        // Receber o IP do broker MQTT via Intent
+        brokerIp = intent.getStringExtra("BROKER_IP")
         
         // Inicializar os TextViews
         txtAccelerometer = findViewById(R.id.txtAccelerometer)
@@ -222,6 +230,9 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
                 velocityX: Float,
                 velocityY: Float
             ): Boolean {
+                // Não processar gestos se o alerta estiver ativo
+                if (isAlertActive) return false
+                
                 if (e1 == null) return false
                 
                 val diffY = e2.y - e1.y
@@ -242,7 +253,12 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
 
         // Aplicar o detector de gestos à view raiz
         findViewById<View>(android.R.id.content).setOnTouchListener { _, event ->
-            gestureDetector.onTouchEvent(event)
+            // Não processar toques se o alerta estiver ativo
+            if (isAlertActive) {
+                false
+            } else {
+                gestureDetector.onTouchEvent(event)
+            }
         }
     }
 
@@ -252,7 +268,13 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        return gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+        // Se o alerta estiver ativo, permitir toques normais (para o botão funcionar)
+        // Caso contrário, processar gestos normalmente
+        return if (isAlertActive) {
+            super.onTouchEvent(event)
+        } else {
+            gestureDetector.onTouchEvent(event) || super.onTouchEvent(event)
+        }
     }
 
     private fun setupFallDetection() {
@@ -294,7 +316,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         if (isAlertActive) return
         
         isAlertActive = true
-        alertCountdown = 5
+        alertCountdown = 10 // Alterado de 5 para 10 segundos
         
         // Mostrar tela vermelha completa
         layoutFallAlertOverlay.visibility = View.VISIBLE
@@ -332,8 +354,40 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
     }
 
     private fun sendFallAlert() {
-        // Enviar mensagem MQTT
-        mqttHandler.publish("fall/alert", "fall alert")
+        // Criar JSON com horário atual em formato ISO 8601 UTC
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        val currentTime = sdf.format(Date())
+        val fallMessage = """{"time":"$currentTime","fall":1}"""
+        
+        // Conectar ao MQTT e enviar mensagem se o IP estiver disponível
+        brokerIp?.let { ip ->
+            val brokerUrl = "tcp://$ip:1883"
+            mqttHandler.connect(brokerUrl, "fall-alert-${System.currentTimeMillis()}") { connected ->
+                if (connected) {
+                    // Enviar mensagem MQTT para o tópico /Fall
+                    mqttHandler.publish("/Fall", fallMessage) { success ->
+                        runOnUiThread {
+                            if (success) {
+                                txtFallStatus.text = "Alerta de Queda ENVIADO!"
+                            } else {
+                                txtFallStatus.text = "Erro ao enviar alerta!"
+                            }
+                            txtFallStatus.setBackgroundColor(getColor(android.R.color.holo_red_dark))
+                        }
+                    }
+                } else {
+                    runOnUiThread {
+                        txtFallStatus.text = "Erro de conexão MQTT!"
+                        txtFallStatus.setBackgroundColor(getColor(android.R.color.holo_red_dark))
+                    }
+                }
+            }
+        } ?: run {
+            // Se não há IP, apenas mostrar mensagem
+            txtFallStatus.text = "Alerta criado (sem conexão MQTT)"
+            txtFallStatus.setBackgroundColor(getColor(android.R.color.holo_red_dark))
+        }
         
         // Esconder tela vermelha
         layoutFallAlertOverlay.visibility = View.GONE
@@ -341,10 +395,6 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         
         // Parar vibração
         vibrator.cancel()
-        
-        // Mostrar confirmação
-        txtFallStatus.text = "Alerta de Queda ENVIADO!"
-        txtFallStatus.setBackgroundColor(getColor(android.R.color.holo_red_dark))
     }
 
     private fun cancelFallAlert() {

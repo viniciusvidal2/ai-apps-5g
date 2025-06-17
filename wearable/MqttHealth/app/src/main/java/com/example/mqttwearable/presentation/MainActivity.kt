@@ -164,6 +164,11 @@ class MainActivity : ComponentActivity() {
         btnAcc.setOnClickListener {
             // Navegar para a tela de acelerômetro
             val intent = Intent(this, AccelerometerActivity::class.java)
+            // Passar o IP do broker MQTT se estiver conectado
+            val ipText = edtIp.text.toString().trim()
+            if (ipText.isNotEmpty()) {
+                intent.putExtra("BROKER_IP", ipText)
+            }
             startActivity(intent)
         }
 
@@ -268,6 +273,12 @@ class MainActivity : ComponentActivity() {
     private fun onSwipeDown() {
         // Navegar para a tela de acelerômetro
         val intent = Intent(this, AccelerometerActivity::class.java)
+        // Passar o IP do broker MQTT se estiver conectado
+        val edtIp = findViewById<EditText>(R.id.edtIp)
+        val ipText = edtIp.text.toString().trim()
+        if (ipText.isNotEmpty()) {
+            intent.putExtra("BROKER_IP", ipText)
+        }
         startActivity(intent)
     }
 

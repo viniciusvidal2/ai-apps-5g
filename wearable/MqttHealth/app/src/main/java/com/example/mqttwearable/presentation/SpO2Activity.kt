@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import com.example.mqttwearable.R
 import com.example.mqttwearable.sensors.*
+import com.example.mqttwearable.data.SpO2DataManager
 import com.samsung.android.service.health.tracking.HealthTrackerException
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -105,9 +106,13 @@ class SpO2Activity : Activity() {
                 }
             }
             SpO2Status.MEASUREMENT_COMPLETED -> {
-                Log.i(appTag, "Measurement completed")
+                Log.i(appTag, "Measurement completed with SpO2: $spO2Value")
                 isMeasurementRunning.set(false)
                 spO2Listener?.stopTracker()
+                
+                // Atualizar o SpO2DataManager com o novo valor
+                SpO2DataManager.updateSpO2Value(spO2Value)
+                
                 runOnUiThread {
                     txtStatus.text = "Medição concluída."
                     txtSpO2.text = spO2Value.toString()

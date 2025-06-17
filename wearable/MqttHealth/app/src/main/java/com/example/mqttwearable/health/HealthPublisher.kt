@@ -21,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.example.mqttwearable.mqtt.MqttHandler
 import com.example.mqttwearable.location.LocationManager
+import com.example.mqttwearable.data.SpO2DataManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,7 +31,7 @@ import java.util.TimeZone
 public class HealthPublisher(
     private val context: Context,
     private val mqttHandler: MqttHandler
-) {
+) : SpO2DataManager.SpO2DataListener {
     private val passiveMonitoringClient: PassiveMonitoringClient =
         HealthServices.getClient(context).passiveMonitoringClient
 
@@ -49,6 +50,9 @@ public class HealthPublisher(
     // Localização atual
     private var currentLatitude: Double? = null
     private var currentLongitude: Double? = null
+    
+    // SpO2 atual
+    private var currentSpO2: Int? = null
 
     // Intervalo de envio em milissegundos
     var sendIntervalMs: Long = 5000L
@@ -83,6 +87,12 @@ public class HealthPublisher(
             }
         }
     }
+    
+    // Implementação do SpO2DataListener
+    override fun onSpO2ValueUpdated(spO2Value: Int, timestamp: Long) {
+        currentSpO2 = spO2Value
+        Log.d("HealthPublisher", "SpO2 recebido: $spO2Value%")
+    }
 
     private fun mapToJson(map: Map<String, Any>): String {
         return map.entries.joinToString(prefix = "{", postfix = "}") { (k, v) ->
@@ -108,6 +118,12 @@ public class HealthPublisher(
         
         // Iniciar atualizações de localização
         locationManager.startLocationUpdates()
+        
+        // Registrar listener para SpO2
+        SpO2DataManager.addListener(this)
+        
+        // Obter SpO2 atual se disponível
+        currentSpO2 = SpO2DataManager.getCurrentSpO2()
         
         val types = setOf(
             DataType.CALORIES_DAILY,      // calorias diárias
@@ -144,6 +160,11 @@ public class HealthPublisher(
                             toSend["longitude"] = currentLongitude!!
                         }
                         
+                        // Adicionar SpO2 se disponível
+                        currentSpO2?.let { spO2 ->
+                            toSend["spo2"] = spO2
+                        }
+                        
                         val json = mapToJson(toSend)
                         Log.d("HealthPublisher", "Sending latest via MQTT: $json")
                         mqttHandler.publish("health/data", json)
@@ -157,6 +178,7 @@ public class HealthPublisher(
     fun stopPassiveMeasure() {
         passiveMonitoringClient.clearPassiveListenerCallbackAsync()
         locationManager.stopLocationUpdates()
+        SpO2DataManager.removeListener(this)
         Log.d("HealthPublisher", "PassiveListener unregistered")
         senderJob?.cancel()
         senderJob = null

@@ -52,14 +52,10 @@ class PdfParseAgent:
             userdata (Any): User-defined data of any type.
             msg (mqtt.MQTTMessage): The received MQTT message.
         """
-        print(f"Received message on topic {msg.topic}:")
         self.pdf_lookup.set_pdf_bytes(msg.payload)
         self.pdf_lookup.load_pdf()
         data_prompts = self.pdf_lookup.get_pdf_data_prompts()
-        print("PDF data prompts built successfully.")
         # Publish the PDF data prompts to the MQTT broker
-        print(
-            f"Publishing PDF data prompts to topic {self.output_topic}")
         self.client.publish(
             self.output_topic,
             payload=json.dumps(data_prompts),
@@ -77,12 +73,9 @@ class PdfParseAgent:
     def stop(self) -> None:
         """Stops the MQTT client and disconnects from the broker."""
         if not self.client.is_connected():
-            print("Client is not connected. No need to stop.")
             return
-        print("Stopping PdfParseAgent...")
         self.client.loop_stop()
         self.client.disconnect()
-        print("PdfParseAgent stopped.")
 
 
 def main() -> None:
@@ -116,7 +109,6 @@ def main() -> None:
         user_id=args.user_id
     )
     try:
-        print("PdfParseAgent is running. Waiting for PDF messages...")
         # Keep the agent running to listen for incoming messages
         while True:
             pass

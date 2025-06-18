@@ -1,5 +1,7 @@
 package com.example.mqttwearable.mqtt
+
 import android.content.Context
+import android.content.SharedPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -14,43 +16,44 @@ import org.eclipse.paho.client.mqttv3.IMqttToken
 import org.eclipse.paho.client.mqttv3.MqttCallback
 import android.util.Log
 
-//sudo nano /etc/mosquitto/mosquitto.conf
-//# Permite conexões de qualquer IP (não apenas localhost)
-//listener 1883 0.0.0.0
-//
-//# Habilita autenticação anônima (apenas para testes)
-//allow_anonymous true
-//
-
-//cmd
-//No servidor (Windows):
-//Verifique se o Mosquitto está rodando:
-//
-//cmd
-//netstat -ano | findstr 1883
-//(Deve aparecer 0.0.0.0:1883).
-//netstat -ano | findstr 1883
-//A saída deve mostrar:
-//
-//TCP    0.0.0.0:1883          0.0.0.0:0              LISTENING       <PID>
-//TCP    [::]:1883             [::]:0                 LISTENING       <PID>
-////netsh advfirewall firewall add rule name="MQTT" dir=in action=allow protocol=TCP localport=1883
-//mosquitto -v -c mosquitto.conf
-//mosquitto_sub -h 192.168.68.102 -p 1883 -t "teste" -v
-//>mosquitto_pub -h 192.168.68.102 -p 1883 -t teste -m ok
-// adb connect 192.168.68.112:41751
-// adb -s 192.168.68.123:41751 install -r app/build/outputs/apk/debug/app-debug.apk
-//PS C:\Users\lmhon\Dropbox\Projetos\Sto Antonio 5.0\MqttHealth> adb -s 192.168.68.112:42601 logcat  -c
-//PS C:\Users\lmhon\Dropbox\Projetos\Sto Antonio 5.0\MqttHealth> adb -s 192.168.68.112:42601 logcat HealthPublisher:D *:S
-
-
-
-
 class MqttHandler(private val context: Context) {
     private var client: MqttClient? = null
     private var isConnected = false
+    private val prefs: SharedPreferences = context.getSharedPreferences("mqtt_prefs", Context.MODE_PRIVATE)
+    
+    companion object {
+        private const val BROKER_URL_KEY = "broker_url"
+        private const val DEFAULT_BROKER_URL = "tcp://192.168.68.102:1883"
+    }
+
+    // Salva o broker URL no cache
+    fun saveBrokerUrl(brokerUrl: String) {
+        prefs.edit().putString(BROKER_URL_KEY, brokerUrl).apply()
+        Log.d("MqttHandler", "Broker URL saved to cache: $brokerUrl")
+        
+        // Verificar se foi salvo corretamente
+        val savedUrl = prefs.getString(BROKER_URL_KEY, null)
+        Log.d("MqttHandler", "Verification - URL in cache after save: $savedUrl")
+    }
+
+    // Recupera o broker URL do cache
+    fun getCachedBrokerUrl(): String {
+        val cachedUrl = prefs.getString(BROKER_URL_KEY, DEFAULT_BROKER_URL) ?: DEFAULT_BROKER_URL
+        Log.d("MqttHandler", "Retrieved cached broker URL: $cachedUrl")
+        return cachedUrl
+    }
+
+    // Conecta usando o broker URL do cache
+    fun connectWithCachedUrl(clientId: String, callback: (Boolean) -> Unit) {
+        val cachedBrokerUrl = getCachedBrokerUrl()
+        Log.d("MqttHandler", "Connecting with cached URL: $cachedBrokerUrl")
+        connect(cachedBrokerUrl, clientId, callback)
+    }
 
     fun connect(brokerUrl: String, clientId: String, callback: (Boolean) -> Unit) {
+        // Salva automaticamente o broker URL quando conecta
+        saveBrokerUrl(brokerUrl)
+        
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val persistence = MemoryPersistence()

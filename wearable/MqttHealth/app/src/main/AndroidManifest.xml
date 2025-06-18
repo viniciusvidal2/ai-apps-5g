@@ -106,6 +106,13 @@
             android:name=".presentation.TestSpO2Activity"
             android:exported="false"
             android:theme="@android:style/Theme.DeviceDefault" />
+            
+        <activity
+            android:name=".presentation.EmergencyAlertActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.DeviceDefault"
+            android:screenOrientation="portrait"
+            android:launchMode="singleTop" />
     </application>
 
 </manifest>

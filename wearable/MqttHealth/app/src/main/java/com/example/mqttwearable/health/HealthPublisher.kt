@@ -147,7 +147,7 @@ public class HealthPublisher(
 
         val capabilities = passiveMonitoringClient.getCapabilities().supportedDataTypesPassiveMonitoring
         Log.d("HealthPublisher", "Supported passive types: ${capabilities}")
-        mqttHandler.publish("teste",  "Supported passive types: ${capabilities}")
+//        mqttHandler.publish("teste",  "Supported passive types: ${capabilities}")
 
         // Inicia o job de envio periódico
         if (senderJob == null) {

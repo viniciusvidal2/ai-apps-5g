@@ -21,6 +21,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.os.Build
 import android.os.Bundle
+import android.os.Vibrator
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -76,9 +77,11 @@ import android.widget.TextView
 import android.text.InputFilter
 import android.provider.Settings
 import com.example.mqttwearable.data.DeviceIdManager
+import com.example.mqttwearable.sensors.FallDetector
+import com.example.mqttwearable.location.LocationManager
 
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var mqttHandler: MqttHandler
     private lateinit var healthPublisher: HealthPublisher
@@ -99,7 +102,15 @@ class MainActivity : ComponentActivity() {
     // Detector de gestos para capturar o swipe down
     private lateinit var gestureDetector: GestureDetector
 
-
+    // Sensores e detecção de queda
+    private lateinit var sensorManager: SensorManager
+    private var accelerometer: Sensor? = null
+    private lateinit var fallDetector: FallDetector
+    private lateinit var vibrator: Vibrator
+    private lateinit var locationManager: LocationManager
+    private var currentLatitude: Double? = null
+    private var currentLongitude: Double? = null
+    private var fallDetectionActive = false
 
 //    val activeTypes: Set<DeltaDataType<*, *>> = setOf(
 ////        DataType.STEPS,     // é um DeltaDataType<Int, SampleDataPoint<Int>>
@@ -140,6 +151,9 @@ class MainActivity : ComponentActivity() {
 
         // Configurar detector de gestos
         setupGestureDetector()
+        
+        // Configurar detecção de queda
+        setupFallDetection()
 
         val txtAndroidId = findViewById<TextView>(R.id.txtAndroidId)
         val edtIp = findViewById<EditText>(R.id.edtIp)
@@ -150,6 +164,9 @@ class MainActivity : ComponentActivity() {
         
         // Obter e exibir o ANDROID_ID usando o DeviceIdManager
         txtAndroidId.text = DeviceIdManager.getDeviceId()
+        
+        // Carregar IP do cache e definir no campo
+        loadCachedIpAddress(edtIp)
         
         txtStatus?.text = "Desconectado"
         var isConnected = false
@@ -162,6 +179,10 @@ class MainActivity : ComponentActivity() {
                     txtStatus?.text = "Por favor, insira o IP do broker MQTT."
                     return@setOnClickListener
                 }
+                
+                // Salvar IP no cache imediatamente
+                saveCurrentIpToCache(ipText)
+                
                 permissionsLauncher.launch(requiredPermissions)
             } else {
                 mqttHandler.disconnect()
@@ -169,6 +190,8 @@ class MainActivity : ComponentActivity() {
                 mqttConnected = false
                 btnConectar.text = "Conectar"
                 txtStatus?.text = "Desconectado"
+                // Parar detecção de queda quando desconectar
+                stopFallDetection()
             }
         }
 
@@ -206,7 +229,9 @@ class MainActivity : ComponentActivity() {
                     runOnUiThread {
                         if (success) {
                             btnConectar.text = "Desconectar"
-                            txtStatus?.text = "MQTT conectado com sucesso"
+                            txtStatus?.text = "MQTT conectado - Detecção ativa"
+                            // Iniciar detecção de queda quando conectado
+                            startFallDetection()
                         } else {
                             btnConectar.text = "Conectar"
                             txtStatus?.text = "Falha ao conectar MQTT"
@@ -229,6 +254,114 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun setupFallDetection() {
+        // Configurar SensorManager
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        
+        // Inicializar componentes
+        vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        locationManager = LocationManager(applicationContext)
+        
+        // Configurar listener de localização
+        locationManager.setLocationUpdateListener(object : LocationManager.LocationUpdateListener {
+            override fun onLocationUpdate(latitude: Double, longitude: Double) {
+                currentLatitude = latitude
+                currentLongitude = longitude
+                Log.d("MainActivity", "GPS: $latitude, $longitude")
+            }
+            
+            override fun onLocationError(error: String) {
+                Log.e("MainActivity", "GPS Erro: $error")
+            }
+        })
+        
+        // Iniciar atualizações de localização
+        locationManager.startLocationUpdates()
+        
+        // Configurar detector de queda
+        fallDetector = FallDetector()
+        fallDetector.setFallDetectionListener(object : FallDetector.FallDetectionListener {
+            override fun onFallDetected() {
+                runOnUiThread {
+                    if (mqttConnected) {
+                        openEmergencyAlert()
+                    }
+                }
+            }
+            
+            override fun onStateChanged(state: String, magnitude: Float) {
+                // Log para debug
+                Log.d("MainActivity", "FallDetector: $state - Magnitude: $magnitude")
+            }
+        })
+        
+        Log.d("MainActivity", "Fall detection setup completed")
+    }
+    
+    private fun startFallDetection() {
+        if (accelerometer != null && !fallDetectionActive) {
+            sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
+            fallDetectionActive = true
+            Log.d("MainActivity", "Fall detection started")
+        }
+    }
+    
+    private fun stopFallDetection() {
+        if (fallDetectionActive) {
+            sensorManager.unregisterListener(this)
+            fallDetectionActive = false
+            Log.d("MainActivity", "Fall detection stopped")
+        }
+    }
+    
+    private fun openEmergencyAlert() {
+        val intent = Intent(this, EmergencyAlertActivity::class.java)
+        intent.putExtra("CURRENT_LATITUDE", currentLatitude)
+        intent.putExtra("CURRENT_LONGITUDE", currentLongitude)
+        startActivity(intent)
+    }
+    
+    private fun loadCachedIpAddress(edtIp: EditText) {
+        val cachedBrokerUrl = mqttHandler.getCachedBrokerUrl()
+        // Extrair apenas o IP do formato tcp://IP:1883
+        val ipFromCache = cachedBrokerUrl.replace("tcp://", "").replace(":1883", "")
+        
+        Log.d("MainActivity", "Cached broker URL: $cachedBrokerUrl")
+        Log.d("MainActivity", "Extracted IP: $ipFromCache")
+        
+        // Sempre carregar o IP do cache, mesmo se for o padrão
+        if (ipFromCache.isNotEmpty() && ipFromCache != "null") {
+            edtIp.setText(ipFromCache)
+            Log.d("MainActivity", "IP loaded from cache: $ipFromCache")
+        } else {
+            Log.d("MainActivity", "No valid IP in cache, field will remain with hint")
+        }
+    }
+    
+    private fun saveCurrentIpToCache(ipAddress: String) {
+        val brokerUrl = "tcp://$ipAddress:1883"
+        mqttHandler.saveBrokerUrl(brokerUrl)
+        Log.d("MainActivity", "IP saved to cache: $ipAddress -> $brokerUrl")
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        event?.let { sensorEvent ->
+            if (sensorEvent.sensor.type == Sensor.TYPE_ACCELEROMETER && fallDetectionActive) {
+                val x = sensorEvent.values[0]
+                val y = sensorEvent.values[1]
+                val z = sensorEvent.values[2]
+                
+                // Processar dados para detecção de queda
+                fallDetector.processSensorData(x, y, z)
+            }
+        }
+    }
+    
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Não é necessário implementar para este caso de uso
+    }
+
 
     override fun onStart() {
         super.onStart()
@@ -244,6 +377,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopFallDetection()
+        locationManager.stopLocationUpdates()
     }
 
     private fun setupGestureDetector() {

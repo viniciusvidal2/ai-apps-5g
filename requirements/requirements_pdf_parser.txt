@@ -1,0 +1,4 @@
+paho-mqtt==2.1.0
+pdfplumber==0.11.7
+pymupdf==1.26.1
+ollama==0.4.7

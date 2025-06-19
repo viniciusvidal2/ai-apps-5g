@@ -1,0 +1,135 @@
+import paho.mqtt.client as mqtt
+from typing import Any
+import argparse
+import json
+from ai_apis.sheet_data_selection import SheetDataSelection
+
+
+class SheetParseAgent:
+    def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int) -> None:
+        """Initializes a SheetParseAgent object to handle parsing a sheet collumns into input and output.
+
+        Args:
+            mqtt_address (str): The MQTT broker address.
+            mqtt_port (int): The MQTT broker port.
+            user_id (int): The user ID associated with the agent.
+        """
+        # Initialize the sheet data selection instance
+        self.sheet_data_selection = SheetDataSelection()
+        # Start the MQTT client and connect to the broker
+        self.mqtt_address = mqtt_address
+        self.mqtt_port = mqtt_port
+        self.client = mqtt.Client()
+        self.client.connect(self.mqtt_address, self.mqtt_port)
+        # Input and output topics are based on the user ID
+        self.user_id = user_id
+        self.input_topic = f"{str(user_id)}/sheet/encoded"
+        self.output_topic = f"{str(user_id)}/sheet/selected_data"
+        # Start the subscriber to listen for incoming encoded pdf messages
+        self.client.subscribe(self.input_topic, qos=1)
+        self.client.on_message = self.on_message
+        self.client.on_connect = self.on_connect
+        # Start the publisher to send messages to the MQTT broker
+        self.client.loop_start()
+
+    def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int) -> None:
+        """Callback function for when the client connects to the MQTT broker.
+
+        Args:
+            client (mqtt.Client): The MQTT client instance.
+            userdata (Any): User-defined data of any type.
+            flags (dict): Response flags from the broker.
+            rc (int): Connection result code.
+        """
+        print(
+            f"Connected to MQTT broker at {self.mqtt_address}:{self.mqtt_port} for user id {self.user_id}")
+
+    def on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
+        """Callback function for when a message is received on the subscribed topic.
+
+        Args:
+            client (mqtt.Client): The MQTT client instance.
+            userdata (Any): User-defined data of any type.
+            msg (mqtt.MQTTMessage): The received MQTT message.
+        """
+        # Parse the incoming message payload as JSON
+        try:
+            data = json.loads(msg.payload.decode('utf-8'))
+        except json.JSONDecodeError:
+            print("Received message is not valid JSON.")
+            return
+        # Set the sheet data from the received message
+        self.sheet_data_selection.set_sheet_data(data=data.get(
+            'sheet_data', ''), sheet_name=data.get('sheet_name', 'default_sheet'))
+        # Set the input and output columns from the received message
+        self.sheet_data_selection.set_input_data_collumns(
+            input_columns=data.get('input_columns', []))
+        self.sheet_data_selection.set_output_data_collumns(
+            output_columns=data.get('output_columns', []))
+        # Select the data based on the input and output columns
+        selected_data = self.sheet_data_selection.get_selected_data()
+        # Publish the selected data to the MQTT broker
+        self.client.publish(
+            self.output_topic,
+            payload=json.dumps(selected_data),
+            qos=1
+        )
+
+    def get_output_topic(self) -> str:
+        """Returns the output topic for the PDF data prompts.
+
+        Returns:
+            str: The output topic string.
+        """
+        return self.output_topic
+
+    def stop(self) -> None:
+        """Stops the MQTT client and disconnects from the broker."""
+        if not self.client.is_connected():
+            return
+        self.client.loop_stop()
+        self.client.disconnect()
+
+
+def main() -> None:
+    """Main function to run the PdfParseAgent.
+    """
+    # Parsing arguments for the MQTT broker address, port, and user ID
+    parser = argparse.ArgumentParser(description="MQTT Sheet agent")
+    parser.add_argument(
+        "--broker", "-b",
+        type=str,
+        required=True,
+        help="MQTT broker address (e.g., 192.168.1.10)"
+    )
+    parser.add_argument(
+        "--port", "-p",
+        type=int,
+        default=1883,
+        help="MQTT broker port (default: 1883)"
+    )
+    parser.add_argument(
+        "--user_id", "-t",
+        type=int,
+        default="1",
+        help="user id"
+    )
+    args = parser.parse_args()
+    # Create an instance of the agent with the provided MQTT broker address, port, and user ID
+    pdf_agent = SheetParseAgent(
+        mqtt_address=args.broker,
+        mqtt_port=args.port,
+        user_id=args.user_id
+    )
+    try:
+        # Keep the agent running to listen for incoming messages
+        while True:
+            pass
+    except KeyboardInterrupt:
+        print("Stopping SheetParseAgent due to keyboard interrupt.")
+    finally:
+        pdf_agent.stop()
+
+
+if __name__ == "__main__":
+    main()

@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import numpy as np
+import io
 
 
 class NeuralNetworkTrainer:
@@ -181,6 +182,16 @@ class NeuralNetworkTrainer:
         output_scaled = output_tensor.cpu().numpy()
         output = self.scaler_out.inverse_transform(output_scaled)
         return output
+    
+    def get_serialized_model(self) -> bytes:
+        """Get the trained model.
+
+        Returns:
+            bytes: The serialized trained neural network model.
+        """
+        buffer = io.BytesIO()
+        torch.save(self.model.state_dict(), buffer)
+        return buffer.getvalue()
 
 
 if __name__ == "__main__":

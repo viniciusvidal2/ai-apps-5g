@@ -6,13 +6,15 @@ from ai_apis.nn_model_train import NeuralNetworkTrainer
 
 
 class NnTrainAgent:
-    def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int) -> None:
+    def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int, input_topic: str, output_topic: str) -> None:
         """Initializes a NnTrainAgent object to handle the neural network training with desired data.
 
         Args:
             mqtt_address (str): The MQTT broker address.
             mqtt_port (int): The MQTT broker port.
             user_id (int): The user ID associated with the agent.
+            input_topic (str): The MQTT topic to subscribe for input data.
+            output_topic (str): The MQTT topic to publish output data.
         """
         # Initialize the engine instance
         self.nn_trainer = NeuralNetworkTrainer()
@@ -23,8 +25,8 @@ class NnTrainAgent:
         self.client.connect(self.mqtt_address, self.mqtt_port)
         # Input and output topics are based on the user ID
         self.user_id = user_id
-        self.input_topic = f"{str(user_id)}/nn/train_data"
-        self.output_topic = f"{str(user_id)}/nn/output_data"
+        self.input_topic = input_topic
+        self.output_topic = output_topic
         # Start the subscriber to listen for incoming encoded pdf messages
         self.client.subscribe(self.input_topic, qos=1)
         self.client.on_message = self.on_message
@@ -126,12 +128,26 @@ def main() -> None:
         default="1",
         help="user id"
     )
+    parser.add_argument(
+        "--input_topic", "-i",
+        type=str,
+        default="nn/train/input",
+        help="MQTT input topic for neural network training data"
+    )
+    parser.add_argument(
+        "--output_topic", "-o",
+        type=str,
+        default="nn/train/output",
+        help="MQTT output topic for trained neural network model"
+    )
     args = parser.parse_args()
     # Create an instance of the agent with the provided MQTT broker address, port, and user ID
     agent = NnTrainAgent(
         mqtt_address=args.broker,
         mqtt_port=args.port,
-        user_id=args.user_id
+        user_id=args.user_id,
+        input_topic=args.input_topic,
+        output_topic=args.output_topic
     )
     try:
         # Keep the agent running to listen for incoming messages

@@ -79,6 +79,10 @@ import android.provider.Settings
 import com.example.mqttwearable.data.DeviceIdManager
 import com.example.mqttwearable.sensors.FallDetector
 import com.example.mqttwearable.location.LocationManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
@@ -93,7 +97,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         android.Manifest.permission.ACTIVITY_RECOGNITION,
         android.Manifest.permission.BODY_SENSORS,
         android.Manifest.permission.ACCESS_FINE_LOCATION,
-        android.Manifest.permission.ACCESS_COARSE_LOCATION
+        android.Manifest.permission.ACCESS_COARSE_LOCATION,
+        android.Manifest.permission.POST_NOTIFICATIONS
     )
 
     // 2) Crie o launcher que vai pedir essas permissões
@@ -111,6 +116,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentLatitude: Double? = null
     private var currentLongitude: Double? = null
     private var fallDetectionActive = false
+
+    // Variáveis removidas - publicação do acelerômetro agora é feita pelo HealthForegroundService
 
     private val spO2MeasurementDuration = 35000L
     private val spO2MeasurementInterval = 60000L
@@ -291,7 +298,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 mqttConnected = false
                 btnConectar.text = "Conectar"
                 txtStatus?.text = "Desconectado"
-                // Parar detecção de queda quando desconectar
+                // Parar detecção de queda e publicação do acelerômetro quando desconectar
                 stopFallDetection()
             }
         }
@@ -344,6 +351,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             healthPublisher.startPassiveMeasure()
                         }
                         val intent = Intent(this, HealthForegroundService::class.java)
+                        intent.putExtra(HealthForegroundService.EXTRA_BROKER_IP, ipText)
                         ContextCompat.startForegroundService(this, intent)
                     } else {
                         Log.e("MainActivity", "Falha ao conectar MQTT")
@@ -397,14 +405,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             }
         })
         
-        Log.d("MainActivity", "Fall detection setup completed")
+        Log.d("MainActivity", "Fall detection setup completed - Nota: Detecção principal agora é no HealthForegroundService")
     }
     
     private fun startFallDetection() {
         if (accelerometer != null && !fallDetectionActive) {
             sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_UI)
             fallDetectionActive = true
-            Log.d("MainActivity", "Fall detection started")
+            Log.d("MainActivity", "Fall detection started - Detecção principal é no HealthForegroundService")
+            
+            // Nota: A detecção principal de queda e publicação do acelerômetro agora são feitas pelo HealthForegroundService
         }
     }
     
@@ -475,6 +485,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onStop() {
         super.onStop()
     }
+
+    // Métodos de publicação do acelerômetro removidos - agora são feitos pelo HealthForegroundService
 
     override fun onDestroy() {
         super.onDestroy()

@@ -58,7 +58,8 @@ class LocationManager(private val context: Context) {
                     AndroidLocationManager.GPS_PROVIDER,
                     10000L, // 10 segundos
                     10f,    // 10 metros
-                    locationListener!!
+                    locationListener!!,
+                    android.os.Looper.getMainLooper()
                 )
                 Log.d("LocationManager", "GPS habilitado")
             }
@@ -69,7 +70,8 @@ class LocationManager(private val context: Context) {
                     AndroidLocationManager.NETWORK_PROVIDER,
                     10000L, // 10 segundos
                     10f,    // 10 metros
-                    locationListener!!
+                    locationListener!!,
+                    android.os.Looper.getMainLooper()
                 )
                 Log.d("LocationManager", "Network Location habilitado")
             }

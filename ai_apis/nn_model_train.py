@@ -6,6 +6,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import numpy as np
 import io
+import base64
 
 
 class NeuralNetworkTrainer:
@@ -164,7 +165,7 @@ class NeuralNetworkTrainer:
 
         Args:
             input_dict (dict): Dictionary where keys are feature names and values are lists of feature values.
-        
+
         Returns:
             np.ndarray: The predicted output values after inverse scaling.
         """
@@ -182,16 +183,16 @@ class NeuralNetworkTrainer:
         output_scaled = output_tensor.cpu().numpy()
         output = self.scaler_out.inverse_transform(output_scaled)
         return output
-    
-    def get_serialized_model(self) -> bytes:
+
+    def get_serialized_model(self) -> str:
         """Get the trained model.
 
         Returns:
-            bytes: The serialized trained neural network model.
+            str: The serialized trained neural network model, in string format to be json compatible.
         """
         buffer = io.BytesIO()
         torch.save(self.model.state_dict(), buffer)
-        return buffer.getvalue()
+        return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
 if __name__ == "__main__":

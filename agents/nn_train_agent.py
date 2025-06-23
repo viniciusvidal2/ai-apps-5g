@@ -7,7 +7,7 @@ from ai_apis.nn_model_train import NeuralNetworkTrainer
 
 class NnTrainAgent:
     def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int) -> None:
-        """Initializes a NnTrainAgent object to handle parsing a sheet collumns into input and output.
+        """Initializes a NnTrainAgent object to handle the neural network training with desired data.
 
         Args:
             mqtt_address (str): The MQTT broker address.
@@ -23,8 +23,8 @@ class NnTrainAgent:
         self.client.connect(self.mqtt_address, self.mqtt_port)
         # Input and output topics are based on the user ID
         self.user_id = user_id
-        self.input_topic = f"{str(user_id)}/sheet/encoded"
-        self.output_topic = f"{str(user_id)}/sheet/selected_data"
+        self.input_topic = f"{str(user_id)}/nn/train_data"
+        self.output_topic = f"{str(user_id)}/nn/output_data"
         # Start the subscriber to listen for incoming encoded pdf messages
         self.client.subscribe(self.input_topic, qos=1)
         self.client.on_message = self.on_message
@@ -69,7 +69,7 @@ class NnTrainAgent:
         self.nn_trainer.set_network_shape(hidden_layers=hidden_layers)
         self.nn_trainer.build_model()
         self.nn_trainer.train(epochs=epochs, lr=lr, batch_size=batch_size)
-        model = self.nn_trainer.get_serialized_model()
+        model = self.nn_trainer.get_serialized_model()  # [str]
         # Serialize the model to send through MQTT
         model_data = {
             'input_data': input_data,

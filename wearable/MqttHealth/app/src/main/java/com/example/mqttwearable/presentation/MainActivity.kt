@@ -160,6 +160,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             isSpO2MeasurementRunning.set(false)
             spO2Listener?.stopTracker()
             com.example.mqttwearable.data.SpO2DataManager.updateSpO2Value(spO2Value)
+            // Voltar fundo para padrão após medição bem-sucedida
+            txtSpO2Main.setBackgroundColor(resources.getColor(android.R.color.background_dark, theme))
+            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
+        } else if (status == com.example.mqttwearable.sensors.SpO2Status.DEVICE_MOVING ||
+             status == com.example.mqttwearable.sensors.SpO2Status.LOW_SIGNAL) {
+            // Erro durante medição
+            txtSpO2Main.setBackgroundColor(android.graphics.Color.RED)
+            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
         }
     }
 
@@ -169,11 +177,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             previousSpO2Status = com.example.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
             it.startTracker()
             isSpO2MeasurementRunning.set(true)
+            // Alterar fundo para AZUL enquanto mede
+            txtSpO2Main.setBackgroundColor(android.graphics.Color.BLUE)
+            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
             // Forçar parada de segurança após a duração prevista
             measurementHandler.postDelayed({
                 if (isSpO2MeasurementRunning.get()) {
                     it.stopTracker()
                     isSpO2MeasurementRunning.set(false)
+                    // Medição não concluiu – marcar como erro
+                    txtSpO2Main.setBackgroundColor(android.graphics.Color.RED)
+                    txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
                 }
             }, spO2MeasurementDuration + 2000)
         }

@@ -1,0 +1,31 @@
+FROM ubuntu:22.04
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-distutils \
+    python3-pip \
+    curl \
+    git \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+# Update pip
+RUN pip install --upgrade pip
+
+# Copy code to inside the image
+COPY requirements/requirements_nn_train.txt /app/requirements_nn_train.txt
+RUN pip install --no-cache-dir --timeout=100 --retries=100 -r requirements_nn_train.txt
+
+# Copy interesting folders and app file
+COPY ai_apis/nn_model_train.py /app/ai_apis/nn_model_train.py
+COPY agents/nn_train_agent.py /app/agents/nn_train_agent.py
+
+# Expose the MQTT port
+EXPOSE 1883
+
+# Set the command to run the agent
+ENTRYPOINT ["python3", "-m", "agents.nn_train_agent"]

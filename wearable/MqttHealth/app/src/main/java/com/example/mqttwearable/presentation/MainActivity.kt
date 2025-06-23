@@ -112,6 +112,82 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentLongitude: Double? = null
     private var fallDetectionActive = false
 
+    private val spO2MeasurementDuration = 35000L
+    private val spO2MeasurementInterval = 60000L
+    private val isSpO2MeasurementRunning = java.util.concurrent.atomic.AtomicBoolean(false)
+    private lateinit var measurementHandler: android.os.Handler
+    private var connectionManagerSpO2: com.example.mqttwearable.sensors.ConnectionManager? = null
+    private var spO2Listener: com.example.mqttwearable.sensors.SpO2Listener? = null
+    private var previousSpO2Status: Int = com.example.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
+
+    private lateinit var txtSpO2Main: android.widget.TextView
+
+    // Listener para receber atualizações do SpO2DataManager
+    private val spO2DataListener = object : com.example.mqttwearable.data.SpO2DataManager.SpO2DataListener {
+        override fun onSpO2ValueUpdated(spO2Value: Int, timestamp: Long) {
+            runOnUiThread {
+                txtSpO2Main.text = spO2Value.toString()
+            }
+        }
+    }
+
+    // Observer de conexão com o serviço de saúde
+    private val spO2ConnectionObserver = object : com.example.mqttwearable.sensors.ConnectionObserver {
+        override fun onConnectionResult(message: String) {
+            // Se a mensagem indicar erro de suporte, ignoramos
+            if (message.contains("não suportado")) return
+
+            // Inicializar listeners quando conectado
+            spO2Listener = com.example.mqttwearable.sensors.SpO2Listener { status, spO2Value ->
+                onSpO2TrackerDataChanged(status, spO2Value)
+            }
+            connectionManagerSpO2?.initSpO2(spO2Listener!!)
+            // Iniciar o loop de medição periódica
+            startPeriodicSpO2Measurement()
+        }
+
+        override fun onError(exception: com.samsung.android.service.health.tracking.HealthTrackerException) {
+            // Loga o erro, mas não interrompe a aplicação principal
+            android.util.Log.e("MainActivity", "Erro de conexão SpO2: ${exception.message}")
+        }
+    }
+
+    private fun onSpO2TrackerDataChanged(status: Int, spO2Value: Int) {
+        if (status == previousSpO2Status) return
+        previousSpO2Status = status
+
+        if (status == com.example.mqttwearable.sensors.SpO2Status.MEASUREMENT_COMPLETED) {
+            isSpO2MeasurementRunning.set(false)
+            spO2Listener?.stopTracker()
+            com.example.mqttwearable.data.SpO2DataManager.updateSpO2Value(spO2Value)
+        }
+    }
+
+    private fun performSpO2Measurement() {
+        if (isSpO2MeasurementRunning.get()) return
+        spO2Listener?.let {
+            previousSpO2Status = com.example.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
+            it.startTracker()
+            isSpO2MeasurementRunning.set(true)
+            // Forçar parada de segurança após a duração prevista
+            measurementHandler.postDelayed({
+                if (isSpO2MeasurementRunning.get()) {
+                    it.stopTracker()
+                    isSpO2MeasurementRunning.set(false)
+                }
+            }, spO2MeasurementDuration + 2000)
+        }
+    }
+
+    private fun startPeriodicSpO2Measurement() {
+        measurementHandler.post(object : Runnable {
+            override fun run() {
+                performSpO2Measurement()
+                measurementHandler.postDelayed(this, spO2MeasurementInterval)
+            }
+        })
+    }
+
 //    val activeTypes: Set<DeltaDataType<*, *>> = setOf(
 ////        DataType.STEPS,     // é um DeltaDataType<Int, SampleDataPoint<Int>>
 ////        DataType.CALORIES,  // é um DeltaDataType<Float, SampleDataPoint<Float>>
@@ -161,6 +237,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val btnAcc = findViewById<Button>(R.id.btnAcc)
         val btnSpO2 = findViewById<Button>(R.id.btnSpO2)
         val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+        txtSpO2Main = findViewById(R.id.txtSpO2Main)
+
+        // Inicializa o handler para medições periódicas
+        measurementHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        // Registrar listener de dados de SpO2
+        com.example.mqttwearable.data.SpO2DataManager.addListener(spO2DataListener)
+
+        // Criar ConnectionManager para SpO2
+        connectionManagerSpO2 = com.example.mqttwearable.sensors.ConnectionManager(spO2ConnectionObserver)
+        connectionManagerSpO2?.connect(applicationContext)
         
         // Obter e exibir o ANDROID_ID usando o DeviceIdManager
         txtAndroidId.text = DeviceIdManager.getDeviceId()
@@ -379,6 +466,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         super.onDestroy()
         stopFallDetection()
         locationManager.stopLocationUpdates()
+        // Limpar medições de SpO2
+        measurementHandler.removeCallbacksAndMessages(null)
+        com.example.mqttwearable.data.SpO2DataManager.removeListener(spO2DataListener)
+        spO2Listener?.stopTracker()
+        connectionManagerSpO2?.disconnect()
     }
 
     private fun setupGestureDetector() {

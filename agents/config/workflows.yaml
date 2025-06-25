@@ -1,0 +1,19 @@
+workflows:
+  - name: pdf_inference
+    description: A workflow for PDF inference
+    agents_list: [
+      pdf_parser
+    ]
+
+  - name: nn_train_from_sheet
+    description: A workflow for training a neural network from a sheet
+    agents_list: [
+      sheet_parser,
+      nn_trainer
+    ]
+    
+  - name: chatbot
+    description: A workflow for chatbot conversation
+    agents_list: [
+      chatbot,
+    ]

@@ -3,7 +3,8 @@ import fitz  # PyMuPDF
 import io
 from PIL import Image
 import ollama
-import io
+import os
+import time
 
 
 class PdfLookup:
@@ -14,7 +15,7 @@ class PdfLookup:
         self.pdf_images_info = None
         self.pdf_data_prompt = None
         self.pdf_bytes = None
-        
+
     def set_pdf_bytes(self, pdf_bytes: bytes) -> None:
         """Sets the PDF file content as bytes to be processed.
 
@@ -27,7 +28,8 @@ class PdfLookup:
         """Loads the PDF file, extracts text and images, and prepares the data for inference.
         """
         if not self.pdf_bytes:
-            raise ValueError("PDF bytes are not set. Please set the PDF bytes before loading.")
+            raise ValueError(
+                "PDF bytes are not set. Please set the PDF bytes before loading.")
         self.pdf_stream = io.BytesIO(self.pdf_bytes)
         self.pdf_stream.seek(0)
         # Load the PDF text using the plumber library
@@ -105,7 +107,8 @@ class PdfInference:
         except FileNotFoundError:
             raise ValueError(f"PDF file not found at path: {path}")
         except Exception as e:
-            raise ValueError(f"An error occurred while reading the PDF file: {e}")
+            raise ValueError(
+                f"An error occurred while reading the PDF file: {e}")
 
     def set_inference_prompt(self, prompt: str) -> None:
         """Sets the inference prompt to be used with the PDF data.
@@ -129,28 +132,61 @@ class PdfInference:
         pdf_data_prompts = self.pdf_lookup.get_pdf_data_prompts()
         # Use the Ollama API to run inference with the PDF data and the inference prompt
         print("Running inference with Ollama API...")
+        formated_prompt = f"""
+        Instrucao: A seguir, voce recebera o conteudo de um PDF dividido em duas partes: texto e imagens.
+        A primeira parte contem o texto do PDF, e a segunda parte contem as imagens do PDF.
+        Sua tarefa e analisar o conteudo do PDF e responder a pergunta que sera feita a seguir
+        com base no conteudo do PDF.
+        Texto do PDF:
+        {pdf_data_prompts["text"]}
+        Imagens do PDF:
+        {pdf_data_prompts["images"]}
+        Pergunta: {self.inference_prompt}
+        Resposta:
+        """
         response = ollama.chat(
-            model="qwen3:8b",
+            model="deepseek-r1:70b",
             messages=[
-                {"role": "system", "content": "Colocarei no proximo prompt o conteudo de um PDF, somente a parte textual"},
-                {"role": "user", "content": pdf_data_prompts["text"]},
-                {"role": "system", "content": "Colocarei no proximo prompt o conteudo do mesmo PDF, somente a parte de imagens"},
-                {"role": "user", "content": pdf_data_prompts["images"]},
-                {"role": "system", "content": "Agora, por favor, responda a pergunta abaixo com base no conteudo do PDF"},
-                {"role": "user", "content": self.inference_prompt},
+                {"role": "system", "content": "Voce e um assintente de IA especializado em analise de documentos PDF."},
+                {"role": "user", "content": formated_prompt},
             ]
         )
-        return response['message']['content']
+        # Remove everything from the think process
+        answer = response['message']['content']
+        think_end_section = "</think>"
+        if think_end_section in response['message']['content']:
+            answer = response['message']['content'].split(
+                think_end_section)[-1].strip()
+        return answer
 
 
 if __name__ == "__main__":
+    os.environ["OLLAMA_ACCELERATE"] = "gpu"
     # Example usage
     pdf_inference = PdfInference()
-    pdf_inference.set_pdf_path("/home/grin/Downloads/boleto.pdf")
-    query_prompt = "Qual o valor final deste boleto? Qual a data de vencimento?"
-    pdf_inference.set_inference_prompt(query_prompt)
-    result = pdf_inference.run_inference()
-    # Print the result from the LLM
-    print(f"\nQuery Prompt: {query_prompt}")
-    print("\n=== LLM Response ===\n")
-    print(result)
+    pdf_inference.set_pdf_path("/home/vini/Downloads/manual_corolla.pdf")
+    # query_prompts = [
+    #     "Quais passos sao de responsabilidade de daiana santos?",
+    #     "Quais passos sao de responsabilidade de INFRA-SPO?",
+    #     "Me fale quantos passos ha no plano de atualizacao?",
+    #     "Qual a data de emissao do plano de atualizacao?",
+    #     "Qual o prazo de execucao do plano de atualizacao, somando as duracoes de cada passo?",
+    #     "Faca um resumo tecnico das descricoes das atividades"
+    # ]
+    query_prompts = [
+        "Me diga as regras para condutores profissionais.",
+        "Faça um resumo do anexo do código brasileiro de trânsito, com os pontos mais críticos.",
+        "Quais as principais funcionalidades dos pneus?",
+        "Quais são as obrigações do condutor profissional?",
+    ]
+    for query_prompt in query_prompts:
+        print("\n\n---------------------------------------------------------\n\n")
+        start_t = time.time()
+        pdf_inference.set_inference_prompt(query_prompt)
+        result = pdf_inference.run_inference()
+        # Print the result from the LLM
+        print(f"\nQuery Prompt: {query_prompt}")
+        print("\n=== LLM Response ===\n")
+        print(result)
+        end_t = time.time()
+        print(f"\nTime taken for inference: {end_t - start_t:.2f} seconds")

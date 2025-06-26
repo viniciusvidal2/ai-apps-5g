@@ -2,12 +2,12 @@ import paho.mqtt.client as mqtt
 from typing import Any
 import argparse
 import json
-from ai_apis.nn_model_train import NeuralNetworkTrainer
+from ai_apis.chat_with_history import ChatBot
 
 
-class NnTrainAgent:
+class ChatbotAgent:
     def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int, input_topic: str, output_topic: str) -> None:
-        """Initializes a NnTrainAgent object to handle the neural network training with desired data.
+        """Initializes a ChatbotAgent object to handle chat interactions.
 
         Args:
             mqtt_address (str): The MQTT broker address.
@@ -16,8 +16,8 @@ class NnTrainAgent:
             input_topic (str): The MQTT topic to subscribe for input data.
             output_topic (str): The MQTT topic to publish output data.
         """
-        # Initialize the engine instance
-        self.nn_trainer = NeuralNetworkTrainer()
+        # Initialize the chat bot instance
+        self.chatbot = ChatBot(model_id="deepseek-r1:70b")
         # Start the MQTT client and connect to the broker
         self.mqtt_address = mqtt_address
         self.mqtt_port = mqtt_port
@@ -60,33 +60,21 @@ class NnTrainAgent:
         except json.JSONDecodeError:
             print("Received message is not valid JSON.")
             return
-        # Extract the data from the message
-        input_data = data.get('input_data', {})
-        output_data = data.get('output_data', {})
-        hidden_layers = data.get('hidden_layers', [32, 16])
-        epochs = data.get('epochs', 100)
-        lr = data.get('lr', 0.01)
-        batch_size = data.get('batch_size', 16)
-        self.nn_trainer.set_data(input_data, output_data)
-        self.nn_trainer.set_network_shape(hidden_layers=hidden_layers)
-        self.nn_trainer.build_model()
-        self.nn_trainer.train(epochs=epochs, lr=lr, batch_size=batch_size)
-        model = self.nn_trainer.get_serialized_model()  # [str]
-        # Serialize the model to send through MQTT
-        model_data = {
-            'input_data': input_data,
-            'output_data': output_data,
-            'hidden_layers': hidden_layers,
-            'epochs': epochs,
-            'lr': lr,
-            'batch_size': batch_size,
-            'model': model
-        }
+        # Insert the message into the chatbot and get the response
+        assistant_response = ""
+        for chunk in self.chatbot.chat(user_input=data["user_input"]):
+            assistant_response += chunk
+            print(chunk, end="", flush=True)
         # Publish the model data to the MQTT broker
         self.client.publish(
             self.output_topic,
-            payload=json.dumps(model_data),
+            payload=json.dumps({"assistant_response": assistant_response}),
             qos=1
+        )
+        # Update the chatbot history with the user input and assistant response
+        self.chatbot.updateHistory(
+            user_input=data["user_input"],
+            assistant_response=assistant_response
         )
 
     def get_output_topic(self) -> str:
@@ -106,10 +94,10 @@ class NnTrainAgent:
 
 
 def main() -> None:
-    """Main function to run the PdfParseAgent.
+    """Main function to run the Chatbot agent.
     """
     # Parsing arguments for the MQTT broker address, port, and user ID
-    parser = argparse.ArgumentParser(description="MQTT Sheet agent")
+    parser = argparse.ArgumentParser(description="MQTT Chatbot agent")
     parser.add_argument(
         "--broker", "-b",
         type=str,
@@ -131,18 +119,18 @@ def main() -> None:
     parser.add_argument(
         "--input_topic", "-i",
         type=str,
-        default="nn/train/input",
-        help="MQTT input topic for neural network training data"
+        default="chatbot/input",
+        help="MQTT input topic"
     )
     parser.add_argument(
         "--output_topic", "-o",
         type=str,
-        default="nn/train/output",
-        help="MQTT output topic for trained neural network model"
+        default="chatbot/output",
+        help="MQTT output topic"
     )
     args = parser.parse_args()
     # Create an instance of the agent with the provided MQTT broker address, port, and user ID
-    agent = NnTrainAgent(
+    agent = ChatbotAgent(
         mqtt_address=args.broker,
         mqtt_port=args.port,
         user_id=args.user_id,
@@ -154,7 +142,7 @@ def main() -> None:
         while True:
             pass
     except KeyboardInterrupt:
-        print("Stopping NnTrainAgent due to keyboard interrupt.")
+        print("Stopping Chatbot agent due to keyboard interrupt.")
     finally:
         agent.stop()
 

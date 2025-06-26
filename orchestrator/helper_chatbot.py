@@ -48,10 +48,10 @@ def chatbot_ui():
             docker_run_command += f" --input_topic {input_topic} --output_topic {output_topic}"
             subprocess.Popen(docker_run_command, shell=True)
         # Subscribe to the chatbot output topic
-        st.chatbot_input_topic = input_topics[0]
-        st.chatbot_output_topic = output_topics[0]
+        st.session_state.chatbot_input_topic = input_topics[0]
+        st.session_state.chatbot_output_topic = output_topics[0]
         st.session_state.mqtt_client.subscribe(
-            st.chatbot_output_topic, qos=1)
+            st.session_state.chatbot_output_topic, qos=1)
         # Create the chatbot callback, controlling message flow with a flag
         st.session_state.mqtt_client.on_message = assistant_response_callback
         st.new_chatbot_message = False

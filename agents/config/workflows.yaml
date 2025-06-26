@@ -1,19 +1,33 @@
 workflows:
-  - name: pdf_inference
+  pdf_inference:
+    name: pdf_inference
     description: A workflow for PDF inference
-    agents_list: [
-      pdf_parser
-    ]
+    agents:
+      - pdf_parser
+    input_topics:
+      - pdf_parser/input
+    output_topics:
+      - pdf_parser/output
 
-  - name: nn_train_from_sheet
+  nn_train_from_sheet:
+    name: nn_train_from_sheet
     description: A workflow for training a neural network from a sheet
-    agents_list: [
-      sheet_parser,
-      nn_trainer
-    ]
-    
-  - name: chatbot
+    agents:
+      - sheet_parser
+      - nn_trainer
+    input_topics:
+      - sheet_parser/input
+      - nn_trainer/input
+    output_topics:
+      - nn_trainer/input
+      - nn_trainer/output
+
+  chatbot:
+    name: chatbot
     description: A workflow for chatbot conversation
-    agents_list: [
-      chatbot,
-    ]
+    agents:
+      - chatbot
+    input_topics:
+      - chatbot/input
+    output_topics:
+      - chatbot/output

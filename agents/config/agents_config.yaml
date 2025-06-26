@@ -1,20 +1,24 @@
 agents:
-  - name: nn_trainer
+  nn_trainer:
+    name: nn_trainer
     dockerfile_path: dockerfiles/Dockerfile.nntrainagent
     input_topic: nn_trainer/input
     output_topic: nn_trainer/output
 
-  - name: pdf_parser
+  pdf_parser:
+    name: pdf_parser
     dockerfile_path: dockerfiles/Dockerfile.pdfparseragent
     input_topic: pdf_parser/input
     output_topic: pdf_parser/output
 
-  - name: sheet_parser
+  sheet_parser:
+    name: sheet_parser
     dockerfile_path: dockerfiles/Dockerfile.sheetparseragent
     input_topic: sheet_parser/input
     output_topic: sheet_parser/output
 
-  - name: chatbot
+  chatbot:
+    name: chatbot
     dockerfile_path: dockerfiles/Dockerfile.chatbotagent
     input_topic: chatbot/input
     output_topic: chatbot/output

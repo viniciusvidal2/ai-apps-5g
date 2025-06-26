@@ -13,3 +13,8 @@ agents:
     dockerfile_path: dockerfiles/Dockerfile.sheetparseragent
     input_topic: sheet_parser/input
     output_topic: sheet_parser/output
+
+  - name: chatbot
+    dockerfile_path: dockerfiles/Dockerfile.chatbotagent
+    input_topic: chatbot/input
+    output_topic: chatbot/output

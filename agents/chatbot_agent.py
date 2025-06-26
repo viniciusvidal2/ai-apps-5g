@@ -17,7 +17,7 @@ class ChatbotAgent:
             output_topic (str): The MQTT topic to publish output data.
         """
         # Initialize the chat bot instance
-        self.chatbot = ChatBot(model_id="deepseek-r1:70b")
+        self.chatbot = ChatBot(model_id="gemma3:1b")
         # Start the MQTT client and connect to the broker
         self.mqtt_address = mqtt_address
         self.mqtt_port = mqtt_port

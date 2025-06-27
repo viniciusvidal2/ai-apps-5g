@@ -4,6 +4,7 @@ import streamlit as st
 import os
 import sys
 import subprocess
+import json
 
 # Add the parent directory folder to find our modules
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,13 +31,13 @@ def assistant_response_callback(client: mqtt.Client, userdata: Any, msg: mqtt.MQ
     if "assistant_response" not in st.session_state:
         st.session_state.assistant_response = ""
     st.session_state.assistant_response = data
-    st.new_chatbot_message = True
+    st.session_state.new_chatbot_message = True
 
 
 def chatbot_ui():
     """Streamlit UI for the chatbot agent."""
     # Initialize the control variables in the UI
-    if "chatbot_ui_initialized" not in st.session_state:
+    if st.session_state.chatbot_ui_initialized == False:
         # Initialize the proper agents from the workflow
         workflow = st.session_state.workflows["chatbot"]
         necessary_agents = workflow["agents"]
@@ -54,7 +55,7 @@ def chatbot_ui():
             st.session_state.chatbot_output_topic, qos=1)
         # Create the chatbot callback, controlling message flow with a flag
         st.session_state.mqtt_client.on_message = assistant_response_callback
-        st.new_chatbot_message = False
+        st.session_state.new_chatbot_message = False
         st.session_state.chatbot_ui_initialized = True
 
     # Display the app title and description
@@ -76,16 +77,15 @@ def chatbot_ui():
         # Publish the user input to the MQTT broker
         st.session_state.mqtt_client.publish(
             st.session_state.chatbot_input_topic,
-            payload=prompt,
-            qos=1,
-            retain=False
+            payload=json.dumps({"user_input": prompt}),
+            qos=1
         )
         # Run a spinner while waiting for the assistant response
         with st.spinner("Aguardando resposta do assistente..."):
             # Wait for the assistant response
-            while not st.new_chatbot_message:
+            while not st.session_state.new_chatbot_message:
                 st.session_state.mqtt_client.loop(timeout=1.0)
-            st.new_chatbot_message = False
+            st.session_state.new_chatbot_message = False
         # Get the assistant response from the MQTT broker
         if "assistant_response" not in st.session_state:
             st.session_state.assistant_response = ""

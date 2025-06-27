@@ -52,6 +52,7 @@ def main() -> None:
         # Tab control state variables
         st.session_state.active_tab = None
         st.session_state.active_process = None
+        st.session_state.chatbot_ui_initialized = False
         # Set the window as initialized
         st.session_state.ui_initialized = True
 

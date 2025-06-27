@@ -101,7 +101,7 @@ def main() -> None:
     parser.add_argument(
         "--broker", "-b",
         type=str,
-        required=True,
+        default="localhost",
         help="MQTT broker address (e.g., 192.168.1.10)"
     )
     parser.add_argument(
@@ -113,7 +113,7 @@ def main() -> None:
     parser.add_argument(
         "--user_id", "-t",
         type=int,
-        default="1",
+        default=1,
         help="user id"
     )
     parser.add_argument(

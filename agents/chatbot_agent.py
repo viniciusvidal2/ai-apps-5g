@@ -101,7 +101,7 @@ def main() -> None:
     parser.add_argument(
         "--broker", "-b",
         type=str,
-        required=True,
+        default="localhost",
         help="MQTT broker address (e.g., 192.168.1.10)"
     )
     parser.add_argument(
@@ -113,19 +113,19 @@ def main() -> None:
     parser.add_argument(
         "--user_id", "-t",
         type=int,
-        default="1",
+        default=1,
         help="user id"
     )
     parser.add_argument(
         "--input_topic", "-i",
         type=str,
-        default="chatbot/input",
+        default="input",
         help="MQTT input topic"
     )
     parser.add_argument(
         "--output_topic", "-o",
         type=str,
-        default="chatbot/output",
+        default="output",
         help="MQTT output topic"
     )
     args = parser.parse_args()

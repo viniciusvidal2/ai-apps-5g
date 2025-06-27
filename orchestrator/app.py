@@ -4,23 +4,17 @@ import os
 import sys
 import argparse
 import yaml
-import subprocess
 from helper_chatbot import chatbot_ui
+from tools import kill_all_processes
 
 # Add the parent directory folder to find our modules
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_path)
 
 
-def kill_all_processes() -> None:
-    """Kills all the agents that can be running from old processes."""
-    with st.spinner("Parando outros agentes..."):
-        for agent in st.session_state.agents.values():
-            try:
-                subprocess.run(agent["docker_stop_command"],
-                            shell=True, check=False)
-            except subprocess.CalledProcessError as e:
-                st.error(f"Error stopping agent {agent['name']}: {e}")
+def reset_pages_data() -> None:
+    """Resets the dictionaries with each pages data"""
+    st.session_state.chatbot_page_data = None
 
 
 def main() -> None:
@@ -63,7 +57,7 @@ def main() -> None:
             st.session_state.workflows = config["workflows"]
         # Tab control state variables
         st.session_state.active_page = None
-        st.session_state.chatbot_ui_initialized = False
+        st.session_state.chatbot_page_data = None
         # Set the window as initialized
         st.session_state.ui_initialized = True
 
@@ -71,7 +65,7 @@ def main() -> None:
     st.set_page_config(page_title="Assistente Inteligente SAE", layout="wide")
     st.title("Assistente Inteligente SAE")
 
-    # Define the page titles and matching functions
+    # Define the page titles
     agent_pages = [
         "Chatbot",
         "Redes Neurais por planilha",
@@ -80,25 +74,23 @@ def main() -> None:
 
     # Layout: 2 columns (left for radio, right for button)
     col1, col2 = st.columns([3, 1])
-
     with col1:
         st.session_state.selected_page = st.radio(
             "Escolha o agente:", agent_pages, key="page_selector")
-
     with col2:
         if st.button("🚀 Lançar agente!"):
-            kill_all_processes()
-            st.session_state.active_page = st.session_state.selected_page
+            with st.spinner("Parando outros agentes..."):
+                reset_pages_data()
+                kill_all_processes(agents=st.session_state.agents)
+                st.session_state.active_page = st.session_state.selected_page
 
     # Now render the active agent's interface
     if st.session_state.active_page == "Chatbot":
-        chatbot_ui()  # This stays rendered and interactive
+        chatbot_ui()
     elif st.session_state.active_page == "Redes Neurais por planilha":
         st.header("Redes Neurais por planilha")
-        # Call other UI or logic
     elif st.session_state.active_page == "Análise de PDFs":
         st.header("Análise de PDFs")
-        # Call other UI or logic
     else:
         st.info("Selecione uma página e clique em '🚀 Lançar agente!'")
 

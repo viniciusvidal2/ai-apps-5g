@@ -4,11 +4,23 @@ import os
 import sys
 import argparse
 import yaml
+import subprocess
 from helper_chatbot import chatbot_ui
 
 # Add the parent directory folder to find our modules
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_path)
+
+
+def kill_all_processes() -> None:
+    """Kills all the agents that can be running from old processes."""
+    with st.spinner("Parando outros agentes..."):
+        for agent in st.session_state.agents.values():
+            try:
+                subprocess.run(agent["docker_stop_command"],
+                            shell=True, check=False)
+            except subprocess.CalledProcessError as e:
+                st.error(f"Error stopping agent {agent['name']}: {e}")
 
 
 def main() -> None:
@@ -50,38 +62,45 @@ def main() -> None:
             config = yaml.safe_load(f)
             st.session_state.workflows = config["workflows"]
         # Tab control state variables
-        st.session_state.active_tab = None
-        st.session_state.active_process = None
+        st.session_state.active_page = None
         st.session_state.chatbot_ui_initialized = False
         # Set the window as initialized
         st.session_state.ui_initialized = True
 
-    # Set the page configuration
+    # Page config
     st.set_page_config(page_title="Assistente Inteligente SAE", layout="wide")
     st.title("Assistente Inteligente SAE")
 
-    # Create the tabs
-    st.session_state.tab_titles = [
-        "Chatbot", "Redes Neurais por planilha", "Análise de PDFs"]
-    tabs = st.tabs(st.session_state.tab_titles)
-    st.session_state.active_tab = st.session_state.tab_titles[0]
+    # Define the page titles and matching functions
+    agent_pages = [
+        "Chatbot",
+        "Redes Neurais por planilha",
+        "Análise de PDFs"
+    ]
 
-    # Populate each tab with proper helper functions
-    with tabs[0]:
-        if st.session_state.active_tab != st.session_state.tab_titles[0]:
-            st.session_state.active_tab = st.session_state.tab_titles[0]
-        chatbot_ui()
-    print(st.session_state.active_tab)
-    with tabs[1]:
-        if st.session_state.active_tab != st.session_state.tab_titles[1]:
-            st.session_state.active_tab = st.session_state.tab_titles[1]
+    # Layout: 2 columns (left for radio, right for button)
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.session_state.selected_page = st.radio(
+            "Escolha o agente:", agent_pages, key="page_selector")
+
+    with col2:
+        if st.button("🚀 Lançar agente!"):
+            kill_all_processes()
+            st.session_state.active_page = st.session_state.selected_page
+
+    # Now render the active agent's interface
+    if st.session_state.active_page == "Chatbot":
+        chatbot_ui()  # This stays rendered and interactive
+    elif st.session_state.active_page == "Redes Neurais por planilha":
         st.header("Redes Neurais por planilha")
-    print(st.session_state.active_tab)
-    with tabs[2]:
-        if st.session_state.active_tab != st.session_state.tab_titles[2]:
-            st.session_state.active_tab = st.session_state.tab_titles[2]
+        # Call other UI or logic
+    elif st.session_state.active_page == "Análise de PDFs":
         st.header("Análise de PDFs")
-    print(st.session_state.active_tab)
+        # Call other UI or logic
+    else:
+        st.info("Selecione uma página e clique em '🚀 Lançar agente!'")
 
 
 if __name__ == "__main__":

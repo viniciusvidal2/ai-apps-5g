@@ -5,6 +5,7 @@ import os
 import sys
 import subprocess
 import json
+import time
 
 # Add the parent directory folder to find our modules
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -22,15 +23,13 @@ def assistant_response_callback(client: mqtt.Client, userdata: Any, msg: mqtt.MQ
         msg (mqtt.MQTTMessage): The received MQTT message.
     """
     # Decode the message payload
-    try:
-        data = msg.payload.decode('utf-8')
-    except UnicodeDecodeError:
-        print("Received message is not valid UTF-8.")
-        return
+    payload = msg.payload.decode('utf-8')
+    data = json.loads(payload)
     # Store the assistant response in the session state
     if "assistant_response" not in st.session_state:
         st.session_state.assistant_response = ""
-    st.session_state.assistant_response = data
+    st.session_state.assistant_response = data["assistant_response"].replace(
+        '\n', '\n\n')
     st.session_state.new_chatbot_message = True
 
 
@@ -90,8 +89,14 @@ def chatbot_ui():
         if "assistant_response" not in st.session_state:
             st.session_state.assistant_response = ""
         response_placeholder = st.empty()
-        response_placeholder.markdown(st.session_state.assistant_response)
+        typed_response = ""
+        for char in st.session_state.assistant_response:
+            typed_response += char
+            response_placeholder.markdown(typed_response)
+            # Simulate typing effect
+            time.sleep(0.01)
         # Store the assistant response in the session state
-        st.session_state.chatbot_messages.append({"role": "user", "content": prompt})
+        st.session_state.chatbot_messages.append(
+            {"role": "user", "content": prompt})
         st.session_state.chatbot_messages.append(
             {"role": "assistant", "content": st.session_state.assistant_response})

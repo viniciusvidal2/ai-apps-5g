@@ -1,6 +1,5 @@
 import yaml
 import subprocess
-import os
 
 
 def load_agents_config(path: str) -> dict:
@@ -23,7 +22,7 @@ def build_agent_images(agents_config: dict) -> None:
         agents_config (dict): The configuration dictionary containing agent definitions.
     """
     agents = agents_config.get('agents', [])
-    for agent in agents:
+    for agent in agents.values():
         name = agent['name']
         dockerfile_path = agent['dockerfile_path']
         # Determine the build context (directory of the Dockerfile)

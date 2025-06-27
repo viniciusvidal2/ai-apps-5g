@@ -31,9 +31,11 @@ ENV OLLAMA_MODELS="/app/ollama_models"
 # Copy interesting folders and app file
 COPY ai_apis/chat_with_history.py /app/ai_apis/chat_with_history.py
 COPY agents/chatbot_agent.py /app/agents/chatbot_agent.py
+COPY agents/start_chatbot_docker.sh /app/agents/start_chatbot_docker.sh
+RUN chmod +x /app/agents/start_chatbot_docker.sh
 
 # Expose the MQTT port
 EXPOSE 1883
 
 # Set the command to run the agent as a module
-ENTRYPOINT ["python3", "-m", "agents.chatbot_agent"]
+ENTRYPOINT ["/app/agents/start_chatbot_docker.sh"]

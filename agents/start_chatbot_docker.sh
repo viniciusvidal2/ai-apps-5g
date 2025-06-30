@@ -4,7 +4,7 @@
 ollama serve &
 
 # Optional: wait for ollama to start
-sleep 2
+sleep 5
 
 # Now run your Python module, passing ALL arguments
 python3 -m agents.chatbot_agent "$@"

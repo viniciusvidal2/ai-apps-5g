@@ -14,8 +14,8 @@ class ChatbotAgentTest:
         self.client.connect(self.mqtt_address, self.mqtt_port)
         # Input and output topics are based on the user ID
         self.user_id = 1
-        self.input_topic = f"{str(self.user_id)}/chatbot/input_data"
-        self.output_topic = f"{str(self.user_id)}/chatbot/output_data"
+        self.input_topic = f"input"
+        self.output_topic = f"output"
         # Start the subscriber to listen for incoming messages
         self.client.on_message = self.on_message
         self.client.on_connect = self.on_connect

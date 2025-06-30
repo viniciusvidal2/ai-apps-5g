@@ -4,10 +4,13 @@ workflows:
     description: A workflow for PDF inference
     agents:
       - pdf_parser
+      - chatbot
     input_topics:
       - pdf_parser/input
+      - chatbot/input
     output_topics:
       - pdf_parser/output
+      - chatbot/output
 
   nn_train_from_sheet:
     name: nn_train_from_sheet

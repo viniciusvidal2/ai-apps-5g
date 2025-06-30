@@ -11,8 +11,6 @@ from tools import launch_agents_from_workflow
 root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(root_path)
 
-os.environ["OLLAMA_ACCELERATE"] = "gpu"
-
 
 def assistant_response_callback(client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
     """Callback function for when a message is received on the subscribed topic.

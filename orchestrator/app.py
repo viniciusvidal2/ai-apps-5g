@@ -5,6 +5,7 @@ import sys
 import argparse
 import yaml
 from helper_chatbot import chatbot_ui
+from helper_pdf_inference import pdf_inference_ui
 from tools import kill_all_processes
 
 # Add the parent directory folder to find our modules
@@ -58,6 +59,8 @@ def main() -> None:
         # Tab control state variables
         st.session_state.active_page = None
         st.session_state.chatbot_page_data = None
+        st.session_state.pdf_inference_page_data = None
+        st.session_state.nn_train_from_sheet_page_data = None
         # Set the window as initialized
         st.session_state.ui_initialized = True
 
@@ -90,7 +93,7 @@ def main() -> None:
     elif st.session_state.active_page == "Redes Neurais por planilha":
         st.header("Redes Neurais por planilha")
     elif st.session_state.active_page == "Análise de PDFs":
-        st.header("Análise de PDFs")
+        pdf_inference_ui()
     else:
         st.info("Selecione uma página e clique em '🚀 Lançar agente!'")
 

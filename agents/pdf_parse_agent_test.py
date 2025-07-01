@@ -8,7 +8,7 @@ class PdfParseAgentTest:
         """Initializes a PdfParseAgentTest object to test the PDF parsing capabilities.
         
         Args:
-            pdf_test_path (str): The path to the test PDF file. Defaults to "test.pdf".
+            pdf_test_path (str): The path to the test PDF file.
         """
         self.pdf_test_path = pdf_test_path
         # Start the MQTT client and connect to the broker

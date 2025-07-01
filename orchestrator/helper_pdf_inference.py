@@ -45,7 +45,6 @@ def on_message(client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> Non
             qos=1
         )
     elif msg.topic == st.session_state.pdf_inference_page_data["assistant_response_topic"]:
-        pass
         # Store the assistant response in the session state
         st.session_state.pdf_inference_page_data["assistant_response"] = (
             data["assistant_response"].replace('\n', '\n\n')
@@ -75,35 +74,42 @@ def pdf_inference_ui():
         # Create the callback, controlling incoming messages or pdf info
         st.session_state.mqtt_client.on_message = on_message
         st.session_state.pdf_inference_page_data["assistant_response_arrived"] = False
-        st.session_state.pdf_inference_page_data["question_ready"] = False
+        st.session_state.pdf_inference_page_data["question_pdf_ready"] = False
         # Assistant response
         st.session_state.pdf_inference_page_data["assistant_response"] = ""
+        # Initialize chat history
+        st.session_state.pdf_inference_page_data["messages"] = []
 
     # Display the app title and description
-    st.title("Assistente de PDFs do GRIn")
+    st.title("Assistente de PDFs")
 
     # Layout: input and file uploader side by side
     col1, col2 = st.columns([2, 1])
     with col1:
+        # Display chat messages from history on app rerun
+        for message in st.session_state.pdf_inference_page_data["messages"]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
         st.session_state.pdf_inference_page_data["inference_prompt"] = st.text_area(
-            "Your Instructions:",
-            placeholder="Write instructions or questions related to your PDF...",
+            "Busca sobre o PDF anexado:",
+            placeholder="Escreva instruções ou perguntas relacionadas ao seu PDF...",
             key="user_text"
         )
     with col2:
         st.session_state.pdf_inference_page_data["uploaded_file"] = st.file_uploader(
-            "Attach a PDF file",
+            "Anexar um arquivo PDF",
             type=["pdf"],
             key="pdf_file"
         )
     # Process button
     if st.button("Process"):
         if st.session_state.pdf_inference_page_data["inference_prompt"] and st.session_state.pdf_inference_page_data["uploaded_file"]:
-            st.session_state.pdf_inference_page_data["question_ready"] = True
+            st.session_state.pdf_inference_page_data["question_pdf_ready"] = True
         else:
-            st.warning("Please provide both text input and a PDF file.")
+            st.warning(
+                "Por favor, forneça tanto o texto de entrada quanto um arquivo PDF.")
 
-    if st.session_state.pdf_inference_page_data["question_ready"]:
+    if st.session_state.pdf_inference_page_data["question_pdf_ready"]:
         # Convert the PDF into binary data and send the request
         pdf_bytes = st.session_state.pdf_inference_page_data["uploaded_file"].read(
         )
@@ -113,17 +119,23 @@ def pdf_inference_ui():
             qos=1
         )
         # While message is not received, spin and wait
-        with st.spinner("Processing... Please wait."):
+        with st.spinner("Processando... Por favor, aguarde."):
             while not st.session_state.pdf_inference_page_data["assistant_response_arrived"]:
                 st.session_state.mqtt_client.loop(timeout=1.0)
             st.session_state.pdf_inference_page_data["assistant_response_arrived"] = False
-            # Print the assistant response from the MQTT broker
-            response_placeholder = st.empty()
-            typed_response = ""
-            for char in st.session_state.pdf_inference_page_data["assistant_response"]:
-                typed_response += char
-                response_placeholder.markdown(typed_response)
-                # Simulate typing effect
-                time.sleep(0.01)
+        # Print the assistant response from the MQTT broker
+        response_placeholder = st.empty()
+        typed_response = ""
+        for char in st.session_state.pdf_inference_page_data["assistant_response"]:
+            typed_response += char
+            response_placeholder.markdown(typed_response)
+            # Simulate typing effect
+            time.sleep(0.01)
+        # Store the assistant response in the session state
+        st.session_state.pdf_inference_page_data["messages"].append(
+            {"role": "user", "content": st.session_state.pdf_inference_page_data["inference_prompt"]})
+        st.session_state.pdf_inference_page_data["messages"].append(
+            {"role": "assistant", "content": st.session_state.pdf_inference_page_data["assistant_response"]})
     else:
-        st.warning("Please provide both text input and a PDF file.")
+        st.warning(
+            "Por favor, forneça tanto o texto de entrada quanto um arquivo PDF.")

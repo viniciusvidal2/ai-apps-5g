@@ -16,6 +16,8 @@ sys.path.append(root_path)
 def reset_pages_data() -> None:
     """Resets the dictionaries with each pages data"""
     st.session_state.chatbot_page_data = None
+    st.session_state.pdf_inference_page_data = None
+    st.session_state.nn_train_from_sheet_page_data = None
 
 
 def main() -> None:
@@ -65,8 +67,8 @@ def main() -> None:
         st.session_state.ui_initialized = True
 
     # Page config
-    st.set_page_config(page_title="Assistente Inteligente SAE", layout="wide")
-    st.title("Assistente Inteligente SAE")
+    st.set_page_config(page_title="Assistentes Inteligentes SAE", layout="wide")
+    st.title("Assistentes Inteligentes SAE")
 
     # Define the page titles
     agent_pages = [

@@ -53,7 +53,7 @@ def chatbot_ui():
         st.session_state.chatbot_page_data["assistant_response"] = ""
 
     # Display the app title and description
-    st.title("Assistente de IA do GRIn")
+    st.title("Assistente de IA")
 
     # Display chat messages from history on app rerun
     for message in st.session_state.chatbot_page_data["messages"]:

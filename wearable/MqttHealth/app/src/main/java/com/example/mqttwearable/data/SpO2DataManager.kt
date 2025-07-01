@@ -1,4 +1,4 @@
-package com.example.mqttwearable.data
+package com.sae5g.mqttwearable.data
 
 import android.util.Log
 import java.util.concurrent.atomic.AtomicInteger

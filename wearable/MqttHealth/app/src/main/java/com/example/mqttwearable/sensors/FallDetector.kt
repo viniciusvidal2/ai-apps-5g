@@ -1,4 +1,4 @@
-package com.example.mqttwearable.sensors
+package com.sae5g.mqttwearable.sensors
 
 import kotlin.math.sqrt
 

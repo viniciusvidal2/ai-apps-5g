@@ -1,4 +1,4 @@
-package com.example.mqttwearable.presentation
+package com.sae5g.mqttwearable.presentation
 
 import android.annotation.SuppressLint
 import android.content.Context
@@ -17,11 +17,11 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
-import com.example.mqttwearable.R
-import com.example.mqttwearable.sensors.FallDetector
-import com.example.mqttwearable.mqtt.MqttHandler
-import com.example.mqttwearable.location.LocationManager
-import com.example.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.R
+import com.sae5g.mqttwearable.sensors.FallDetector
+import com.sae5g.mqttwearable.mqtt.MqttHandler
+import com.sae5g.mqttwearable.location.LocationManager
+import com.sae5g.mqttwearable.data.DeviceIdManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

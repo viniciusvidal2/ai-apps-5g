@@ -1,4 +1,4 @@
-package com.example.mqttwearable.tile
+package com.sae5g.mqttwearable.tile
 
 import android.content.Context
 import androidx.wear.protolayout.ColorBuilders.argb

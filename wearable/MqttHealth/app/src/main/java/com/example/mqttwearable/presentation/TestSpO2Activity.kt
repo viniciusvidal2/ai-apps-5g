@@ -1,4 +1,4 @@
-package com.example.mqttwearable.presentation
+package com.sae5g.mqttwearable.presentation
 
 import android.Manifest
 import android.app.Activity
@@ -9,7 +9,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
-import com.example.mqttwearable.R
+import com.sae5g.mqttwearable.R
 import com.samsung.android.service.health.tracking.ConnectionListener
 import com.samsung.android.service.health.tracking.HealthTrackingService
 import com.samsung.android.service.health.tracking.HealthTrackerException

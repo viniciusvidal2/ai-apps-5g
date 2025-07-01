@@ -1,4 +1,4 @@
-package com.example.mqttwearable.health
+package com.sae5g.mqttwearable.health
 
 import android.app.Service
 import android.content.Context
@@ -6,32 +6,32 @@ import android.content.Intent
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
-import com.example.mqttwearable.R
+import com.sae5g.mqttwearable.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import com.example.mqttwearable.mqtt.MqttHandler
+import com.sae5g.mqttwearable.mqtt.MqttHandler
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.Looper
-import com.example.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.data.DeviceIdManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import android.util.Log
-import com.example.mqttwearable.sensors.FallDetector
-import com.example.mqttwearable.location.LocationManager
+import com.sae5g.mqttwearable.sensors.FallDetector
+import com.sae5g.mqttwearable.location.LocationManager
 import android.os.Vibrator
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import androidx.core.app.NotificationManagerCompat
-import com.example.mqttwearable.presentation.EmergencyAlertActivity
+import com.sae5g.mqttwearable.presentation.EmergencyAlertActivity
 
 class HealthForegroundService : Service(), SensorEventListener {
     private lateinit var wakeLock: PowerManager.WakeLock

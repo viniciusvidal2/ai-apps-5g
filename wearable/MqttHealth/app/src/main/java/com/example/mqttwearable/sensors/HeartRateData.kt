@@ -1,4 +1,4 @@
-package com.example.mqttwearable.sensors
+package com.sae5g.mqttwearable.sensors
 
 data class HeartRateData(
     var status: Int = HeartRateStatus.HR_STATUS_NONE,

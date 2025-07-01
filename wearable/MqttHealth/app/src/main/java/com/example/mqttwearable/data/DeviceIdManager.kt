@@ -1,4 +1,4 @@
-package com.example.mqttwearable.data
+package com.sae5g.mqttwearable.data
 
 import android.content.Context
 import android.provider.Settings

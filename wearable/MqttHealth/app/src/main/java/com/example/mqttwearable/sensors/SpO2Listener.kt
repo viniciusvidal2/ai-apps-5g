@@ -1,10 +1,10 @@
-package com.example.mqttwearable.sensors
+package com.sae5g.mqttwearable.sensors
 
 import android.util.Log
 import com.samsung.android.service.health.tracking.HealthTracker
 import com.samsung.android.service.health.tracking.data.DataPoint
 import com.samsung.android.service.health.tracking.data.ValueKey
-import com.example.mqttwearable.R
+import com.sae5g.mqttwearable.R
 
 class SpO2Listener(private val onSpO2Update: (Int, Int) -> Unit) : BaseListener() {
     

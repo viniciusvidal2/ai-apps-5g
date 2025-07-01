@@ -10,11 +10,11 @@ plugins {
 
 
 android {
-    namespace = "com.example.mqttwearable"
+    namespace = "com.sae5g.mqttwearable"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.mqttwearable"
+        applicationId = "com.sae5g.mqttwearable"
         minSdk = 30
         targetSdk = 34
         versionCode = 1

@@ -3,7 +3,7 @@
  * most up to date changes to the libraries and their usages.
  */
 
-package com.example.mqttwearable.presentation
+package com.sae5g.mqttwearable.presentation
 
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
@@ -63,22 +63,22 @@ import androidx.compose.runtime.remember
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
 import androidx.lifecycle.lifecycleScope
-import com.example.mqttwearable.R
-import com.example.mqttwearable.mqtt.MqttHandler
-import com.example.mqttwearable.health.HealthPublisher
+import com.sae5g.mqttwearable.R
+import com.sae5g.mqttwearable.mqtt.MqttHandler
+import com.sae5g.mqttwearable.health.HealthPublisher
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import com.example.mqttwearable.health.HealthForegroundService
+import com.sae5g.mqttwearable.health.HealthForegroundService
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import android.text.InputFilter
 import android.provider.Settings
-import com.example.mqttwearable.data.DeviceIdManager
-import com.example.mqttwearable.sensors.FallDetector
-import com.example.mqttwearable.location.LocationManager
+import com.sae5g.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.sensors.FallDetector
+import com.sae5g.mqttwearable.location.LocationManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -123,14 +123,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private val spO2MeasurementInterval = 60000L
     private val isSpO2MeasurementRunning = java.util.concurrent.atomic.AtomicBoolean(false)
     private lateinit var measurementHandler: android.os.Handler
-    private var connectionManagerSpO2: com.example.mqttwearable.sensors.ConnectionManager? = null
-    private var spO2Listener: com.example.mqttwearable.sensors.SpO2Listener? = null
-    private var previousSpO2Status: Int = com.example.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
+    private var connectionManagerSpO2: com.sae5g.mqttwearable.sensors.ConnectionManager? = null
+    private var spO2Listener: com.sae5g.mqttwearable.sensors.SpO2Listener? = null
+    private var previousSpO2Status: Int = com.sae5g.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
 
     private lateinit var txtSpO2Main: android.widget.TextView
 
     // Listener para receber atualizações do SpO2DataManager
-    private val spO2DataListener = object : com.example.mqttwearable.data.SpO2DataManager.SpO2DataListener {
+    private val spO2DataListener = object : com.sae5g.mqttwearable.data.SpO2DataManager.SpO2DataListener {
         override fun onSpO2ValueUpdated(spO2Value: Int, timestamp: Long) {
             runOnUiThread {
                 txtSpO2Main.text = spO2Value.toString()
@@ -139,13 +139,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 
     // Observer de conexão com o serviço de saúde
-    private val spO2ConnectionObserver = object : com.example.mqttwearable.sensors.ConnectionObserver {
+    private val spO2ConnectionObserver = object : com.sae5g.mqttwearable.sensors.ConnectionObserver {
         override fun onConnectionResult(message: String) {
             // Se a mensagem indicar erro de suporte, ignoramos
             if (message.contains("não suportado")) return
 
             // Inicializar listeners quando conectado
-            spO2Listener = com.example.mqttwearable.sensors.SpO2Listener { status, spO2Value ->
+            spO2Listener = com.sae5g.mqttwearable.sensors.SpO2Listener { status, spO2Value ->
                 onSpO2TrackerDataChanged(status, spO2Value)
             }
             connectionManagerSpO2?.initSpO2(spO2Listener!!)
@@ -163,15 +163,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (status == previousSpO2Status) return
         previousSpO2Status = status
 
-        if (status == com.example.mqttwearable.sensors.SpO2Status.MEASUREMENT_COMPLETED) {
+        if (status == com.sae5g.mqttwearable.sensors.SpO2Status.MEASUREMENT_COMPLETED) {
             isSpO2MeasurementRunning.set(false)
             spO2Listener?.stopTracker()
-            com.example.mqttwearable.data.SpO2DataManager.updateSpO2Value(spO2Value)
+            com.sae5g.mqttwearable.data.SpO2DataManager.updateSpO2Value(spO2Value)
             // Voltar fundo para padrão após medição bem-sucedida
             txtSpO2Main.setBackgroundColor(resources.getColor(android.R.color.background_dark, theme))
             txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
-        } else if (status == com.example.mqttwearable.sensors.SpO2Status.DEVICE_MOVING ||
-             status == com.example.mqttwearable.sensors.SpO2Status.LOW_SIGNAL) {
+        } else if (status == com.sae5g.mqttwearable.sensors.SpO2Status.DEVICE_MOVING ||
+             status == com.sae5g.mqttwearable.sensors.SpO2Status.LOW_SIGNAL) {
             // Erro durante medição
             txtSpO2Main.setBackgroundColor(android.graphics.Color.RED)
             txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private fun performSpO2Measurement() {
         if (isSpO2MeasurementRunning.get()) return
         spO2Listener?.let {
-            previousSpO2Status = com.example.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
+            previousSpO2Status = com.sae5g.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
             it.startTracker()
             isSpO2MeasurementRunning.set(true)
             // Alterar fundo para AZUL enquanto mede
@@ -264,10 +264,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         measurementHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
         // Registrar listener de dados de SpO2
-        com.example.mqttwearable.data.SpO2DataManager.addListener(spO2DataListener)
+        com.sae5g.mqttwearable.data.SpO2DataManager.addListener(spO2DataListener)
 
         // Criar ConnectionManager para SpO2
-        connectionManagerSpO2 = com.example.mqttwearable.sensors.ConnectionManager(spO2ConnectionObserver)
+        connectionManagerSpO2 = com.sae5g.mqttwearable.sensors.ConnectionManager(spO2ConnectionObserver)
         connectionManagerSpO2?.connect(applicationContext)
         
         // Obter e exibir o ANDROID_ID usando o DeviceIdManager
@@ -494,7 +494,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         locationManager.stopLocationUpdates()
         // Limpar medições de SpO2
         measurementHandler.removeCallbacksAndMessages(null)
-        com.example.mqttwearable.data.SpO2DataManager.removeListener(spO2DataListener)
+        com.sae5g.mqttwearable.data.SpO2DataManager.removeListener(spO2DataListener)
         spO2Listener?.stopTracker()
         connectionManagerSpO2?.disconnect()
     }

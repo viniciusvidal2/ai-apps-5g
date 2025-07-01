@@ -1,4 +1,4 @@
-package com.example.mqttwearable.health
+package com.sae5g.mqttwearable.health
 
 import android.content.Context
 import android.util.Log
@@ -19,10 +19,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.mqttwearable.mqtt.MqttHandler
-import com.example.mqttwearable.location.LocationManager
-import com.example.mqttwearable.data.SpO2DataManager
-import com.example.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.mqtt.MqttHandler
+import com.sae5g.mqttwearable.location.LocationManager
+import com.sae5g.mqttwearable.data.SpO2DataManager
+import com.sae5g.mqttwearable.data.DeviceIdManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date

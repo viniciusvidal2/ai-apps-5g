@@ -1,4 +1,4 @@
-package com.example.mqttwearable.presentation
+package com.sae5g.mqttwearable.presentation
 
 import android.content.Context
 import android.os.Bundle
@@ -11,9 +11,9 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.ComponentActivity
-import com.example.mqttwearable.R
-import com.example.mqttwearable.mqtt.MqttHandler
-import com.example.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.R
+import com.sae5g.mqttwearable.mqtt.MqttHandler
+import com.sae5g.mqttwearable.data.DeviceIdManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale

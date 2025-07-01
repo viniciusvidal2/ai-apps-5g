@@ -1,4 +1,4 @@
-package com.example.mqttwearable.sensors
+package com.sae5g.mqttwearable.sensors
 
 object SpO2Status {
     const val LOW_SIGNAL = -5

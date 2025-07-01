@@ -1,4 +1,4 @@
-package com.example.mqttwearable.location
+package com.sae5g.mqttwearable.location
 
 import android.Manifest
 import android.content.Context

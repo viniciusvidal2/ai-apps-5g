@@ -1,4 +1,4 @@
-package com.example.mqttwearable.complication
+package com.sae5g.mqttwearable.complication
 
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType

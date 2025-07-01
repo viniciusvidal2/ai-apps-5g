@@ -1,4 +1,4 @@
-package com.example.mqttwearable.sensors
+package com.sae5g.mqttwearable.sensors
 
 object HeartRateStatus {
     const val HR_STATUS_NONE = 0

@@ -1,4 +1,4 @@
-package com.example.mqttwearable.presentation
+package com.sae5g.mqttwearable.presentation
 
 import android.Manifest
 import android.app.Activity
@@ -14,9 +14,9 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
-import com.example.mqttwearable.R
-import com.example.mqttwearable.sensors.*
-import com.example.mqttwearable.data.SpO2DataManager
+import com.sae5g.mqttwearable.R
+import com.sae5g.mqttwearable.sensors.*
+import com.sae5g.mqttwearable.data.SpO2DataManager
 import com.samsung.android.service.health.tracking.HealthTrackerException
 import java.util.concurrent.atomic.AtomicBoolean
 

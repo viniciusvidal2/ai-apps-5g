@@ -1,4 +1,4 @@
-package com.example.mqttwearable.mqtt
+package com.sae5g.mqttwearable.mqtt
 
 import android.content.Context
 import android.content.SharedPreferences

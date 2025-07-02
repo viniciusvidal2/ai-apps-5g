@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     // Variáveis removidas - publicação do acelerômetro agora é feita pelo HealthForegroundService
 
     private val spO2MeasurementDuration = 35000L
-    private val spO2MeasurementInterval = 60000L
+    private val spO2MeasurementInterval = 1800000L  // 30 minutos
     private val isSpO2MeasurementRunning = java.util.concurrent.atomic.AtomicBoolean(false)
     private lateinit var measurementHandler: android.os.Handler
     private var connectionManagerSpO2: com.sae5g.mqttwearable.sensors.ConnectionManager? = null

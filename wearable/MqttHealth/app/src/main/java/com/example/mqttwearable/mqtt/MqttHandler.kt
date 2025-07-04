@@ -87,7 +87,7 @@ class MqttHandler(private val context: Context) {
         }
     }
 
-    fun publish(topic: String, message: String, callback: (Boolean) -> Unit = { _ -> }) {
+    fun publish(topic: String, message: String, encrypt: Boolean = true, callback: (Boolean) -> Unit = { _ -> }) {
         if (!isConnected) {
             Log.e("MqttHandler", "Not connected, cannot publish")
             callback(false)
@@ -96,9 +96,27 @@ class MqttHandler(private val context: Context) {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val mqttMessage = MqttMessage(message.toByteArray())
+                // Criptografar a mensagem se solicitado
+                val finalMessage = if (encrypt) {
+                    val encryptedMessage = AESCrypto.encrypt(message)
+                    if (encryptedMessage != null) {
+                        encryptedMessage
+                    } else {
+                        Log.e("MqttHandler", "Failed to encrypt message, sending plain text")
+                        message
+                    }
+                } else {
+                    message
+                }
+                
+                val mqttMessage = MqttMessage(finalMessage.toByteArray())
                 client?.publish(topic, mqttMessage)
-                Log.d("MqttHandler", "Published to $topic: $message")
+                
+                if (encrypt) {
+                    Log.d("MqttHandler", "Published encrypted message to $topic (original: $message)")
+                } else {
+                    Log.d("MqttHandler", "Published to $topic: $message")
+                }
                 callback(true)
             } catch (e: MqttException) {
                 Log.e("MqttHandler", "Publish failed", e)

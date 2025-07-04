@@ -56,7 +56,8 @@ public class HealthPublisher(
     private var currentSpO2: Int? = null
 
     // Intervalo de envio em milissegundos (1 minuto)
-    var sendIntervalMs: Long = 60000L
+//    var sendIntervalMs: Long = 60000L
+    var sendIntervalMs: Long = 10000L
 
     init {
         // Garantir que o DeviceIdManager está inicializado
@@ -147,7 +148,6 @@ public class HealthPublisher(
 
         val capabilities = passiveMonitoringClient.getCapabilities().supportedDataTypesPassiveMonitoring
         Log.d("HealthPublisher", "Supported passive types: ${capabilities}")
-//        mqttHandler.publish("teste",  "Supported passive types: ${capabilities}")
 
         // Inicia o job de envio periódico
         if (senderJob == null) {

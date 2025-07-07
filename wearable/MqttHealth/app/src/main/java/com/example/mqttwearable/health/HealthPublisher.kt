@@ -23,6 +23,7 @@ import com.sae5g.mqttwearable.mqtt.MqttHandler
 import com.sae5g.mqttwearable.location.LocationManager
 import com.sae5g.mqttwearable.data.SpO2DataManager
 import com.sae5g.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -33,6 +34,7 @@ public class HealthPublisher(
     private val context: Context,
     private val mqttHandler: MqttHandler
 ) : SpO2DataManager.SpO2DataListener {
+    private val wifiConnectivityManager = WiFiConnectivityManager(context)
     private val passiveMonitoringClient: PassiveMonitoringClient =
         HealthServices.getClient(context).passiveMonitoringClient
 
@@ -152,8 +154,9 @@ public class HealthPublisher(
         // Inicia o job de envio periódico
         if (senderJob == null) {
             senderJob = CoroutineScope(Dispatchers.IO).launch {
+                // Aguardar 3 segundos para sincronizar com timer visual
+                delay(3000)
                 while (true) {
-                    delay(sendIntervalMs)
                     if (latestData.isNotEmpty()) {
                         val toSend = latestData.toMap().toMutableMap()
                         lastUpdateTimestamp?.let {
@@ -175,9 +178,24 @@ public class HealthPublisher(
                         }
                         
                         val json = mapToJson(toSend)
-                        Log.d("HealthPublisher", "Sending latest via MQTT: $json")
-                        mqttHandler.publish("health/data", json)
+                        Log.d("HealthPublisher", "Verificando WiFi antes de enviar dados via MQTT...")
+                        
+                        // Verificar WiFi antes de enviar
+                        if (wifiConnectivityManager.isWiFiConnected()) {
+                            val networkName = wifiConnectivityManager.getCurrentNetworkName()
+                            Log.d("HealthPublisher", "WiFi OK (${networkName}), enviando dados: $json")
+                            mqttHandler.publish("health/data", json) { success ->
+                                if (success) {
+                                    Log.d("HealthPublisher", "Dados enviados com sucesso via WiFi: $networkName")
+                                } else {
+                                    Log.w("HealthPublisher", "Falha ao enviar dados mesmo com WiFi conectado")
+                                }
+                            }
+                        } else {
+                            Log.w("HealthPublisher", "Sem WiFi - Dados não enviados: $json")
+                        }
                     }
+                    delay(sendIntervalMs)
                 }
             }
         }

@@ -62,10 +62,10 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
-import androidx.lifecycle.lifecycleScope
+// lifecycleScope import removido - não usado mais na MainActivity
 import com.sae5g.mqttwearable.R
 import com.sae5g.mqttwearable.mqtt.MqttHandler
-import com.sae5g.mqttwearable.health.HealthPublisher
+// HealthPublisher import removido - usado apenas no HealthForegroundService
 import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
 import androidx.activity.result.ActivityResultLauncher
 import androidx.core.app.NotificationManagerCompat
@@ -79,16 +79,22 @@ import android.provider.Settings
 import com.sae5g.mqttwearable.data.DeviceIdManager
 import com.sae5g.mqttwearable.sensors.FallDetector
 import com.sae5g.mqttwearable.location.LocationManager
+import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.os.CountDownTimer
 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var mqttHandler: MqttHandler
-    private lateinit var healthPublisher: HealthPublisher
+    // healthPublisher removido - será usado apenas no HealthForegroundService
 
     // Indica se o MQTT está conectado
     private var mqttConnected by mutableStateOf(false)
@@ -113,9 +119,18 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private lateinit var fallDetector: FallDetector
     private lateinit var vibrator: Vibrator
     private lateinit var locationManager: LocationManager
+    private lateinit var wifiConnectivityManager: WiFiConnectivityManager
+    private lateinit var connectivityManager: ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var currentLatitude: Double? = null
     private var currentLongitude: Double? = null
     private var fallDetectionActive = false
+    
+    // Timer para próximo envio MQTT
+    private var mqttSendTimer: CountDownTimer? = null
+    private var nextSendTime: Long = 10000L // Será sincronizado com HealthPublisher no onCreate
+    private var isWifiConnected = false
+    private var currentWifiName: String? = null
 
     // Variáveis removidas - publicação do acelerômetro agora é feita pelo HealthForegroundService
 
@@ -242,7 +257,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         setTheme(android.R.style.Theme_DeviceDefault)
 
         mqttHandler = MqttHandler(applicationContext)
-        healthPublisher = HealthPublisher(applicationContext, mqttHandler)
+        // HealthPublisher removido - será usado apenas no HealthForegroundService
+        
+        // Configurar timer para 9 segundos (9s countdown + 1s "Enviando" = 10s total)
+        nextSendTime = 9000L
+        
+        // Inicializar gerenciador de conectividade WiFi
+        wifiConnectivityManager = WiFiConnectivityManager(applicationContext)
+        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        setupWifiStatusListener()
+        setupNetworkMonitoring()
 
         setContentView(R.layout.activity_main)
 
@@ -259,6 +283,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val btnSpO2 = findViewById<Button>(R.id.btnSpO2)
         val txtStatus = findViewById<TextView?>(R.id.txtStatus)
         txtSpO2Main = findViewById(R.id.txtSpO2Main)
+        
+        // Configurar timer MQTT
+        setupMqttTimer()
 
         // Inicializa o handler para medições periódicas
         measurementHandler = android.os.Handler(android.os.Looper.getMainLooper())
@@ -276,9 +303,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         // Carregar IP do cache e definir no campo
         loadCachedIpAddress(edtIp)
         
-        txtStatus?.text = "Desconectado"
+        txtStatus?.text = "Verificando WiFi..."
         var isConnected = false
         btnConectar.text = "Conectar"
+        
+        // O status WiFi será verificado pelo setupNetworkMonitoring()
 
         btnConectar.setOnClickListener {
             if (!isConnected) {
@@ -297,9 +326,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 isConnected = false
                 mqttConnected = false
                 btnConectar.text = "Conectar"
-                txtStatus?.text = "Desconectado"
+                updateConnectionStatus()
                 // Parar detecção de queda e publicação do acelerômetro quando desconectar
                 stopFallDetection()
+                stopMqttSendTimer()
             }
         }
 
@@ -337,19 +367,22 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     runOnUiThread {
                         if (success) {
                             btnConectar.text = "Desconectar"
-                            txtStatus?.text = "MQTT conectado - Detecção ativa"
+                            updateConnectionStatus()
                             // Iniciar detecção de queda quando conectado
                             startFallDetection()
+                            // Aguardar 3 segundos antes de iniciar timer (sincronizar com HealthPublisher)
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                startMqttSendTimer()
+                            }, 3000)
                         } else {
                             btnConectar.text = "Conectar"
                             txtStatus?.text = "Falha ao conectar MQTT"
+                            stopMqttSendTimer()
                         }
                     }
                     if (success) {
                         Log.d("MainActivity", "MQTT conectado com sucesso")
-                        lifecycleScope.launch {
-                            healthPublisher.startPassiveMeasure()
-                        }
+                        // HealthPublisher removido da MainActivity - roda apenas no HealthForegroundService
                         val intent = Intent(this, HealthForegroundService::class.java)
                         intent.putExtra(HealthForegroundService.EXTRA_BROKER_IP, ipText)
                         ContextCompat.startForegroundService(this, intent)
@@ -455,6 +488,188 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         mqttHandler.saveBrokerUrl(brokerUrl)
         Log.d("MainActivity", "IP saved to cache: $ipAddress -> $brokerUrl")
     }
+    
+    private fun setupWifiStatusListener() {
+        wifiConnectivityManager.setStatusListener(object : WiFiConnectivityManager.WiFiStatusListener {
+            override fun onWiFiStatusChanged(isConnected: Boolean, networkName: String?) {
+                runOnUiThread {
+                    val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+                    if (isConnected) {
+                        txtStatus?.text = "WiFi: $networkName"
+                    } else {
+                        txtStatus?.text = "Sem WiFi"
+                    }
+                }
+            }
+            
+            override fun onMqttServerReachable(isReachable: Boolean, serverIp: String) {
+                runOnUiThread {
+                    val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+                    if (isReachable) {
+                        txtStatus?.text = "WiFi + MQTT OK"
+                    } else {
+                        txtStatus?.text = "WiFi OK, MQTT inacessível"
+                    }
+                }
+            }
+            
+            override fun onError(message: String) {
+                runOnUiThread {
+                    val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+                    txtStatus?.text = message
+                }
+                Log.e("MainActivity", "WiFi Error: $message")
+            }
+        })
+    }
+    
+    private fun setupNetworkMonitoring() {
+        val networkRequest = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+            
+        networkCallback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                Log.d("MainActivity", "WiFi network available")
+                CoroutineScope(Dispatchers.IO).launch {
+                    val networkName = wifiConnectivityManager.getCurrentNetworkName()
+                    runOnUiThread {
+                        isWifiConnected = true
+                        currentWifiName = networkName
+                        updateConnectionStatus()
+                    }
+                }
+            }
+            
+            override fun onLost(network: Network) {
+                Log.d("MainActivity", "WiFi network lost")
+                runOnUiThread {
+                    isWifiConnected = false
+                    currentWifiName = null
+                    updateConnectionStatus()
+                }
+            }
+            
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                // Verificar se ainda tem capacidades de internet
+                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                runOnUiThread {
+                    if (!hasInternet && isWifiConnected) {
+                        isWifiConnected = false
+                        updateConnectionStatus()
+                    }
+                }
+            }
+        }
+        
+        connectivityManager.registerNetworkCallback(networkRequest, networkCallback!!)
+        
+        // Verificar status inicial
+        checkInitialWifiStatus()
+    }
+    
+    private fun checkInitialWifiStatus() {
+        CoroutineScope(Dispatchers.IO).launch {
+            isWifiConnected = wifiConnectivityManager.isWiFiConnected()
+            currentWifiName = wifiConnectivityManager.getCurrentNetworkName()
+            
+            runOnUiThread {
+                updateConnectionStatus()
+            }
+        }
+    }
+    
+    private fun updateConnectionStatus() {
+        val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+        
+        // Verificar status de conectividade em tempo real
+        CoroutineScope(Dispatchers.IO).launch {
+            val wifiConnected = wifiConnectivityManager.isWiFiConnected()
+            val wifiWithoutInternet = wifiConnectivityManager.isWiFiConnectedWithoutInternet()
+            val networkName = wifiConnectivityManager.getCurrentNetworkName()
+            
+            runOnUiThread {
+                when {
+                    wifiWithoutInternet -> {
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} (Sem Internet)"
+                    }
+                    !wifiConnected -> {
+                        txtStatus?.text = "Sem WiFi"
+                    }
+                    mqttConnected && wifiConnected -> {
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} - MQTT OK"
+                    }
+                    wifiConnected -> {
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"}"
+                    }
+                    else -> {
+                        txtStatus?.text = "Verificando conexão..."
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun setupMqttTimer() {
+        // Timer será iniciado quando conectar ao MQTT
+    }
+    
+    private fun startMqttSendTimer() {
+        stopMqttSendTimer() // Parar timer anterior se existir
+        
+        mqttSendTimer = object : CountDownTimer(nextSendTime, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val seconds = millisUntilFinished / 1000
+                runOnUiThread {
+                    val btnConectar = findViewById<Button>(R.id.btnConectar)
+                    
+                    // Verificar status WiFi antes de mostrar countdown
+                    if (isWifiConnected) {
+                        btnConectar.text = "Desconectar (${seconds}s)"
+                    } else {
+                        btnConectar.text = "Sem WiFi (${seconds}s)"
+                    }
+                }
+            }
+            
+            override fun onFinish() {
+                runOnUiThread {
+                    val btnConectar = findViewById<Button>(R.id.btnConectar)
+                    
+                    // Verificar conectividade antes de tentar enviar
+                    CoroutineScope(Dispatchers.IO).launch {
+                        val wifiOk = wifiConnectivityManager.isWiFiConnected()
+                        val networkName = wifiConnectivityManager.getCurrentNetworkName()
+                        
+                        runOnUiThread {
+                            if (wifiOk) {
+                                btnConectar.text = "Enviando..."
+                                val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+                                txtStatus?.text = "Enviando via WiFi: ${networkName ?: "Conectado"}"
+                            } else {
+                                btnConectar.text = "Sem WiFi!"
+                                val txtStatus = findViewById<TextView?>(R.id.txtStatus)
+                                txtStatus?.text = "Sem WiFi - Envio cancelado"
+                            }
+                            
+                            // Voltar ao status normal após 1 segundo e reiniciar timer (manter ciclo de 10s)
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                if (mqttConnected) {
+                                    updateConnectionStatus()
+                                    startMqttSendTimer() // Reiniciar timer
+                                }
+                            }, 1000)
+                        }
+                    }
+                }
+            }
+        }.start()
+    }
+    
+    private fun stopMqttSendTimer() {
+        mqttSendTimer?.cancel()
+        mqttSendTimer = null
+    }
 
     override fun onSensorChanged(event: SensorEvent?) {
         event?.let { sensorEvent ->
@@ -492,6 +707,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         super.onDestroy()
         stopFallDetection()
         locationManager.stopLocationUpdates()
+        
+        // Limpar monitoramento de rede
+        networkCallback?.let { callback ->
+            connectivityManager.unregisterNetworkCallback(callback)
+        }
+        
+        // Parar timer MQTT
+        stopMqttSendTimer()
+        
         // Limpar medições de SpO2
         measurementHandler.removeCallbacksAndMessages(null)
         com.sae5g.mqttwearable.data.SpO2DataManager.removeListener(spO2DataListener)

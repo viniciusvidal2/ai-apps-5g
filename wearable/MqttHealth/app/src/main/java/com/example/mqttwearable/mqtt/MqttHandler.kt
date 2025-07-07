@@ -15,11 +15,13 @@ import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken
 import org.eclipse.paho.client.mqttv3.IMqttToken
 import org.eclipse.paho.client.mqttv3.MqttCallback
 import android.util.Log
+import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 
 class MqttHandler(private val context: Context) {
     private var client: MqttClient? = null
     private var isConnected = false
     private val prefs: SharedPreferences = context.getSharedPreferences("mqtt_prefs", Context.MODE_PRIVATE)
+    private val wifiManager = WiFiConnectivityManager(context)
     
     companion object {
         private const val BROKER_URL_KEY = "broker_url"
@@ -88,6 +90,54 @@ class MqttHandler(private val context: Context) {
     }
 
     fun publish(topic: String, message: String, encrypt: Boolean = true, callback: (Boolean) -> Unit = { _ -> }) {
+        // Primeiro verificar conectividade WiFi
+        checkConnectivityAndPublish(topic, message, encrypt, callback)
+    }
+    
+    private fun checkConnectivityAndPublish(topic: String, message: String, encrypt: Boolean, callback: (Boolean) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            Log.d("MqttHandler", "Verificando conectividade antes de publicar...")
+            
+            // Extrair IP do servidor MQTT do broker URL
+            val serverIp = extractServerIpFromBrokerUrl()
+            
+            if (serverIp == null) {
+                Log.e("MqttHandler", "Não foi possível extrair IP do servidor MQTT")
+                callback(false)
+                return@launch
+            }
+            
+            wifiManager.checkFullConnectivity(serverIp) { result ->
+                when (result) {
+                    WiFiConnectivityManager.ConnectivityResult.FULL_CONNECTIVITY -> {
+                        Log.d("MqttHandler", "Conectividade completa verificada, publicando mensagem...")
+                        performPublish(topic, message, encrypt, callback)
+                    }
+                    WiFiConnectivityManager.ConnectivityResult.WIFI_ONLY -> {
+                        Log.w("MqttHandler", "WiFi conectado mas servidor MQTT não alcançável")
+                        callback(false)
+                    }
+                    WiFiConnectivityManager.ConnectivityResult.NO_WIFI -> {
+                        Log.w("MqttHandler", "Sem conexão WiFi disponível")
+                        callback(false)
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun extractServerIpFromBrokerUrl(): String? {
+        val brokerUrl = getCachedBrokerUrl()
+        return try {
+            // Formato: tcp://IP:1883
+            brokerUrl.replace("tcp://", "").split(":")[0]
+        } catch (e: Exception) {
+            Log.e("MqttHandler", "Erro ao extrair IP do broker URL: $brokerUrl", e)
+            null
+        }
+    }
+    
+    private fun performPublish(topic: String, message: String, encrypt: Boolean, callback: (Boolean) -> Unit) {
         if (!isConnected) {
             Log.e("MqttHandler", "Not connected, cannot publish")
             callback(false)

@@ -32,6 +32,7 @@ import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import androidx.core.app.NotificationManagerCompat
 import com.sae5g.mqttwearable.presentation.EmergencyAlertActivity
+import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 
 class HealthForegroundService : Service(), SensorEventListener {
     private lateinit var wakeLock: PowerManager.WakeLock
@@ -60,6 +61,7 @@ class HealthForegroundService : Service(), SensorEventListener {
     private var isFallAlertActive = false
     private lateinit var notificationManager: NotificationManager
     private var fallDetectionActive = false
+    private lateinit var wifiConnectivityManager: WiFiConnectivityManager
 
     // IDs para notificações
     private val FALL_ALERT_NOTIFICATION_ID = 2
@@ -94,6 +96,9 @@ class HealthForegroundService : Service(), SensorEventListener {
 
         startForeground(ONGOING_NOTIFICATION_ID, notification)
 
+        // Inicializar gerenciador de conectividade WiFi
+        wifiConnectivityManager = WiFiConnectivityManager(applicationContext)
+        
         // Inicializar sensores e detecção de queda
         setupAccelerometer()
         setupFallDetection()
@@ -375,6 +380,65 @@ class HealthForegroundService : Service(), SensorEventListener {
     }
 
     private fun sendFallAlert() {
+        Log.d("HealthForegroundService", "Iniciando processo de envio de alerta de queda...")
+        
+        // Primeiro verificar conectividade WiFi
+        CoroutineScope(Dispatchers.IO).launch {
+            // Extrair IP do servidor MQTT
+            val mqttServerIp = extractMqttServerIp()
+            
+            if (mqttServerIp == null) {
+                Log.e("HealthForegroundService", "Não foi possível determinar IP do servidor MQTT")
+                showConnectivityNotification("❌ Erro de Configuração", "IP do servidor MQTT não encontrado")
+                cleanupFallAlert()
+                return@launch
+            }
+            
+            wifiConnectivityManager.checkFullConnectivity(mqttServerIp) { result ->
+                when (result) {
+                    WiFiConnectivityManager.ConnectivityResult.FULL_CONNECTIVITY -> {
+                        Log.d("HealthForegroundService", "Conectividade completa verificada, enviando alerta...")
+                        performFallAlertSend()
+                    }
+                    WiFiConnectivityManager.ConnectivityResult.WIFI_ONLY -> {
+                        Log.w("HealthForegroundService", "WiFi conectado mas servidor MQTT inacessível")
+                        showConnectivityNotification("❌ Sem WiFi", "Servidor MQTT inacessível - Alerta não enviado")
+                        cleanupFallAlert()
+                    }
+                    WiFiConnectivityManager.ConnectivityResult.NO_WIFI -> {
+                        Log.w("HealthForegroundService", "Sem conexão WiFi")
+                        showConnectivityNotification("❌ Sem WiFi", "Conecte-se a uma rede WiFi para enviar alertas")
+                        cleanupFallAlert()
+                    }
+                }
+            }
+        }
+    }
+    
+    private fun extractMqttServerIp(): String? {
+        return try {
+            val cachedBrokerUrl = mqttHandler?.getCachedBrokerUrl() ?: return null
+            // Formato: tcp://IP:1883
+            cachedBrokerUrl.replace("tcp://", "").split(":")[0]
+        } catch (e: Exception) {
+            Log.e("HealthForegroundService", "Erro ao extrair IP do broker URL", e)
+            null
+        }
+    }
+    
+    private fun showConnectivityNotification(title: String, message: String) {
+        val notification = NotificationCompat.Builder(this, FALL_ALERT_CHANNEL_ID)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .build()
+
+        notificationManager.notify(FALL_ALERT_NOTIFICATION_ID + 1, notification)
+    }
+    
+    private fun performFallAlertSend() {
         // Criar JSON com horário atual em formato ISO 8601 UTC
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

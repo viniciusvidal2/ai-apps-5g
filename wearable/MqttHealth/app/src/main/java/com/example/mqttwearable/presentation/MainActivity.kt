@@ -333,6 +333,34 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 stopMqttSendTimer()
             }
         }
+        
+        // Botão temporário para testar fila (long press no botão conectar)
+        btnConectar.setOnLongClickListener {
+            val queueStats = mqttHandler.getQueueStats()
+            val queueSize = queueStats["totalMessages"] as? Int ?: 0
+            
+            Log.d("MainActivity", "🐛 TESTE MANUAL: Verificando fila...")
+            Log.d("MainActivity", "🐛 TESTE MANUAL: Tamanho da fila: $queueSize")
+            Log.d("MainActivity", "🐛 TESTE MANUAL: Stats completas: $queueStats")
+            
+            if (queueSize > 0) {
+                Log.d("MainActivity", "🐛 TESTE MANUAL: Forçando processamento da fila...")
+                txtStatus?.text = "Testando fila ($queueSize msgs)..."
+                mqttHandler.onWiFiReconnected()
+                
+                // Voltar ao status normal após 3 segundos
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateConnectionStatus()
+                }, 3000)
+            } else {
+                txtStatus?.text = "Fila vazia para teste"
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    updateConnectionStatus()
+                }, 2000)
+            }
+            
+            true // Consumir o long click
+        }
 
         btnAcc.setOnClickListener {
             // Navegar para a tela de acelerômetro
@@ -548,9 +576,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                                 updateConnectionStatus()
                                 
                                 if (success && isConnected) {
-                                    Log.d("MainActivity", "Reconexão WiFi automática bem-sucedida: $networkName")
+                                    Log.d("MainActivity", "🎉 Reconexão WiFi automática bem-sucedida: $networkName")
+                                    // Processar fila de mensagens após reconexão WiFi
+                                    Log.d("MainActivity", "🔄 Chamando mqttHandler.onWiFiReconnected()...")
+                                    mqttHandler.onWiFiReconnected()
                                 } else {
-                                    Log.w("MainActivity", "Falha na reconexão WiFi automática")
+                                    Log.w("MainActivity", "❌ Falha na reconexão WiFi automática")
                                 }
                             }
                         }
@@ -604,20 +635,26 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             val wifiConnected = wifiConnectivityManager.isWiFiConnected()
             val wifiWithoutInternet = wifiConnectivityManager.isWiFiConnectedWithoutInternet()
             val networkName = wifiConnectivityManager.getCurrentNetworkName()
+            val queueStats = mqttHandler.getQueueStats()
+            val queueSize = queueStats["totalMessages"] as? Int ?: 0
             
             runOnUiThread {
                 when {
                     wifiWithoutInternet -> {
-                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} (Sem Internet)"
+                        val queueText = if (queueSize > 0) " (Fila: $queueSize)" else ""
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} (Sem Internet)$queueText"
                     }
                     !wifiConnected -> {
-                        txtStatus?.text = "Sem WiFi"
+                        val queueText = if (queueSize > 0) " (Fila: $queueSize)" else ""
+                        txtStatus?.text = "Sem WiFi$queueText"
                     }
                     mqttConnected && wifiConnected -> {
-                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} - MQTT OK"
+                        val queueText = if (queueSize > 0) " (Enviando fila: $queueSize)" else ""
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"} - MQTT OK$queueText"
                     }
                     wifiConnected -> {
-                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"}"
+                        val queueText = if (queueSize > 0) " (Fila: $queueSize)" else ""
+                        txtStatus?.text = "WiFi: ${networkName ?: "Conectado"}$queueText"
                     }
                     else -> {
                         txtStatus?.text = "Verificando conexão..."
@@ -646,6 +683,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     } else {
                         btnConectar.text = "Sem WiFi (${seconds}s)"
                     }
+                    
+                    // Atualizar status com informações da fila
+                    updateConnectionStatus()
                 }
             }
             

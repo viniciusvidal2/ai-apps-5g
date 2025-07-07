@@ -187,19 +187,26 @@ public class HealthPublisher(
                         val json = mapToJson(toSend)
                         Log.d("HealthPublisher", "Verificando WiFi antes de enviar dados via MQTT...")
                         
-                        // Verificar WiFi antes de enviar
-                        if (wifiConnectivityManager.isWiFiConnected()) {
-                            val networkName = wifiConnectivityManager.getCurrentNetworkName()
-                            Log.d("HealthPublisher", "WiFi OK (${networkName}), enviando dados: $json")
-                            mqttHandler.publish("health/data", json) { success ->
-                                if (success) {
-                                    Log.d("HealthPublisher", "Dados enviados com sucesso via WiFi: $networkName")
+                        // Enviar dados via MQTT (será adicionado à fila se sem WiFi)
+                        val wifiConnected = wifiConnectivityManager.isWiFiConnected()
+                        val networkName = wifiConnectivityManager.getCurrentNetworkName()
+                        
+                        if (wifiConnected) {
+                            Log.d("HealthPublisher", "📶 WiFi OK (${networkName}), enviando dados: $json")
+                        } else {
+                            Log.w("HealthPublisher", "📵 Sem WiFi - Dados serão adicionados à fila: $json")
+                        }
+                        
+                        mqttHandler.publish("health/data", json) { success ->
+                            if (success) {
+                                Log.d("HealthPublisher", "✅ Dados enviados com sucesso via WiFi: $networkName")
+                            } else {
+                                if (wifiConnectivityManager.isWiFiConnected()) {
+                                    Log.w("HealthPublisher", "❌ Falha ao enviar dados mesmo com WiFi conectado")
                                 } else {
-                                    Log.w("HealthPublisher", "Falha ao enviar dados mesmo com WiFi conectado")
+                                    Log.d("HealthPublisher", "📥 Dados adicionados à fila - aguardando WiFi")
                                 }
                             }
-                        } else {
-                            Log.w("HealthPublisher", "Sem WiFi - Dados não enviados: $json")
                         }
                     }
                     delay(sendIntervalMs)

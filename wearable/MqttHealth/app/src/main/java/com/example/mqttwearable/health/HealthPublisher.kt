@@ -159,6 +159,13 @@ public class HealthPublisher(
                 while (true) {
                     if (latestData.isNotEmpty()) {
                         val toSend = latestData.toMap().toMutableMap()
+                        
+                        // Adicionar hora atual do dispositivo
+                        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+                        sdf.timeZone = TimeZone.getTimeZone("UTC")
+                        val currentTime = sdf.format(Date())
+                        toSend["time"] = currentTime
+                        
                         lastUpdateTimestamp?.let {
                             toSend["lastUpdateTime"] = formatIsoUtc(it)
                         }

@@ -66,10 +66,12 @@ class MqttHandler(private val context: Context) {
                         keepAliveInterval = 20
                     }
                     connect(options)
-                    this@MqttHandler.isConnected = true
-                    Log.d("MqttHandler", "Connected to $brokerUrl")
-                    callback(true)
                 }
+                
+                // Definir como conectado após sucesso na conexão
+                isConnected = true
+                Log.d("MqttHandler", "Connected to $brokerUrl")
+                callback(true)
             } catch (e: MqttException) {
                 Log.e("MqttHandler", "Connection failed", e)
                 callback(false)
@@ -110,8 +112,27 @@ class MqttHandler(private val context: Context) {
             wifiManager.checkFullConnectivity(serverIp) { result ->
                 when (result) {
                     WiFiConnectivityManager.ConnectivityResult.FULL_CONNECTIVITY -> {
-                        Log.d("MqttHandler", "Conectividade completa verificada, publicando mensagem...")
-                        performPublish(topic, message, encrypt, callback)
+                        Log.d("MqttHandler", "Conectividade WiFi+MQTT verificada, verificando cliente MQTT...")
+                        
+                        // Verificar se cliente MQTT está realmente conectado
+                        val clientConnected = client?.isConnected ?: false
+                        Log.d("MqttHandler", "Estado MQTT: isConnected=$isConnected, client.isConnected=$clientConnected")
+                        
+                        if (isConnected && clientConnected) {
+                            Log.d("MqttHandler", "Cliente MQTT já conectado, publicando mensagem...")
+                            performPublishDirect(topic, message, encrypt, callback)
+                        } else {
+                            Log.w("MqttHandler", "Servidor MQTT alcançável mas cliente não conectado, reconectando...")
+                            attemptReconnection { reconnectSuccess ->
+                                if (reconnectSuccess) {
+                                    Log.d("MqttHandler", "Reconexão bem-sucedida, publicando mensagem...")
+                                    performPublishDirect(topic, message, encrypt, callback)
+                                } else {
+                                    Log.e("MqttHandler", "Falha na reconexão MQTT")
+                                    callback(false)
+                                }
+                            }
+                        }
                     }
                     WiFiConnectivityManager.ConnectivityResult.WIFI_ONLY -> {
                         Log.w("MqttHandler", "WiFi conectado mas servidor MQTT não alcançável")
@@ -139,11 +160,24 @@ class MqttHandler(private val context: Context) {
     
     private fun performPublish(topic: String, message: String, encrypt: Boolean, callback: (Boolean) -> Unit) {
         if (!isConnected) {
-            Log.e("MqttHandler", "Not connected, cannot publish")
-            callback(false)
+            Log.w("MqttHandler", "MQTT não conectado, tentando reconectar...")
+            // Tentar reconectar automaticamente
+            attemptReconnection { reconnectSuccess ->
+                if (reconnectSuccess) {
+                    Log.d("MqttHandler", "Reconexão bem-sucedida, tentando publicar novamente...")
+                    performPublish(topic, message, encrypt, callback)
+                } else {
+                    Log.e("MqttHandler", "Falha na reconexão MQTT")
+                    callback(false)
+                }
+            }
             return
         }
 
+        performPublishDirect(topic, message, encrypt, callback)
+    }
+    
+    private fun performPublishDirect(topic: String, message: String, encrypt: Boolean, callback: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 // Criptografar a mensagem se solicitado
@@ -189,9 +223,9 @@ class MqttHandler(private val context: Context) {
                         isConnected = false
                     }
 
-                    override fun messageArrived(topic: String, message: MqttMessage) {
-                        val payload = String(message.payload)
-                        Log.d("MqttHandler", "Message arrived on $topic: $payload")
+                    override fun messageArrived(receivedTopic: String, receivedMessage: MqttMessage) {
+                        val payload = String(receivedMessage.payload)
+                        Log.d("MqttHandler", "Message arrived on $receivedTopic: $payload")
                         callback(payload)
                     }
 
@@ -203,6 +237,73 @@ class MqttHandler(private val context: Context) {
                 Log.d("MqttHandler", "Subscribed to $topic")
             } catch (e: MqttException) {
                 Log.e("MqttHandler", "Subscribe failed", e)
+            }
+        }
+    }
+    
+    private fun attemptReconnection(callback: (Boolean) -> Unit) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                Log.d("MqttHandler", "Tentando reconexão automática...")
+                
+                // Desconectar cliente antigo se existir
+                client?.let { oldClient ->
+                    try {
+                        if (oldClient.isConnected) {
+                            oldClient.disconnect()
+                        }
+                        oldClient.close()
+                    } catch (e: Exception) {
+                        Log.w("MqttHandler", "Erro ao desconectar cliente antigo: ${e.message}")
+                    }
+                }
+                
+                // Tentar nova conexão usando URL em cache
+                val cachedBrokerUrl = getCachedBrokerUrl()
+                val clientId = "WearableClient_${System.currentTimeMillis()}"
+                
+                val persistence = MemoryPersistence()
+                client = MqttClient(cachedBrokerUrl, clientId, persistence).apply {
+                    val options = MqttConnectOptions().apply {
+                        isCleanSession = true
+                        connectionTimeout = 10
+                        keepAliveInterval = 20
+                    }
+                    
+                    // Configurar callback para detectar perda de conexão
+                    setCallback(object : MqttCallback {
+                        override fun connectionLost(cause: Throwable) {
+                            Log.e("MqttHandler", "Conexão MQTT perdida novamente", cause)
+                            this@MqttHandler.isConnected = false
+                        }
+
+                        override fun messageArrived(receivedTopic: String, receivedMessage: MqttMessage) {
+                            Log.d("MqttHandler", "Mensagem recebida em $receivedTopic: ${String(receivedMessage.payload)}")
+                        }
+
+                        override fun deliveryComplete(token: IMqttDeliveryToken) {
+                            Log.d("MqttHandler", "Mensagem entregue com sucesso")
+                        }
+                    })
+                    
+                    connect(options)
+                }
+                
+                // Verificar se a conexão foi realmente estabelecida
+                if (client?.isConnected == true) {
+                    isConnected = true
+                    Log.d("MqttHandler", "Reconexão MQTT bem-sucedida para $cachedBrokerUrl")
+                    callback(true)
+                } else {
+                    isConnected = false
+                    Log.e("MqttHandler", "Reconexão falhou - cliente não conectado")
+                    callback(false)
+                }
+                
+            } catch (e: MqttException) {
+                Log.e("MqttHandler", "Falha na reconexão MQTT", e)
+                isConnected = false
+                callback(false)
             }
         }
     }

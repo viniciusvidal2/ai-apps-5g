@@ -122,15 +122,13 @@ class WiFiConnectivityManager(private val context: Context) {
     }
     
     /**
-     * Tenta conectar a uma rede WiFi conhecida
+     * Tenta reconectar a WiFi usando abordagem compatível com Android 10+
      */
     fun attemptConnectionToKnownNetworks(callback: (Boolean) -> Unit) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 if (!wifiManager.isWifiEnabled) {
-                    Log.d(TAG, "WiFi está desabilitado, tentando habilitar...")
-                    // Nota: Em Android 10+, apps não podem habilitar WiFi programaticamente
-                    // Mas podemos verificar se foi habilitado pelo usuário
+                    Log.d(TAG, "WiFi está desabilitado")
                     statusListener?.onError("WiFi desabilitado. Habilite manualmente.")
                     callback(false)
                     return@launch
@@ -145,37 +143,30 @@ class WiFiConnectivityManager(private val context: Context) {
                     return@launch
                 }
                 
-                // Tentar reconectar às redes conhecidas
-                val configuredNetworks = wifiManager.configuredNetworks
-                if (configuredNetworks.isNullOrEmpty()) {
-                    Log.d(TAG, "Nenhuma rede WiFi conhecida encontrada")
-                    statusListener?.onError("Nenhuma rede WiFi conhecida")
-                    callback(false)
-                    return@launch
-                }
+                Log.d(TAG, "Aguardando reconexão automática do sistema...")
                 
-                Log.d(TAG, "Tentando reconectar a redes conhecidas...")
-                
-                // Aguardar alguns segundos para possível reconexão automática
-                repeat(10) { attempt ->
-                    delay(1000)
+                // Aguardar reconexão automática do sistema (Android 10+ gerencia isso automaticamente)
+                repeat(15) { attempt ->
+                    delay(2000) // Aguardar 2 segundos entre verificações
+                    
                     if (isWiFiConnected()) {
                         val networkName = getCurrentNetworkName()
-                        Log.d(TAG, "Conectado automaticamente à rede: $networkName")
+                        Log.d(TAG, "Reconectado automaticamente à rede: $networkName")
                         statusListener?.onWiFiStatusChanged(true, networkName)
                         callback(true)
                         return@launch
                     }
-                    Log.d(TAG, "Tentativa ${attempt + 1}/10 - Aguardando conexão...")
+                    
+                    Log.d(TAG, "Tentativa ${attempt + 1}/15 - Aguardando reconexão automática...")
                 }
                 
-                Log.d(TAG, "Falha ao conectar automaticamente às redes conhecidas")
+                Log.d(TAG, "Sistema não conseguiu reconectar automaticamente")
                 statusListener?.onWiFiStatusChanged(false, null)
                 callback(false)
                 
             } catch (e: Exception) {
-                Log.e(TAG, "Erro ao tentar conectar a redes conhecidas", e)
-                statusListener?.onError("Erro ao conectar: ${e.message}")
+                Log.e(TAG, "Erro ao aguardar reconexão", e)
+                statusListener?.onError("Erro na reconexão: ${e.message}")
                 callback(false)
             }
         }

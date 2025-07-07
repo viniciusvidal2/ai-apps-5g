@@ -59,6 +59,7 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.DeltaDataType
@@ -530,13 +531,29 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d("MainActivity", "WiFi network available")
+                Log.d("MainActivity", "WiFi network available - tentando reconexão automática")
                 CoroutineScope(Dispatchers.IO).launch {
-                    val networkName = wifiConnectivityManager.getCurrentNetworkName()
-                    runOnUiThread {
-                        isWifiConnected = true
-                        currentWifiName = networkName
-                        updateConnectionStatus()
+                    // Aguardar um pouco para rede estabilizar
+                    delay(2000)
+                    
+                    // Tentar reconectar a redes conhecidas
+                    wifiConnectivityManager.attemptConnectionToKnownNetworks { success ->
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val networkName = wifiConnectivityManager.getCurrentNetworkName()
+                            val isConnected = wifiConnectivityManager.isWiFiConnected()
+                            
+                            runOnUiThread {
+                                isWifiConnected = isConnected
+                                currentWifiName = if (isConnected) networkName else null
+                                updateConnectionStatus()
+                                
+                                if (success && isConnected) {
+                                    Log.d("MainActivity", "Reconexão WiFi automática bem-sucedida: $networkName")
+                                } else {
+                                    Log.w("MainActivity", "Falha na reconexão WiFi automática")
+                                }
+                            }
+                        }
                     }
                 }
             }

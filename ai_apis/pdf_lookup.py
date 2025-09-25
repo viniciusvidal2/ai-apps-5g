@@ -22,6 +22,10 @@ class PdfLookup:
         Args:
             pdf_bytes (bytes): The byte content of the PDF document.
         """
+        self.pdf_bytes = None
+        self.pdf_text = None
+        self.pdf_images_info = None
+        self.pdf_data_prompt = None
         self.pdf_bytes = pdf_bytes
 
     def load_pdf(self) -> None:
@@ -39,8 +43,6 @@ class PdfLookup:
                 text = page.extract_text()
                 if text:
                     self.pdf_text += f"\n\n--- Page {page_num} ---\n{text}"
-                else:
-                    self.pdf_text += f"\n\n--- Page {page_num} ---\n[No text found]"
         # Load the PDF images using the fitz library (PyMuPDF)
         self.pdf_stream.seek(0)  # Reset the stream position
         doc = fitz.open(stream=self.pdf_stream, filetype="pdf")
@@ -69,7 +71,7 @@ class PdfLookup:
             for img_info in self.pdf_images_info:
                 self.pdf_data_prompt["images"] += f"- Pagina {img_info['page']}\n"
         else:
-            self.pdf_data_prompt += "\n\n(Nao ha IMAGEM no PDF)\n"
+            self.pdf_data_prompt["images"] = "\n\n(Nao ha IMAGEM no PDF)\n"
 
     def get_pdf_data_prompts(self) -> dict:
         """Returns the PDF data prompt containing the extracted text and image information.

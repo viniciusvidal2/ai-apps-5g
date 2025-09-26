@@ -1,6 +1,6 @@
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain_community.chat_models import ChatOllama
+from langchain_ollama import ChatOllama
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -12,50 +12,50 @@ import os
 
 
 class RagDatabaseManager:
-    def __init__(self, model_name: str, persist_path: str, collection_name: str) -> None:
-        self.model_name = model_name
+    def __init__(self, embedding_model_name: str, inference_model_name: str, persist_path: str, collection_name: str) -> None:
+        """
+        Initializes the RAG Database Manager with the specified models and database path.
+
+        Args:
+            embedding_model_name (str): The name of the Ollama embedding model to use.
+            inference_model_name (str): The name of the Ollama inference model to use.
+            persist_path (str): The directory path where the Chroma database will be stored.
+            collection_name (str): The name of the collection within the Chroma database.
+        """
+        self.embedding_model_name = embedding_model_name
+        self.inference_model_name = inference_model_name
         self.persist_path = persist_path
         self.collection_name = collection_name
-        self.embedding_function = self._initialize_embeddings()
+        self.embedding_function = OllamaEmbeddings(
+            model=self.embedding_model_name)
         self.vectorstore = self._load_or_initialize_db()
         print(f"Database Handler initialized.")
-        print(f"Embedding Model: {self.model_name}")
+        print(f"Embedding Model: {self.embedding_model_name}")
+        print(f"Inference Model: {self.inference_model_name}")
+        print(f"Collection Name: {self.collection_name}")
         print(f"Persist Directory: {self.persist_path}")
         # This assumes you have the model pulled and Ollama is running
-        self.llm = ChatOllama(model=self.model_name)
+        self.llm = ChatOllama(model=self.inference_model_name)
         # Initialize the prompt templates
         DOCUMENT_PROMPT_TEMPLATE = """
-        --- CONTEXT CHUNK ---
-        Source: {source} (Page {page})
-        Content:
+        --- CHUNK DE CONTEXTO ---
+        Fonte: {source} (Pagina {page})
+        CONTEUDO:
         {page_content}
         --------------------
         """
-        self.document_prompt = PromptTemplate.from_template(DOCUMENT_PROMPT_TEMPLATE)
+        self.document_prompt = PromptTemplate.from_template(
+            DOCUMENT_PROMPT_TEMPLATE)
         self.rag_prompt = ChatPromptTemplate.from_messages([
             ("system",
-            "Voce e um assistente de IA que ajuda a responder perguntas com base em documentos fornecidos, "
-            "mas tambem pode usar seu conhecimento geral."
-            "Contexto:\n{context}"),
+             "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO fornecido, "
+             "mas tambem pode usar seu conhecimento geral. Cada CHUNK DE CONTEXTO e um trecho de um CONTEUDO de documento que pode conter informaçoes relevantes. "
+             "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta. \n"
+             "CONTEXTO:\n{context}"),
             ("human", "{input}"),
         ])
 
 # region Private internal methods
-
-    def _initialize_embeddings(self) -> OllamaEmbeddings:
-        """
-        Initializes the Ollama Embeddings object.
-
-        Returns:
-            OllamaEmbeddings: The initialized embeddings object.
-        """
-        try:
-            # Assumes Ollama is running and the model is pulled
-            return OllamaEmbeddings(model=self.model_name)
-        except Exception as e:
-            print(f"Error initializing Ollama Embeddings. Ensure Ollama is running.")
-            print(f"Details: {e}")
-            raise
 
     def _load_or_initialize_db(self) -> Chroma:
         """
@@ -89,28 +89,6 @@ class RagDatabaseManager:
                 persist_directory=self.persist_path
             )
 
-    def _persist_db(self) -> None:
-        """Helper to ensure persistence is called."""
-        if self.vectorstore:
-            self.vectorstore.persist()
-            print("✅ Database successfully persisted to disk.")
-        else:
-            print("Error: Vector store is not initialized.")
-
-    def _as_retriever(self, search_kwargs: dict = {"k": 5}) -> Any:
-        """
-        Returns a LangChain Retriever object for performing similarity searches.
-
-        Args:
-            search_kwargs (dict): Parameters for the retriever, e.g., number of results to return.
-
-        Returns:    
-            Any: A LangChain Retriever object or None if the vectorstore is not initialized.
-        """
-        if self.vectorstore:
-            return self.vectorstore.as_retriever(search_kwargs=search_kwargs)
-        return None
-
 # endregion
 # region Public methods
 
@@ -125,6 +103,14 @@ class RagDatabaseManager:
             source_name (str): A name/identifier for the document to use in the metadata.
         """
         print(f"\n--- Adding Document: {source_name} ---")
+        # Check if the document was already added to the database
+        if self.vectorstore:
+            existing_docs = self.vectorstore.similarity_search(
+                query=source_name, k=1)
+            if existing_docs:
+                print(
+                    f"Document '{source_name}' already exists in the database. Skipping addition.")
+                return
         # Load the document using PyPDFLoader
         loader = PyPDFLoader(document_path)
         pages = loader.load()  # Pages are returned as a list of Document objects
@@ -138,19 +124,19 @@ class RagDatabaseManager:
         document_chunks = text_splitter.split_documents(pages)
 
         # Enhance Metadata for easier tracking (Optional but helpful)
-        # The chunking process already created LangChain Document objects, 
+        # The chunking process already created LangChain Document objects,
         # but we can iterate to add a 'full_source' and 'chunk_index' field.
         for i, chunk in enumerate(document_chunks):
             page_info = f"Page: {chunk.metadata.get('page', 'N/A')}"
             chunk.metadata.update({
-                "source": source_name, # Overwrite the 'source' path if PyPDFLoader set a full path
+                "source": source_name,  # Overwrite the 'source' path if PyPDFLoader set a full path
                 "chunk_index": i,
                 "full_source": f"File: {source_name}, {page_info}, Chunk: {i}"
             })
             # Clean up any potential extra metadata from the loader if necessary (e.g., total_pages)
             if 'total_pages' in chunk.metadata:
                 del chunk.metadata['total_pages']
-        
+
         # Add documents to the Vector Store and Persist
         if document_chunks:
             print(
@@ -160,7 +146,7 @@ class RagDatabaseManager:
             self.vectorstore.add_documents(documents=document_chunks)
 
             # Persist the changes to disk
-            self._persist_db()
+            self.vectorstore.persist()
             print(
                 f"Successfully added {len(document_chunks)} chunks to the database.")
         else:
@@ -180,25 +166,44 @@ class RagDatabaseManager:
             print("Error: Vector database is not initialized. Cannot run RAG chain.")
             return {"answer": "Database not available.", "context": []}
 
-        # 2. Create the Document Chain (combines retrieved docs and prompt into a single message for the LLM)
-        # 🌟 KEY CHANGE: Pass the DOCUMENT_PROMPT to the chain configuration.
-        # This ensures each retrieved Document is formatted using this prompt template
-        # before being combined into the large '{context}' block of the RAG_PROMPT_TEMPLATE.
+        # Create the Document Chain (combines retrieved docs and prompt into a single message for the LLM)
         document_chain = create_stuff_documents_chain(
-            self.llm, 
-            self.rag_prompt, 
-            document_prompt=self.document_prompt  # <--- This applies the DOCUMENT_PROMPT to each document
+            self.llm,
+            self.rag_prompt,
+            # This applies the DOCUMENT_PROMPT to each document
+            document_prompt=self.document_prompt
         )
 
-        # 3. Create the Retrieval Chain (combines the retriever and the document chain)
-        retriever = self._as_retriever(
-            search_kwargs={"k": 5})  # Retrieve top 5 chunks
+        # Create the Retrieval Chain (combines the retriever and the document chain)
+        retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
+        # -----------------------------------------------------------------------
+        retrieved_docs = retriever.invoke(query)
+        # Create the context string using the document_prompt for each retrieved doc
+        formatted_context_chunks = [
+            self.document_prompt.format(
+                page_content=doc.page_content, 
+                source=doc.metadata.get('source', 'Unknown'),
+                page=doc.metadata.get('page', 'N/A')
+            )
+            for doc in retrieved_docs
+        ]
+        context_string = "\n".join(formatted_context_chunks)
+        # Now, fill the RAG prompt with the context and the query
+        final_prompt_value = self.rag_prompt.format_prompt(
+            context=context_string,
+            input=query
+        )
+        # 🌟 PRINT THE FINAL PROMPT HERE 🌟
+        print("\n" + "="*50)
+        print("🌟 FINAL PROMPT SENT TO LLM 🌟")
+        # This prints the prompt in the format the LLM expects (System/User messages)
+        print(final_prompt_value.to_string())
+        print("="*50 + "\n")
+        # -----------------------------------------------------------------------
         retrieval_chain = create_retrieval_chain(retriever, document_chain)
 
-        # 4. Invoke the Chain
-        # 🌟 KEY CHANGE: The RAG_PROMPT_TEMPLATE is automatically used here because 
-        # it was passed into the document_chain, which is part of the retrieval_chain.
-        print(f"\n--- Running RAG Chain with {self.model_name} ---")
+        # Invoke the Chain
+        print(f"\n--- Running RAG Chain with {self.inference_model_name} ---")
         response = retrieval_chain.invoke({"input": query})
 
         # Format the context for better display
@@ -235,12 +240,14 @@ if __name__ == "__main__":
     ]
 
     # Model to be used
-    model_name = "qwen3:14b"
+    embedding_model_name = "qwen3-embedding:latest"
+    inference_model_name = "gpt-oss:20b"
 
     # Initialize the RAG Database Manager
     print("Initializing RAG Database Manager...")
     rag_manager = RagDatabaseManager(
-        model_name=model_name,
+        embedding_model_name=embedding_model_name,
+        inference_model_name=inference_model_name,
         persist_path="./chroma_db",
         collection_name="initial_database"
     )
@@ -263,11 +270,7 @@ if __name__ == "__main__":
         "Qual meu endereço completo em Parnamirim"
     ]
     for query in querys:
-        result = rag_manager.generate_rag_answer(
-            query=query,
-            llm_model=model_name
-        )
+        result = rag_manager.generate_rag_answer(query=query)
         print(f"\n--- Query: {query} ---")
         print("Answer:", result["answer"].split("</think>")[-1])
-        print("Context documents retrieved:", result["context_documents"])
 # endregion

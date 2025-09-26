@@ -253,3 +253,8 @@ wrapt==1.17.2
 xgboost==2.1.4
 xxhash==3.5.0
 yarl==1.18.3
+langchain==0.3.27
+langchain-community==0.3.29
+chromadb==1.1.0
+langchain-ollama==0.3.8
+ollama==0.6.0

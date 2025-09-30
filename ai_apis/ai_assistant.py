@@ -54,6 +54,51 @@ class AiAssistant:
             ("human", "{input}"),
         ])
         self.message_history = []
+        # Chunk parameters
+        self.chunk_size = 10000
+        self.chunk_overlap = 200
+        self.n_chunks = 5
+        # Similarity search parameters
+        # Minimum similarity score to consider a match
+        self.similarity_score_threshold = 0.1
+
+    def set_chunking_parameters(self, chunk_size: int, chunk_overlap: int) -> None:
+        """
+        Sets the chunking parameters for document processing.
+
+        Args:
+            chunk_size (int): The maximum number of characters in each chunk.
+            chunk_overlap (int): The number of characters to overlap between chunks.
+        """
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+
+    def set_chunks_to_retrieve(self, n_chunks: int) -> None:
+        """
+        Sets the number of chunks to retrieve during RAG prompt building.
+
+        Args:
+            n_chunks (int): The number of context chunks to retrieve.
+        """
+        self.n_chunks = n_chunks
+
+    def set_similarity_score_threshold(self, threshold: float) -> None:
+        """
+        Sets the similarity score threshold for document retrieval.
+
+        Args:
+            threshold (float): The minimum similarity score to consider a match.
+        """
+        self.similarity_score_threshold = threshold
+
+    def get_chunk_size(self) -> int:
+        """
+        Returns the current chunk size.
+
+        Returns:
+            int: The current chunk size.
+        """
+        return self.chunk_size
 
 # endregion
 # region Private internal methods
@@ -93,33 +138,32 @@ class AiAssistant:
 # endregion
 # region Database RAG methods
 
-    def add_document_to_db(self, document_path: str, chunk_size: int, chunk_overlap: int = 200, source_name: str = "doc_file") -> None:
+    def add_document_to_db(self, document_path: str, source_name: str) -> None:
         """
         Takes a raw document string, chunks it, and adds the chunks to the vector database.
 
         Args:
             document_path (str): The file path to the document to be added.
-            chunk_size (int): The maximum number of characters in each chunk.
-            chunk_overlap (int): The number of characters to overlap between chunks (default 200).
             source_name (str): A name/identifier for the document to use in the metadata.
         """
         print(f"\n--- Adding Document: {source_name} ---")
         # Check if the document was already added to the database
         if self.vectorstore:
             existing_docs = self.vectorstore.similarity_search(
-                query=source_name, k=1)
-            if existing_docs:
-                print(
-                    f"Document '{source_name}' already exists in the database. Skipping addition.")
-                return
+                query=source_name, k=10)
+            for doc in existing_docs:
+                if doc.metadata.get("source") == source_name:
+                    print(
+                        f"Document '{source_name}' already exists in the database. Skipping addition.")
+                    return
         # Load the document using PyPDFLoader
         loader = PyPDFLoader(document_path)
         pages = loader.load()  # Pages are returned as a list of Document objects
         # Initialize Text Splitter
         text_splitter = RecursiveCharacterTextSplitter(
             separators=["\n\n", "\n", " ", ""],
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
         )
         # Convert text chunks to LangChain Document objects and add metadata
         document_chunks = text_splitter.split_documents(pages)
@@ -141,19 +185,15 @@ class AiAssistant:
         # Add documents to the Vector Store and Persist
         if document_chunks:
             print(
-                f"Generated {len(document_chunks)} chunks of size up to {chunk_size}.")
-
+                f"Generated {len(document_chunks)} chunks of size up to {self.chunk_size}.")
             # Use Chroma's add_documents method to insert and embed the chunks
             self.vectorstore.add_documents(documents=document_chunks)
-
-            # Persist the changes to disk
-            self.vectorstore.persist()
             print(
                 f"Successfully added {len(document_chunks)} chunks to the database.")
         else:
             print("Document was empty or too short to chunk.")
 
-    def build_rag_prompt(self, query: str, n_chunks: int = 5) -> Dict[str, Any]:
+    def build_rag_prompt(self, query: str) -> Dict[str, Any]:
         """
         Retrieves documents from the vectorstore and builds the final RAG prompt.
 
@@ -168,7 +208,7 @@ class AiAssistant:
             return {"prompt": None, "context_documents": [], "context_string": ""}
 
         retriever = self.vectorstore.as_retriever(
-            search_kwargs={"k": n_chunks})
+            search_kwargs={"k": self.n_chunks})
         retrieved_docs = retriever.invoke(query)
 
         # Format retrieved docs into context
@@ -355,53 +395,80 @@ class AiAssistant:
 
 if __name__ == "__main__":
     # List of PDFs to add to the database
+    # pdf_files = [
+    #     "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
+    #     "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
+    #     "/home/vini/Downloads/box 31 servicos.pdf",
+    #     "/home/vini/Downloads/contrato natal.pdf",
+    #     "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+    #     "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
+    # ]
+    # querys = [
+    #     "Qual é o código da minha reserva nesta passagem aérea?",
+    #     "Qual o nome do hotel onde ficarei hospedado?",
+    #     "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?",
+    #     "Qual meu endereço completo em Parnamirim no contrato de aluguel?",
+    #     "Há a possibilidade de obter dados em tempo real do APEX 16 utilizando alguma porta NMEA?",
+    # ]
     pdf_files = [
-        # "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-        # "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-        # "/home/vini/Downloads/box 31 servicos.pdf",
-        # "/home/vini/Downloads/contrato natal.pdf",
-        # "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
-        "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
+        "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
+        "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
+        "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
     ]
+    querys = [
+        "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+        "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
+        "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
+        "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
+        "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
+        "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
+        "Quais são os limites de reembolso para refeições durante viagens corporativas?",
+        "Quais despesas não são reembolsáveis segundo o procedimento?",
+        "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
+        "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
+        "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
+        "Quais práticas são proibidas nas relações com agentes públicos?",
+    ]
+    sae_answers = [
+
+    ]
+
 
     # Model to be used
     embedding_model_name = "qwen3-embedding:latest"
     inference_model_name = "gpt-oss:120b"
 
-    # Initialize the RAG Database Manager
-    print("Initializing RAG Database Manager...")
+    # Initialize the AI Assistant
+    print("Initializing AI Assistant...")
     ai_assistant = AiAssistant(
         embedding_model_name=embedding_model_name,
         inference_model_name=inference_model_name,
         persist_path="./chroma_db",
-        collection_name="initial_database"
+        collection_name="dev_collection"
     )
 
+    # Setting pdf chunking parameters
+    ai_assistant.set_chunking_parameters(
+        chunk_size=5000, chunk_overlap=200)
+    ai_assistant.set_chunks_to_retrieve(n_chunks=12)
+
     # Add each PDF to the database
-    MAX_CHUNK_SIZE = 128000
-    N_CHUNKS = 10  
-    CHUNK_SIZE = MAX_CHUNK_SIZE // N_CHUNKS  
     for pdf_file in pdf_files:
         # Add the PDF content to the RAG database
         ai_assistant.add_document_to_db(
             document_path=pdf_file,
-            chunk_size=CHUNK_SIZE,
-            chunk_overlap=200,
             source_name=os.path.basename(pdf_file)
         )
 
     # Generate an answer to a query
-    querys = [
-        # "Qual é o código da minha reserva nesta passagem aérea?",
-        # "Qual o nome do hotel onde ficarei hospedado?",
-        # "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?",
-        # "Qual meu endereço completo em Parnamirim",
-        "Há a possibilidade de obter dados em tempo real do APEX 16 utilizando alguma porta NMEA?",
-    ]
     for query in querys:
         print("\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
-        rag_prompt = ai_assistant.build_rag_prompt(query=query, n_chunks=N_CHUNKS)
+        rag_prompt = ai_assistant.build_rag_prompt(
+            query=query)
         response = ai_assistant.run_inference(
             prompt=rag_prompt["prompt_string"])
         print(f"QUERY: {query}")

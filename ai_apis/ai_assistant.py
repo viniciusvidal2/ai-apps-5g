@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 import os
 
 
-class RagDatabaseManager:
+class AiAssistant:
     # region Initialization and Setup
     """
     Manages a RAG (Retrieval-Augmented Generation) database using Chroma and Ollama models.
@@ -370,7 +370,7 @@ if __name__ == "__main__":
 
     # Initialize the RAG Database Manager
     print("Initializing RAG Database Manager...")
-    rag_manager = RagDatabaseManager(
+    ai_assistant = AiAssistant(
         embedding_model_name=embedding_model_name,
         inference_model_name=inference_model_name,
         persist_path="./chroma_db",
@@ -383,7 +383,7 @@ if __name__ == "__main__":
     CHUNK_SIZE = MAX_CHUNK_SIZE // N_CHUNKS  
     for pdf_file in pdf_files:
         # Add the PDF content to the RAG database
-        rag_manager.add_document_to_db(
+        ai_assistant.add_document_to_db(
             document_path=pdf_file,
             chunk_size=CHUNK_SIZE,
             chunk_overlap=200,
@@ -401,8 +401,8 @@ if __name__ == "__main__":
     for query in querys:
         print("\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
-        rag_prompt = rag_manager.build_rag_prompt(query=query, n_chunks=N_CHUNKS)
-        response = rag_manager.run_inference(
+        rag_prompt = ai_assistant.build_rag_prompt(query=query, n_chunks=N_CHUNKS)
+        response = ai_assistant.run_inference(
             prompt=rag_prompt["prompt_string"])
         print(f"QUERY: {query}")
         print(f"ANSWER: {response['answer']}")

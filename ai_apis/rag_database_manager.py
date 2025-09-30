@@ -2,16 +2,20 @@ from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_ollama import ChatOllama
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.schema.document import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-from typing import Dict, Any
+from typing import Dict, Any, List
 import os
 
 
 class RagDatabaseManager:
+    # region Initialization and Setup
+    """
+    Manages a RAG (Retrieval-Augmented Generation) database using Chroma and Ollama models.
+    """
+
     def __init__(self, embedding_model_name: str, inference_model_name: str, persist_path: str, collection_name: str) -> None:
         """
         Initializes the RAG Database Manager with the specified models and database path.
@@ -29,11 +33,6 @@ class RagDatabaseManager:
         self.embedding_function = OllamaEmbeddings(
             model=self.embedding_model_name)
         self.vectorstore = self._load_or_initialize_db()
-        print(f"Database Handler initialized.")
-        print(f"Embedding Model: {self.embedding_model_name}")
-        print(f"Inference Model: {self.inference_model_name}")
-        print(f"Collection Name: {self.collection_name}")
-        print(f"Persist Directory: {self.persist_path}")
         # This assumes you have the model pulled and Ollama is running
         self.llm = ChatOllama(model=self.inference_model_name)
         # Initialize the prompt templates
@@ -54,7 +53,9 @@ class RagDatabaseManager:
              "CONTEXTO:\n{context}"),
             ("human", "{input}"),
         ])
+        self.message_history = []
 
+# endregion
 # region Private internal methods
 
     def _load_or_initialize_db(self) -> Chroma:
@@ -90,7 +91,7 @@ class RagDatabaseManager:
             )
 
 # endregion
-# region Public methods
+# region Database RAG methods
 
     def add_document_to_db(self, document_path: str, chunk_size: int, chunk_overlap: int = 200, source_name: str = "doc_file") -> None:
         """
@@ -152,6 +153,56 @@ class RagDatabaseManager:
         else:
             print("Document was empty or too short to chunk.")
 
+    def build_rag_prompt(self, query: str, n_chunks: int = 5) -> Dict[str, Any]:
+        """
+        Retrieves documents from the vectorstore and builds the final RAG prompt.
+
+        Args:
+            query (str): The user's input query.
+            n_chunks (int): The number of context chunks to retrieve (default 5).
+
+        Returns:
+            Dict[str, Any]: Contains the final prompt string, retrieved docs, and context string.
+        """
+        if not self.vectorstore:
+            return {"prompt": None, "context_documents": [], "context_string": ""}
+
+        retriever = self.vectorstore.as_retriever(
+            search_kwargs={"k": n_chunks})
+        retrieved_docs = retriever.invoke(query)
+
+        # Format retrieved docs into context
+        formatted_context_chunks = [
+            self.document_prompt.format(
+                page_content=doc.page_content,
+                source=doc.metadata.get("source", "Unknown"),
+                page=doc.metadata.get("page", "N/A"),
+            )
+            for doc in retrieved_docs
+        ]
+        context_string = "\n".join(formatted_context_chunks)
+
+        # Fill the RAG prompt
+        final_prompt_value = self.rag_prompt.format_prompt(
+            context=context_string,
+            input=query,
+        )
+        final_prompt_string = final_prompt_value.to_string()
+
+        # # Debug print
+        # print("\n" + "=" * 50)
+        # print("🌟 FINAL PROMPT BUILT 🌟")
+        # print(final_prompt_string)
+        # print("=" * 50 + "\n")
+
+        return {
+            # This is a PromptValue object (LangChain)
+            "prompt": final_prompt_value,
+            "prompt_string": final_prompt_string,
+            "context_documents": retrieved_docs,
+            "context_string": context_string,
+        }
+
     def generate_rag_answer(self, query: str) -> Dict[str, Any]:
         """
         Runs the RAG chain: retrieves context and generates an answer using an LLM.
@@ -181,7 +232,7 @@ class RagDatabaseManager:
         # Create the context string using the document_prompt for each retrieved doc
         formatted_context_chunks = [
             self.document_prompt.format(
-                page_content=doc.page_content, 
+                page_content=doc.page_content,
                 source=doc.metadata.get('source', 'Unknown'),
                 page=doc.metadata.get('page', 'N/A')
             )
@@ -217,13 +268,86 @@ class RagDatabaseManager:
             "sources_summary": "\n".join(context_sources)
         }
 
-    def get_database_path(self) -> str:
-        """Returns the path to the RAG database.
+# endregion
+# region Inference related methods
+
+    def format_general_user_prompt(self, user_input: str) -> str:
+        """
+        Formats a general user input into the RAG prompt structure without retrieval.
+
+        Args:
+            user_input (str): The user's input query.
 
         Returns:
-            str: The path to the RAG database.
+            str: The formatted prompt string.
         """
-        return self.persist_path
+        final_prompt_value = self.rag_prompt.format_prompt(
+            context="Nenhum contexto fornecido, utilize seu conhecimento ou o histórico de mensagens anteriores.",
+            input=user_input,
+        )
+        final_prompt_string = final_prompt_value.to_string()
+
+        # Debug print
+        print("\n" + "=" * 50)
+        print("🌟 FORMATTED USER PROMPT 🌟")
+        print(final_prompt_string)
+        print("=" * 50 + "\n")
+
+        return final_prompt_string
+
+    def run_inference(self, prompt: Any) -> Dict[str, Any]:
+        """
+        Runs inference on a given prompt using the LLM.
+        Can take either a string or a LangChain PromptValue.
+
+        Args:
+            prompt (str | PromptValue): The prepared prompt.
+
+        Returns:
+            Dict[str, Any]: The model's answer.
+        """
+        # If string, wrap into the right input format
+        if isinstance(prompt, str):
+            input_data = {"input": prompt}
+        else:
+            input_data = {"input": prompt.to_string()}
+
+        response = self.llm.invoke(input_data["input"])  # direct LLM call
+
+        return {
+            "answer": response.content,
+        }
+
+# endregion
+# region Message History methods
+
+    def increment_history(self, user_input: str, assistant_response: str) -> None:
+        """
+        Updates the message history with a new user input and assistant response.
+
+        Args:
+            user_input (str): The user's input message.
+            assistant_response (str): The assistant's response message.
+        """
+        self.message_history += [
+            {'role': 'user', 'content': user_input},
+            {'role': 'assistant', 'content': assistant_response},
+        ]
+
+    def clear_history(self) -> None:
+        """
+        Clears the message history.
+        """
+        self.message_history = []
+
+    def get_history(self) -> List[Dict[str, str]]:
+        """
+        Returns the current message history.
+
+        Returns:
+            List[Dict[str, str]]: The message history.
+        """
+        return self.message_history
 
 # endregion
 # region Example usage
@@ -232,16 +356,17 @@ class RagDatabaseManager:
 if __name__ == "__main__":
     # List of PDFs to add to the database
     pdf_files = [
-        "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-        "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-        "/home/vini/Downloads/box 31 servicos.pdf",
-        "/home/vini/Downloads/contrato natal.pdf",
-        "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+        # "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
+        # "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
+        # "/home/vini/Downloads/box 31 servicos.pdf",
+        # "/home/vini/Downloads/contrato natal.pdf",
+        # "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+        "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
     ]
 
     # Model to be used
     embedding_model_name = "qwen3-embedding:latest"
-    inference_model_name = "gpt-oss:20b"
+    inference_model_name = "gpt-oss:120b"
 
     # Initialize the RAG Database Manager
     print("Initializing RAG Database Manager...")
@@ -253,24 +378,37 @@ if __name__ == "__main__":
     )
 
     # Add each PDF to the database
+    MAX_CHUNK_SIZE = 128000
+    N_CHUNKS = 10  
+    CHUNK_SIZE = MAX_CHUNK_SIZE // N_CHUNKS  
     for pdf_file in pdf_files:
         # Add the PDF content to the RAG database
         rag_manager.add_document_to_db(
             document_path=pdf_file,
-            chunk_size=50000,
+            chunk_size=CHUNK_SIZE,
             chunk_overlap=200,
             source_name=os.path.basename(pdf_file)
         )
 
     # Generate an answer to a query
     querys = [
-        "Qual é o código da minha reserva nesta passagem aérea?",
-        "Qual o nome do hotel onde ficarei hospedado?",
-        "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?",
-        "Qual meu endereço completo em Parnamirim"
+        # "Qual é o código da minha reserva nesta passagem aérea?",
+        # "Qual o nome do hotel onde ficarei hospedado?",
+        # "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?",
+        # "Qual meu endereço completo em Parnamirim",
+        "Há a possibilidade de obter dados em tempo real do APEX 16 utilizando alguma porta NMEA?",
     ]
     for query in querys:
-        result = rag_manager.generate_rag_answer(query=query)
-        print(f"\n--- Query: {query} ---")
-        print("Answer:", result["answer"].split("</think>")[-1])
+        print("\n" + "-" * 80)
+        print(f"--- Running Inference with {inference_model_name} ---")
+        rag_prompt = rag_manager.build_rag_prompt(query=query, n_chunks=N_CHUNKS)
+        response = rag_manager.run_inference(
+            prompt=rag_prompt["prompt_string"])
+        print(f"QUERY: {query}")
+        print(f"ANSWER: {response['answer']}")
+        print("SOURCES:")
+        for doc in rag_prompt["context_documents"]:
+            print(
+                f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
+        print("-" * 80)
 # endregion

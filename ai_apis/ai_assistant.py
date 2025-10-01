@@ -8,6 +8,7 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from typing import Dict, Any, List
 import os
+import subprocess
 
 
 class AiAssistant:
@@ -98,6 +99,13 @@ class AiAssistant:
             int: The current chunk size.
         """
         return self.chunk_size
+    
+    def close_assistant(self) -> None:
+        """
+        Closes the assistant and performs any necessary cleanup, especially in the models.
+        """
+        subprocess.run(["ollama", "stop", self.inference_model_name])
+        subprocess.run(["ollama", "stop", self.embedding_model_name])
 
 # endregion
 # region Private internal methods
@@ -473,4 +481,7 @@ if __name__ == "__main__":
             print(
                 f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
         print("-" * 80)
+
+    # Close the assistant and clean up resources
+    ai_assistant.close_assistant()
 # endregion

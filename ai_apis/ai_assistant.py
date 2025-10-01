@@ -58,7 +58,6 @@ class AiAssistant:
         self.chunk_size = 10000
         self.chunk_overlap = 200
         self.n_chunks = 5
-        # Similarity search parameters
         # Minimum similarity score to consider a match
         self.similarity_score_threshold = 0.1
 
@@ -432,10 +431,6 @@ if __name__ == "__main__":
         "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
         "Quais práticas são proibidas nas relações com agentes públicos?",
     ]
-    sae_answers = [
-
-    ]
-
 
     # Model to be used
     embedding_model_name = "qwen3-embedding:latest"

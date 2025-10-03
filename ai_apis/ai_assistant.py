@@ -4,9 +4,11 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts.chat import ChatPromptValue
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
-from typing import Dict, Any, List
+from langchain.schema import SystemMessage, HumanMessage, AIMessage
+from typing import Dict, Any
 import os
 import subprocess
 
@@ -234,8 +236,8 @@ class AiAssistant:
             context=context_string,
             input=query,
         )
-        final_prompt_string = final_prompt_value.to_string()
 
+        # final_prompt_string = final_prompt_value.to_string()
         # # Debug print
         # print("\n" + "=" * 50)
         # print("🌟 FINAL PROMPT BUILT 🌟")
@@ -243,9 +245,7 @@ class AiAssistant:
         # print("=" * 50 + "\n")
 
         return {
-            # This is a PromptValue object (LangChain)
             "prompt": final_prompt_value,
-            "prompt_string": final_prompt_string,
             "context_documents": retrieved_docs,
             "context_string": context_string,
         }
@@ -318,7 +318,7 @@ class AiAssistant:
 # endregion
 # region Inference related methods
 
-    def format_general_user_prompt(self, user_input: str) -> str:
+    def format_general_user_prompt(self, user_input: str) -> ChatPromptValue:
         """
         Formats a general user input into the RAG prompt structure without retrieval.
 
@@ -326,60 +326,65 @@ class AiAssistant:
             user_input (str): The user's input query.
 
         Returns:
-            str: The formatted prompt string.
+            ChatPromptValue: The formatted prompt.
         """
+        # Fill the prompt with a default context message
         final_prompt_value = self.rag_prompt.format_prompt(
-            context="Nenhum CONTEXTO fornecido, utilize seu conhecimento ou o CONTEXTO do histórico de mensagens anteriores.",
+            context="Nenhum CONTEXTO fornecido. Utilize seu conhecimento ou o CONTEXTO fornecido nas mensagens de 'system' anteriores.",
             input=user_input,
         )
-        final_prompt_string = final_prompt_value.to_string()
 
-        # Debug print
-        print("\n" + "=" * 50)
-        print("🌟 FORMATTED USER PROMPT 🌟")
-        print(final_prompt_string)
-        print("=" * 50 + "\n")
+        # # Debug print
+        # final_prompt_string = final_prompt_value.to_string()
+        # print("\n" + "=" * 50)
+        # print("🌟 FORMATTED USER PROMPT 🌟")
+        # print(final_prompt_string)
+        # print("=" * 50 + "\n")
 
-        return final_prompt_string
+        return final_prompt_value
 
-    def run_inference(self, prompt: Any) -> Dict[str, Any]:
+    def run_inference(self, prompt: ChatPromptValue, use_history: bool) -> str:
         """
         Runs inference on a given prompt using the LLM.
-        Can take either a string or a LangChain PromptValue.
+        Can take either a string or a LangChain ChatPromptValue.
 
         Args:
-            prompt (str | PromptValue): The prepared prompt.
+            prompt (ChatPromptValue): The prepared prompt.
+            use_history (bool): Whether to include message history in the LLM call.
 
         Returns:
-            Dict[str, Any]: The model's answer.
+            str: The model's answer.
         """
-        # If string, wrap into the right input format
-        if isinstance(prompt, str):
-            input_data = {"input": prompt}
+        # Find the messages to send wether from history or just the prompt
+        messages = []
+        if use_history and self.message_history:
+            # If using history, we need to construct a full message list
+            messages = self.message_history.copy()
+            messages.extend(prompt.messages)
         else:
-            input_data = {"input": prompt.to_string()}
+            messages = prompt.messages
+        # Invoke the LLM with the messages
+        response = self.llm.invoke(messages)
 
-        response = self.llm.invoke(input_data["input"])  # direct LLM call
-
-        return {
-            "answer": response.content,
-        }
+        return response.content
 
 # endregion
 # region Message History methods
 
-    def increment_history(self, user_input: str, assistant_response: str) -> None:
+    def increment_history(self, system_message: str, user_input: str, assistant_response: str) -> None:
         """
         Updates the message history with a new user input and assistant response.
 
         Args:
+            system_message (str): The system message to add.
             user_input (str): The user's input message.
             assistant_response (str): The assistant's response message.
         """
-        self.message_history += [
-            {'role': 'user', 'content': user_input},
-            {'role': 'assistant', 'content': assistant_response},
-        ]
+        if system_message:
+            self.message_history.append(SystemMessage(content=system_message))
+        if user_input and assistant_response:
+            self.message_history.append(HumanMessage(content=user_input))
+            self.message_history.append(AIMessage(content=assistant_response))
 
     def clear_history(self) -> None:
         """
@@ -387,12 +392,12 @@ class AiAssistant:
         """
         self.message_history = []
 
-    def get_history(self) -> List[Dict[str, str]]:
+    def get_history(self) -> list:
         """
         Returns the current message history.
 
         Returns:
-            List[Dict[str, str]]: The message history.
+            list: The message history with system, user, and assistant messages types.
         """
         return self.message_history
 
@@ -401,6 +406,26 @@ class AiAssistant:
 
 
 if __name__ == "__main__":
+    ############ Object creation and setup ############
+    # Model to be used
+    embedding_model_name = "qwen3-embedding:latest"
+    inference_model_name = "gpt-oss:120b"
+
+    # Initialize the AI Assistant
+    print("Initializing AI Assistant...")
+    ai_assistant = AiAssistant(
+        embedding_model_name=embedding_model_name,
+        inference_model_name=inference_model_name,
+        persist_path="./chroma_db",
+        collection_name="dev_collection"
+    )
+
+    # Setting pdf chunking parameters
+    ai_assistant.set_chunking_parameters(
+        chunk_size=5000, chunk_overlap=200)
+    ai_assistant.set_chunks_to_retrieve(n_chunks=3)
+
+    ############ Adding documents to the database ############
     # List of PDFs to add to the database
     pdf_files = [
         "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
@@ -411,9 +436,9 @@ if __name__ == "__main__":
         "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
     ]
     querys = [
-        {"question": "Qual é o código da minha reserva nesta passagem aérea?",
-            "search_db": True},
-        {"question": "Agora quais são os trechos que estarei viajando?", "search_db": False},
+        {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
+            "search_db": True, "use_history": True},
+        {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True},
         # {"question": "Qual o nome do hotel onde ficarei hospedado?", "search_db": True},
         # {"question": "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?", "search_db": True},
         # {"question": "Qual meu endereço completo em Parnamirim no contrato de aluguel?",
@@ -443,24 +468,6 @@ if __name__ == "__main__":
     #     "Quais práticas são proibidas nas relações com agentes públicos?",
     # ]
 
-    # Model to be used
-    embedding_model_name = "qwen3-embedding:latest"
-    inference_model_name = "gpt-oss:120b"
-
-    # Initialize the AI Assistant
-    print("Initializing AI Assistant...")
-    ai_assistant = AiAssistant(
-        embedding_model_name=embedding_model_name,
-        inference_model_name=inference_model_name,
-        persist_path="./chroma_db",
-        collection_name="dev_collection"
-    )
-
-    # Setting pdf chunking parameters
-    ai_assistant.set_chunking_parameters(
-        chunk_size=5000, chunk_overlap=200)
-    ai_assistant.set_chunks_to_retrieve(n_chunks=12)
-
     # Add each PDF to the database
     for pdf_file in pdf_files:
         # Add the PDF content to the RAG database
@@ -469,26 +476,37 @@ if __name__ == "__main__":
             source_name=os.path.basename(pdf_file)
         )
 
-    # Generate an answer to a query
+    ############ Running Inference ############
     for query in querys:
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
         # Look if we intend to search a database or just use the general prompt
         if query["search_db"]:
-            rag_prompt = ai_assistant.build_rag_prompt(
+            prompt_data = ai_assistant.build_rag_prompt(
                 query=query["question"])
-            response = ai_assistant.run_inference(
-                prompt=rag_prompt["prompt_string"])
+            prompt = prompt_data["prompt"]
         else:
-            formatted_prompt = ai_assistant.format_general_user_prompt(
+            prompt = ai_assistant.format_general_user_prompt(
                 user_input=query["question"])
-            response = ai_assistant.run_inference(prompt=formatted_prompt)
+
+        # Run inference
+        response = ai_assistant.run_inference(
+            prompt=prompt, use_history=query["use_history"])
+
+        # Update message history
+        if query["use_history"]:
+            ai_assistant.increment_history(
+                system_message=prompt.messages[0].content,
+                user_input=prompt.messages[1].content,
+                assistant_response=response
+            )
+
         # Print the response and sources if applicable
         print(f"QUERY: {query['question']}")
-        print(f"ANSWER: {response['answer']}")
+        print(f"ANSWER: {response}")
         if query["search_db"]:
             print("SOURCES:")
-            for doc in rag_prompt["context_documents"]:
+            for doc in prompt_data["context_documents"]:
                 print(
                     f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
         print("-" * 80)

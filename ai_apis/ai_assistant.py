@@ -57,6 +57,7 @@ class AiAssistant:
             ("human", "{input}"),
         ])
         self.message_history = []
+        self.accessed_database_in_history = []
         # Chunk parameters
         self.chunk_size = 10000
         self.chunk_overlap = 200
@@ -368,6 +369,47 @@ class AiAssistant:
 
         return response.content
 
+    def run_inference_pipeline(self, user_query: str, search_db: bool, use_history: bool) -> Dict[str, Any]:
+        """
+        Runs the full inference pipeline: builds the prompt (with or without RAG), runs inference, and returns the answer.
+
+        Args:
+            user_query (str): The user's input query.
+            search_db (bool): Whether to use RAG (search the database) or just general prompt.
+            use_history (bool): Whether to include message history in the LLM call.
+
+        Returns:
+            Dict[str, Any]: The final response from the inference pipeline, plus sources to it.
+        """
+        # Step 1: Build the prompt
+        if search_db:
+            prompt_data = self.build_rag_prompt(query=user_query)
+            prompt = prompt_data["prompt"]
+            # Add the sources to the history tracking if we used the DB
+            if use_history:
+                self.accessed_database_in_history.extend([
+                    {"source": doc.metadata.get("source", "Unknown"),
+                     "page": doc.metadata.get("page", "N/A")} for doc in prompt_data["context_documents"]
+                ])
+        else:
+            prompt = self.format_general_user_prompt(user_input=user_query)
+
+        # Step 2: Run inference
+        response = self.run_inference(prompt, use_history=use_history)
+
+        # Step 3: Add to history if needed
+        if use_history:
+            self.increment_history(
+                system_message=prompt.messages[0].content,
+                user_input=prompt.messages[1].content,
+                assistant_response=response
+            )
+
+        return {
+            "answer": response,
+            "history_sources": self.accessed_database_in_history
+        }
+
 # endregion
 # region Message History methods
 
@@ -391,6 +433,7 @@ class AiAssistant:
         Clears the message history.
         """
         self.message_history = []
+        self.accessed_database_in_history = []
 
     def get_history(self) -> list:
         """
@@ -400,6 +443,15 @@ class AiAssistant:
             list: The message history with system, user, and assistant messages types.
         """
         return self.message_history
+
+    def get_accessed_sources(self) -> list:
+        """
+        Returns the list of accessed sources in the current session.
+
+        Returns:
+            list: The list of accessed sources with their page numbers.
+        """
+        return self.accessed_database_in_history
 
 # endregion
 # region Example usage
@@ -480,35 +532,17 @@ if __name__ == "__main__":
     for query in querys:
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
-        # Look if we intend to search a database or just use the general prompt
-        if query["search_db"]:
-            prompt_data = ai_assistant.build_rag_prompt(
-                query=query["question"])
-            prompt = prompt_data["prompt"]
-        else:
-            prompt = ai_assistant.format_general_user_prompt(
-                user_input=query["question"])
-
-        # Run inference
-        response = ai_assistant.run_inference(
-            prompt=prompt, use_history=query["use_history"])
-
-        # Update message history
-        if query["use_history"]:
-            ai_assistant.increment_history(
-                system_message=prompt.messages[0].content,
-                user_input=prompt.messages[1].content,
-                assistant_response=response
-            )
+        response_data = ai_assistant.run_inference_pipeline(user_query=query["question"],
+                                                            search_db=query["search_db"],
+                                                            use_history=query["use_history"])
 
         # Print the response and sources if applicable
-        print(f"QUERY: {query['question']}")
-        print(f"ANSWER: {response}")
-        if query["search_db"]:
-            print("SOURCES:")
-            for doc in prompt_data["context_documents"]:
-                print(
-                    f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
+        print(f"QUESTION: {query['question']}")
+        print(f"ANSWER: {response_data['answer']}")
+        print("SOURCES:")
+        for doc in response_data["history_sources"]:
+            print(
+                f"- {doc.get('source', 'Unknown')}, (Page {doc.get('page', 'N/A')})")
         print("-" * 80)
 
     # Close the assistant and clean up resources

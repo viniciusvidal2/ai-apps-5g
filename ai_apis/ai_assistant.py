@@ -99,7 +99,7 @@ class AiAssistant:
             int: The current chunk size.
         """
         return self.chunk_size
-    
+
     def close_assistant(self) -> None:
         """
         Closes the assistant and performs any necessary cleanup, especially in the models.
@@ -329,7 +329,7 @@ class AiAssistant:
             str: The formatted prompt string.
         """
         final_prompt_value = self.rag_prompt.format_prompt(
-            context="Nenhum contexto fornecido, utilize seu conhecimento ou o histórico de mensagens anteriores.",
+            context="Nenhum CONTEXTO fornecido, utilize seu conhecimento ou o CONTEXTO do histórico de mensagens anteriores.",
             input=user_input,
         )
         final_prompt_string = final_prompt_value.to_string()
@@ -402,43 +402,46 @@ class AiAssistant:
 
 if __name__ == "__main__":
     # List of PDFs to add to the database
-    # pdf_files = [
-    #     "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-    #     "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-    #     "/home/vini/Downloads/box 31 servicos.pdf",
-    #     "/home/vini/Downloads/contrato natal.pdf",
-    #     "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
-    #     "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
-    # ]
-    # querys = [
-    #     "Qual é o código da minha reserva nesta passagem aérea?",
-    #     "Qual o nome do hotel onde ficarei hospedado?",
-    #     "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?",
-    #     "Qual meu endereço completo em Parnamirim no contrato de aluguel?",
-    #     "Há a possibilidade de obter dados em tempo real do APEX 16 utilizando alguma porta NMEA?",
-    # ]
     pdf_files = [
-        "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
+        "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
+        "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
+        "/home/vini/Downloads/box 31 servicos.pdf",
+        "/home/vini/Downloads/contrato natal.pdf",
+        "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+        "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
     ]
     querys = [
-        "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
-        "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
-        "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
-        "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
-        "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
-        "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
-        "Quais são os limites de reembolso para refeições durante viagens corporativas?",
-        "Quais despesas não são reembolsáveis segundo o procedimento?",
-        "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
-        "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
-        "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
-        "Quais práticas são proibidas nas relações com agentes públicos?",
+        {"question": "Qual é o código da minha reserva nesta passagem aérea?",
+            "search_db": True},
+        {"question": "Agora quais são os trechos que estarei viajando?", "search_db": False},
+        # {"question": "Qual o nome do hotel onde ficarei hospedado?", "search_db": True},
+        # {"question": "Qual o valor total gasto com a passagem aerea do rio de janeiro para sao paulo?", "search_db": True},
+        # {"question": "Qual meu endereço completo em Parnamirim no contrato de aluguel?",
+        #     "search_db": True},
+        # {"question": "Há a possibilidade de obter dados em tempo real do APEX 16 utilizando alguma porta NMEA?", "search_db": True},
     ]
+    # pdf_files = [
+    #     "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
+    #     "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
+    #     "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
+    # ]
+    # querys = [
+    #     "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+    #     "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
+    #     "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
+    #     "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
+    #     "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
+    #     "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
+    #     "Quais são os limites de reembolso para refeições durante viagens corporativas?",
+    #     "Quais despesas não são reembolsáveis segundo o procedimento?",
+    #     "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
+    #     "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
+    #     "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
+    #     "Quais práticas são proibidas nas relações com agentes públicos?",
+    # ]
 
     # Model to be used
     embedding_model_name = "qwen3-embedding:latest"
@@ -468,18 +471,26 @@ if __name__ == "__main__":
 
     # Generate an answer to a query
     for query in querys:
-        print("\n" + "-" * 80)
+        print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
-        rag_prompt = ai_assistant.build_rag_prompt(
-            query=query)
-        response = ai_assistant.run_inference(
-            prompt=rag_prompt["prompt_string"])
-        print(f"QUERY: {query}")
+        # Look if we intend to search a database or just use the general prompt
+        if query["search_db"]:
+            rag_prompt = ai_assistant.build_rag_prompt(
+                query=query["question"])
+            response = ai_assistant.run_inference(
+                prompt=rag_prompt["prompt_string"])
+        else:
+            formatted_prompt = ai_assistant.format_general_user_prompt(
+                user_input=query["question"])
+            response = ai_assistant.run_inference(prompt=formatted_prompt)
+        # Print the response and sources if applicable
+        print(f"QUERY: {query['question']}")
         print(f"ANSWER: {response['answer']}")
-        print("SOURCES:")
-        for doc in rag_prompt["context_documents"]:
-            print(
-                f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
+        if query["search_db"]:
+            print("SOURCES:")
+            for doc in rag_prompt["context_documents"]:
+                print(
+                    f"- {doc.metadata.get('source', 'Unknown')}, (Page {doc.metadata.get('page', 'N/A')})")
         print("-" * 80)
 
     # Close the assistant and clean up resources

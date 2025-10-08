@@ -172,4 +172,5 @@ cython_debug/
 
 ollama_models/blobs
 ollama_models/manifests
-chroma_db
+chroma_*
+answers*

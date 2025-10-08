@@ -1,0 +1,14 @@
+# FastAPI and server dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Additional dependencies for functionality
+python-multipart==0.0.6
+
+# Database and cache dependencies for local development
+psycopg2-binary==2.9.9
+redis==5.0.1
+
+# Environment and configuration
+python-dotenv==1.0.0

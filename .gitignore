@@ -14,7 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#lib/
+# Não ignorar pasta lib do cliente Next.js
+!ihm/client/lib/
 lib64/
 parts/
 sdist/

@@ -218,11 +218,17 @@ async def run_inference(request: InferenceRequest):
             print("🤖 Using AI Assistant for inference...")
             
             # Call AI Assistant
-            result = ai_assistant.run_inference(
-                query=request.query,
+            result = ai_assistant.run_inference_pipeline(
+                user_query=request.query,
                 search_db=request.search_db,
                 use_history=request.use_history
             )
+
+            print("SOURCES:")
+            for doc in result.get("history_sources", []):
+                print(
+                    f"- {doc.get('source', 'Unknown')}, (Page {doc.get('page', 'N/A')})")
+            print("-" * 80)
             
             # Convert AI response to SSE format
             message_id = "ai-" + str(__import__('uuid').uuid4())

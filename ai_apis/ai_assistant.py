@@ -461,7 +461,7 @@ if __name__ == "__main__":
     ############ Object creation and setup ############
     # Model to be used
     embedding_model_name = "qwen3-embedding:latest"
-    inference_model_name = "gpt-oss:120b"
+    inference_model_name = "gemma3:27b"
 
     # Initialize the AI Assistant
     print("Initializing AI Assistant...")

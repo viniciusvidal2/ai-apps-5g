@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
+import asyncio
 from dotenv import load_dotenv
 
 # Load environment variables from config file
@@ -18,7 +19,15 @@ load_dotenv('config.env')
 project_root = Path(__file__).parent.parent.parent
 sys.path.append(str(project_root))
 
-from ai_apis.ai_assistant import AiAssistant
+# Configuration: Enable/disable AI Assistant
+USE_AI_ASSISTANT = os.getenv("USE_AI_ASSISTANT", "false").lower() == "true"
+
+# Conditional import based on configuration
+if USE_AI_ASSISTANT:
+    from ai_apis.ai_assistant import AiAssistant
+    print("🤖 AI Assistant enabled - importing AiAssistant class")
+else:
+    print("🎭 Mock mode enabled - AI Assistant disabled")
 
 # Server configuration
 app = FastAPI(
@@ -36,7 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global AI Assistant instance
+# Global AI Assistant instance (only if enabled)
 ai_assistant = None
 
 # Pydantic models for data validation
@@ -58,8 +67,18 @@ class HealthResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initializes the AI Assistant when the server starts"""
+    """Initializes the AI Assistant when the server starts (only if enabled)"""
     global ai_assistant
+    
+    if not USE_AI_ASSISTANT:
+        print("\n" + "="*60)
+        print("🎭 MOCK MODE - AI ASSISTANT DISABLED")
+        print("="*60)
+        print("✅ Server ready in mock mode")
+        print("🌐 Mock responses will be returned")
+        print("="*60 + "\n")
+        return
+    
     try:
         print("\n" + "="*60)
         print("🚀 SERVER STARTUP - INITIALIZING AI ASSISTANT")
@@ -110,25 +129,33 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleans up resources when the server stops"""
+    """Cleans up resources when the server stops (only if AI Assistant was enabled)"""
     global ai_assistant
-    if ai_assistant:
-        try:
-            print("\n" + "="*60)
-            print("🔄 SERVER SHUTDOWN - CLOSING AI ASSISTANT")
-            print("="*60)
-            print("🔄 Calling ai_assistant.close_assistant()...")
-            ai_assistant.close_assistant()
-            print("✅ AI Assistant closed successfully!")
-            print("="*60)
-            print("👋 SERVER SHUTDOWN COMPLETED")
-            print("="*60 + "\n")
-        except Exception as e:
-            print(f"\n⚠️ ERROR DURING SHUTDOWN")
-            print(f"🔍 Error type: {type(e).__name__}")
-            print(f"📝 Error message: {str(e)}")
-            print(f"📍 Error location: shutdown_event")
-            print("="*60 + "\n")
+    
+    if not USE_AI_ASSISTANT or not ai_assistant:
+        print("\n" + "="*60)
+        print("🎭 MOCK MODE SHUTDOWN - NO CLEANUP NEEDED")
+        print("="*60)
+        print("👋 Server shutdown completed")
+        print("="*60 + "\n")
+        return
+        
+    try:
+        print("\n" + "="*60)
+        print("🔄 SERVER SHUTDOWN - CLOSING AI ASSISTANT")
+        print("="*60)
+        print("🔄 Calling ai_assistant.close_assistant()...")
+        ai_assistant.close_assistant()
+        print("✅ AI Assistant closed successfully!")
+        print("="*60)
+        print("👋 SERVER SHUTDOWN COMPLETED")
+        print("="*60 + "\n")
+    except Exception as e:
+        print(f"\n⚠️ ERROR DURING SHUTDOWN")
+        print(f"🔍 Error type: {type(e).__name__}")
+        print(f"📝 Error message: {str(e)}")
+        print(f"📍 Error location: shutdown_event")
+        print("="*60 + "\n")
 
 @app.get("/", response_model=HealthResponse)
 async def root():
@@ -142,36 +169,39 @@ async def root():
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
-    global ai_assistant
     print("🏥 Health check requested")
     
-    if ai_assistant is None:
-        print("❌ Health check failed - AI Assistant not initialized")
-        raise HTTPException(status_code=503, detail="AI Assistant not initialized")
-    
-    print("✅ Health check passed - AI Assistant is ready")
-    return HealthResponse(
-        status="healthy",
-        message="Server and AI Assistant working correctly"
-    )
+    if USE_AI_ASSISTANT:
+        if ai_assistant:
+            print("✅ Health check passed - AI Assistant is active")
+            return HealthResponse(
+                status="healthy",
+                message="AI Assistant is active and ready"
+            )
+        else:
+            print("⚠️ Health check warning - AI Assistant not initialized")
+            return HealthResponse(
+                status="warning",
+                message="AI Assistant enabled but not initialized"
+            )
+    else:
+        print("✅ Health check passed - Mock mode active")
+        return HealthResponse(
+            status="healthy",
+            message="Server working in mock mode"
+        )
 
-@app.post("/inference", response_model=InferenceResponse)
+@app.post("/inference")
 async def run_inference(request: InferenceRequest):
     """
-    Runs inference using the AI Assistant
+    Inference endpoint that returns SSE streaming response
     
     Args:
         request: Request data containing query, search_db and use_history
         
     Returns:
-        Response with AI Assistant answer and sources used
+        SSE stream with AI response or mock response
     """
-    global ai_assistant
-    
-    if ai_assistant is None:
-        print("❌ AI Assistant not initialized")
-        raise HTTPException(status_code=503, detail="AI Assistant not initialized")
-    
     try:
         print("\n" + "="*60)
         print("🚀 NEW INFERENCE REQUEST RECEIVED")
@@ -179,41 +209,110 @@ async def run_inference(request: InferenceRequest):
         print(f"📝 Query: {request.query}")
         print(f"🔍 Search DB: {request.search_db}")
         print(f"💬 Use History: {request.use_history}")
+        print(f"🤖 AI Assistant: {'ENABLED' if USE_AI_ASSISTANT else 'DISABLED (Mock)'}")
         print(f"⏰ Timestamp: {__import__('datetime').datetime.now()}")
         print("="*60)
         
-        print("\n🔄 CALLING AI ASSISTANT METHOD...")
-        print(f"📞 Method: ai_assistant.run_inference_pipeline()")
-        print(f"📋 Arguments:")
-        print(f"   - user_query: '{request.query}'")
-        print(f"   - search_db: {request.search_db}")
-        print(f"   - use_history: {request.use_history}")
-        
-        # Execute inference pipeline
-        response_data = ai_assistant.run_inference_pipeline(
-            user_query=request.query,
-            search_db=request.search_db,
-            use_history=request.use_history
-        )
-        
-        print(f"\n✅ AI ASSISTANT RESPONSE RECEIVED")
-        print(f"📄 Answer length: {len(response_data['answer'])} characters")
-        print(f"📚 Sources found: {len(response_data['history_sources'])}")
-        print(f"📝 Answer preview: {response_data['answer'][:100]}...")
-        
-        if response_data['history_sources']:
-            print(f"🔗 Sources used:")
-            for i, source in enumerate(response_data['history_sources'][:3]):  # Show first 3 sources
-                print(f"   {i+1}. {source.get('source', 'Unknown')} (Page {source.get('page', 'N/A')})")
-        
-        print("="*60)
-        print("✅ INFERENCE COMPLETED SUCCESSFULLY")
-        print("="*60 + "\n")
-        
-        return InferenceResponse(
-            answer=response_data["answer"],
-            history_sources=response_data["history_sources"]
-        )
+        if USE_AI_ASSISTANT and ai_assistant:
+            # Use real AI Assistant
+            print("🤖 Using AI Assistant for inference...")
+            
+            # Call AI Assistant
+            result = ai_assistant.run_inference(
+                query=request.query,
+                search_db=request.search_db,
+                use_history=request.use_history
+            )
+            
+            # Convert AI response to SSE format
+            message_id = "ai-" + str(__import__('uuid').uuid4())
+            ai_response = result.get('answer', 'No response generated')
+            
+            async def generate_ai_sse():
+                """Generator que produz eventos SSE do AI Assistant"""
+                import json
+                
+                # 1. Enviar start-step
+                yield f"data: {json.dumps({'type': 'start-step'})}\n\n"
+                
+                # 2. Enviar text-start
+                yield f"data: {json.dumps({'type': 'text-start', 'id': message_id})}\n\n"
+                
+                # 3. Enviar cada palavra como text-delta
+                words = ai_response.split()
+                for word in words:
+                    yield f"data: {json.dumps({'type': 'text-delta', 'id': message_id, 'delta': word + ' '})}\n\n"
+                    await asyncio.sleep(0.05)  # Faster streaming for AI
+                
+                # 4. Enviar text-end
+                yield f"data: {json.dumps({'type': 'text-end', 'id': message_id})}\n\n"
+                
+                # 5. Enviar finish-step
+                yield f"data: {json.dumps({'type': 'finish-step'})}\n\n"
+                
+                # 6. Enviar finish
+                yield f"data: {json.dumps({'type': 'finish'})}\n\n"
+                
+                # 7. Enviar [DONE]
+                yield "data: [DONE]\n\n"
+            
+            from fastapi.responses import StreamingResponse
+            return StreamingResponse(
+                generate_ai_sse(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no"
+                }
+            )
+            
+        else:
+            # Use mock response
+            print("🎭 Using mock response...")
+            
+            # Mensagem de exemplo para streaming
+            example_message = "Esta é uma resposta de exemplo do servidor"
+            message_id = "mock-" + str(__import__('uuid').uuid4())
+            
+            async def generate_mock_sse():
+                """Generator que produz eventos SSE compatíveis com AI SDK"""
+                import json
+                
+                # 1. Enviar start-step
+                yield f"data: {json.dumps({'type': 'start-step'})}\n\n"
+                
+                # 2. Enviar text-start
+                yield f"data: {json.dumps({'type': 'text-start', 'id': message_id})}\n\n"
+                
+                # 3. Enviar cada palavra como text-delta
+                words = example_message.split()
+                for word in words:
+                    yield f"data: {json.dumps({'type': 'text-delta', 'id': message_id, 'delta': word + ' '})}\n\n"
+                    await asyncio.sleep(0.1)  # Simular delay de streaming
+                
+                # 4. Enviar text-end
+                yield f"data: {json.dumps({'type': 'text-end', 'id': message_id})}\n\n"
+                
+                # 5. Enviar finish-step
+                yield f"data: {json.dumps({'type': 'finish-step'})}\n\n"
+                
+                # 6. Enviar finish
+                yield f"data: {json.dumps({'type': 'finish'})}\n\n"
+                
+                # 7. Enviar [DONE]
+                yield "data: [DONE]\n\n"
+            
+            from fastapi.responses import StreamingResponse
+            return StreamingResponse(
+                generate_mock_sse(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no"
+                }
+            )
         
     except Exception as e:
         print(f"\n❌ ERROR DURING INFERENCE")

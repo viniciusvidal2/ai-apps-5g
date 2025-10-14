@@ -1,5 +1,3 @@
-version: '3.3'
-
 services:
   # PostgreSQL Database
   postgres:
@@ -50,6 +48,9 @@ services:
       - POSTGRES_URL=postgresql://gabriel:chatbot123@postgres:5432/chatbot_db
       - REDIS_URL=redis://redis:6379
       - AUTH_SECRET=6c4e5c17ab48c86bd1cb5632e6c8170b
+      - BACKEND_URL=http://host.docker.internal:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./client:/app
       - /app/node_modules

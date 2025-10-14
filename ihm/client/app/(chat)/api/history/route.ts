@@ -19,12 +19,21 @@ export async function GET(request: NextRequest) {
 
   const session = await auth();
 
+  // TEMPORARY FIX: Always use fixed guest user
+  const fixedGuestUser = {
+    id: "00000000-0000-0000-0000-000000000001",
+    email: "guest-fixed@temp.com",
+    type: "guest"
+  };
+
   if (!session?.user) {
-    return new ChatSDKError("unauthorized:chat").toResponse();
+    console.log("[History API] No session found, using fixed guest user");
+  } else {
+    console.log(`[History API] Session found: ${session.user.id}, but using fixed guest user`);
   }
 
   const chats = await getChatsByUserId({
-    id: session.user.id,
+    id: fixedGuestUser.id,
     limit,
     startingAfter,
     endingBefore,

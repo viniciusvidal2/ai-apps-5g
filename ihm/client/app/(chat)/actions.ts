@@ -1,9 +1,8 @@
 "use server";
 
-import { generateText, type UIMessage } from "ai";
+import { type UIMessage } from "ai";
 import { cookies } from "next/headers";
 import type { VisibilityType } from "@/components/visibility-selector";
-import { myProvider } from "@/lib/ai/providers";
 import {
   deleteMessagesByChatIdAfterTimestamp,
   getMessageById,
@@ -12,7 +11,13 @@ import {
 
 export async function saveChatModelAsCookie(model: string) {
   const cookieStore = await cookies();
-  cookieStore.set("chat-model", model);
+  // Only save valid models
+  if (model === "chat-model") {
+    cookieStore.set("chat-model", model);
+  } else {
+    // Clear invalid cookie
+    cookieStore.delete("chat-model");
+  }
 }
 
 export async function generateTitleFromUserMessage({
@@ -20,16 +25,15 @@ export async function generateTitleFromUserMessage({
 }: {
   message: UIMessage;
 }) {
-  const { text: title } = await generateText({
-    model: myProvider.languageModel("title-model"),
-    system: `\n
-    - you will generate a short title based on the first message a user begins a conversation with
-    - ensure it is not more than 80 characters long
-    - the title should be a summary of the user's message
-    - do not use quotes or colons`,
-    prompt: JSON.stringify(message),
-  });
-
+  // Extract text from message parts
+  const textPart = message.parts.find((p) => p.type === "text");
+  const text = textPart && "text" in textPart ? textPart.text : "";
+  
+  // Generate simple title from first 50 characters
+  const title = text.length > 50 
+    ? text.substring(0, 50).trim() + "..." 
+    : text || "Nova conversa";
+  
   return title;
 }
 

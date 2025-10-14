@@ -53,7 +53,7 @@ export function AppSidebar({ user }: { user: User | undefined }) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent align="end" className="hidden md:block">
-                New Chat
+                Nova Conversa
               </TooltipContent>
             </Tooltip>
           </div>

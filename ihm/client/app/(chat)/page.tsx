@@ -18,29 +18,15 @@ export default async function Page() {
   const cookieStore = await cookies();
   const modelIdFromCookie = cookieStore.get("chat-model");
 
-  if (!modelIdFromCookie) {
-    return (
-      <>
-        <Chat
-          autoResume={false}
-          id={id}
-          initialChatModel={DEFAULT_CHAT_MODEL}
-          initialMessages={[]}
-          initialVisibilityType="private"
-          isReadonly={false}
-          key={id}
-        />
-        <DataStreamHandler />
-      </>
-    );
-  }
+  // Force use of DEFAULT_CHAT_MODEL if cookie contains invalid model
+  const validModelId = modelIdFromCookie?.value === "chat-model" ? "chat-model" : DEFAULT_CHAT_MODEL;
 
   return (
     <>
       <Chat
         autoResume={false}
         id={id}
-        initialChatModel={modelIdFromCookie.value}
+        initialChatModel={validModelId}
         initialMessages={[]}
         initialVisibilityType="private"
         isReadonly={false}

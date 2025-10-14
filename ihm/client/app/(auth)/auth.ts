@@ -69,8 +69,12 @@ export const {
       id: "guest",
       credentials: {},
       async authorize() {
-        const [guestUser] = await createGuestUser();
-        return { ...guestUser, type: "guest" };
+        // Always return the fixed guest user
+        return { 
+          id: "00000000-0000-0000-0000-000000000001", 
+          email: "guest-fixed@temp.com",
+          type: "guest" 
+        };
       },
     }),
   ],

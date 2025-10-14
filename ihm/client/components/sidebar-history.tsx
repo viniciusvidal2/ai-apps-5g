@@ -129,7 +129,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     });
 
     toast.promise(deletePromise, {
-      loading: "Deleting chat...",
+      loading: "Excluindo conversa...",
       success: () => {
         mutate((chatHistories) => {
           if (chatHistories) {
@@ -140,9 +140,9 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
           }
         });
 
-        return "Chat deleted successfully";
+        return "Conversa excluída com sucesso";
       },
-      error: "Failed to delete chat",
+      error: "Falha ao excluir conversa",
     });
 
     setShowDeleteDialog(false);
@@ -157,7 +157,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-            Login to save and revisit previous chats!
+            Faça login para salvar e revisitar conversas anteriores!
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -168,7 +168,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
     return (
       <SidebarGroup>
         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-          Today
+          Hoje
         </div>
         <SidebarGroupContent>
           <div className="flex flex-col">
@@ -198,7 +198,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <SidebarGroup>
         <SidebarGroupContent>
           <div className="flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-            Your conversations will appear here once you start chatting!
+            Suas conversas aparecerão aqui quando você começar a conversar!
           </div>
         </SidebarGroupContent>
       </SidebarGroup>
@@ -223,7 +223,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.today.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Today
+                          Hoje
                         </div>
                         {groupedChats.today.map((chat) => (
                           <ChatItem
@@ -243,7 +243,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.yesterday.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Yesterday
+                          Ontem
                         </div>
                         {groupedChats.yesterday.map((chat) => (
                           <ChatItem
@@ -263,7 +263,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.lastWeek.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Last 7 days
+                          Últimos 7 dias
                         </div>
                         {groupedChats.lastWeek.map((chat) => (
                           <ChatItem
@@ -283,7 +283,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.lastMonth.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Last 30 days
+                          Últimos 30 dias
                         </div>
                         {groupedChats.lastMonth.map((chat) => (
                           <ChatItem
@@ -303,7 +303,7 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
                     {groupedChats.older.length > 0 && (
                       <div>
                         <div className="px-2 py-1 text-sidebar-foreground/50 text-xs">
-                          Older than last month
+                          Mais antigo que o último mês
                         </div>
                         {groupedChats.older.map((chat) => (
                           <ChatItem
@@ -334,14 +334,14 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
 
           {hasReachedEnd ? (
             <div className="mt-8 flex w-full flex-row items-center justify-center gap-2 px-2 text-sm text-zinc-500">
-              You have reached the end of your chat history.
+              Você chegou ao fim do seu histórico de conversas.
             </div>
           ) : (
             <div className="mt-8 flex flex-row items-center gap-2 p-2 text-zinc-500 dark:text-zinc-400">
               <div className="animate-spin">
                 <LoaderIcon />
               </div>
-              <div>Loading Chats...</div>
+              <div>Carregando Conversas...</div>
             </div>
           )}
         </SidebarGroupContent>
@@ -350,16 +350,16 @@ export function SidebarHistory({ user }: { user: User | undefined }) {
       <AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogTitle>Você tem certeza absoluta?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete your
-              chat and remove it from our servers.
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente sua
+              conversa e a removerá de nossos servidores.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete}>
-              Continue
+              Continuar
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

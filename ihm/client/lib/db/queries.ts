@@ -64,20 +64,13 @@ export async function createUser(email: string, password: string) {
 }
 
 export async function createGuestUser() {
-  const email = `guest-${Date.now()}`;
-  const password = generateHashedPassword(generateUUID());
-
-  try {
-    return await db.insert(user).values({ email, password }).returning({
-      id: user.id,
-      email: user.email,
-    });
-  } catch (_error) {
-    throw new ChatSDKError(
-      "bad_request:database",
-      "Failed to create guest user"
-    );
-  }
+  // Always return the fixed guest user
+  console.log(`[createGuestUser] Returning fixed guest user`);
+  
+  return [{
+    id: "00000000-0000-0000-0000-000000000001",
+    email: "guest-fixed@temp.com"
+  }];
 }
 
 export async function saveChat({
@@ -92,14 +85,32 @@ export async function saveChat({
   visibility: VisibilityType;
 }) {
   try {
-    return await db.insert(chat).values({
+    console.log("[saveChat] Attempting to save chat with:", {
+      id,
+      userId,
+      title,
+      visibility,
+      createdAt: new Date(),
+    });
+    
+    const result = await db.insert(chat).values({
       id,
       createdAt: new Date(),
       userId,
       title,
       visibility,
     });
-  } catch (_error) {
+    
+    console.log("[saveChat] Successfully saved chat:", result);
+    return result;
+  } catch (error) {
+    console.error("[saveChat] Error saving chat:", error);
+    console.error("[saveChat] Error details:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      constraint: error.constraint,
+    });
     throw new ChatSDKError("bad_request:database", "Failed to save chat");
   }
 }

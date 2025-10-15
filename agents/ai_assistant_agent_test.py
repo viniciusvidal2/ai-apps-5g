@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import json
 
@@ -10,7 +11,8 @@ class AiAssistantAgentTest:
         # Start the MQTT client and connect to the broker
         self.mqtt_address = "localhost"
         self.mqtt_port = 1883
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2)
         self.client.connect(self.mqtt_address, self.mqtt_port)
         # Input and output topics are based on the user ID
         self.user_id = 1
@@ -23,7 +25,7 @@ class AiAssistantAgentTest:
         # Start the publisher to send messages to the MQTT broker
         self.client.loop_start()
 
-    def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int) -> None:
+    def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int, properties=None) -> None:
         """Callback function for when the client connects to the MQTT broker.
 
         Args:
@@ -31,7 +33,10 @@ class AiAssistantAgentTest:
             userdata (Any): User-defined data of any type.
             flags (dict): Response flags from the broker.
             rc (int): Connection result code.
+            properties: MQTT v5.0 properties (optional).
         """
+        print(
+            f"Connected to MQTT broker at {self.mqtt_address}:{self.mqtt_port} for user id {self.user_id}")
         # Creates data for testing
         message = {
             "query": "Hello, how are you?",

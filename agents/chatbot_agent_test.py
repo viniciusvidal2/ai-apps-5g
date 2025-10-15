@@ -1,4 +1,5 @@
 import paho.mqtt.client as mqtt
+from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import json
 
@@ -10,7 +11,8 @@ class ChatbotAgentTest:
         # Start the MQTT client and connect to the broker
         self.mqtt_address = "localhost"
         self.mqtt_port = 1883
-        self.client = mqtt.Client()
+        self.client = mqtt.Client(
+            callback_api_version=CallbackAPIVersion.VERSION2)
         self.client.connect(self.mqtt_address, self.mqtt_port)
         # Input and output topics are based on the user ID
         self.user_id = 1
@@ -23,7 +25,7 @@ class ChatbotAgentTest:
         # Start the publisher to send messages to the MQTT broker
         self.client.loop_start()
 
-    def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int) -> None:
+    def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int, properties=None) -> None:
         """Callback function for when the client connects to the MQTT broker.
 
         Args:
@@ -58,6 +60,7 @@ class ChatbotAgentTest:
         # Stop the MQTT client loop after receiving the message
         self.client.loop_stop()
         self.client.disconnect()
+
 
 if __name__ == "__main__":
     # Example usage

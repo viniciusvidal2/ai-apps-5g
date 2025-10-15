@@ -22,3 +22,9 @@ agents:
     dockerfile_path: dockerfiles/Dockerfile.chatbotagent
     input_topic: chatbot/input
     output_topic: chatbot/output
+
+  ai_assistant:
+    name: ai_assistant
+    dockerfile_path: dockerfiles/Dockerfile.aiassistantagent
+    input_topic: ai_assistant/input
+    output_topic: ai_assistant/output

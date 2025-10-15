@@ -34,3 +34,13 @@ workflows:
       - chatbot/input
     output_topics:
       - chatbot/output
+
+  ai_assistant:
+    name: ai_assistant
+    description: A workflow for ai_assistant conversation
+    agents:
+      - ai_assistant
+    input_topics:
+      - ai_assistant/input
+    output_topics:
+      - ai_assistant/output

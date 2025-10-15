@@ -468,7 +468,7 @@ class AiAssistant:
 
         return response.content
 
-    def run_inference_pipeline(self, user_query: str, search_db: bool, use_history: bool, use_urls: bool) -> Dict[str, Any]:
+    def run_inference_pipeline(self, user_query: str, search_db: bool, use_history: bool, search_urls: bool) -> Dict[str, Any]:
         """
         Runs the full inference pipeline: builds the prompt (with or without RAG), runs inference, and returns the answer.
 
@@ -476,14 +476,14 @@ class AiAssistant:
             user_query (str): The user's input query.
             search_db (bool): Whether to use RAG (search the database) or just general prompt.
             use_history (bool): Whether to include message history in the LLM call.
-            use_urls (bool): Whether to include web content URLs in the LLM call.
+            search_urls (bool): Whether to include web content URLs in the LLM call.
 
         Returns:
             Dict[str, Any]: The final response from the inference pipeline, plus sources to it.
         """
         prompt = ChatPromptValue(messages=[])
         urls_info_used = []
-        if use_urls and self.urls_to_search:
+        if search_urls and self.urls_to_search:
             # Fetch and include web content in the prompt
             prompt_data = self.build_rag_prompt(
                 query=user_query, vectorstore_name="urls")
@@ -501,7 +501,7 @@ class AiAssistant:
                     {"source": doc.metadata.get("source", "Unknown"),
                      "page": doc.metadata.get("page", "N/A")} for doc in prompt_data["context_documents"]
                 ])
-        if not search_db and not use_urls:
+        if not search_db and not search_urls:
             prompt.messages.extend(self.format_general_user_prompt(
                 user_input=user_query).messages)
 
@@ -581,8 +581,8 @@ if __name__ == "__main__":
     ai_assistant = AiAssistant(
         embedding_model_name=embedding_model_name,
         inference_model_name=inference_model_name,
-        documents_db_path="./chroma_documents_db",
-        url_db_path="./chroma_url_db",
+        documents_db_path="./dbs/chroma_documents_db",
+        url_db_path="./dbs/chroma_url_db",
         collection_name="dev_collection"
     )
 
@@ -609,10 +609,10 @@ if __name__ == "__main__":
     # Example queries to test
     querys = [
         # {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
-        #     "search_db": True, "use_history": True, "use_urls": False},
-        # {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True, "use_urls": False},
+        #     "search_db": True, "use_history": True, "search_urls": False},
+        # {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True, "search_urls": False},
         {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
-            "search_db": False, "use_history": False, "use_urls": True}
+            "search_db": False, "use_history": False, "search_urls": True}
     ]
     # pdf_files = [
     #     "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
@@ -657,7 +657,7 @@ if __name__ == "__main__":
         print(f"--- Running Inference with {inference_model_name} ---")
         response_data = ai_assistant.run_inference_pipeline(user_query=query["question"],
                                                             search_db=query["search_db"],
-                                                            use_urls=query["use_urls"],
+                                                            search_urls=query["search_urls"],
                                                             use_history=query["use_history"])
 
         # Print the response and sources if applicable

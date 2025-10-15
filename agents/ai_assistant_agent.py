@@ -159,7 +159,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     # Create an instance of the agent with the provided MQTT broker address, port, and user ID
-    agent = ChatbotAgent(
+    agent = AiAssistantAgent(
         mqtt_address=args.broker,
         mqtt_port=args.port,
         user_id=args.user_id,

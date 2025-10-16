@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import com.sae5g.mqttwearable.R
 import com.sae5g.mqttwearable.mqtt.MqttHandler
 import com.sae5g.mqttwearable.data.DeviceIdManager
+import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -27,6 +28,7 @@ class EmergencyAlertActivity : ComponentActivity() {
     
     private lateinit var vibrator: Vibrator
     private lateinit var mqttHandler: MqttHandler
+    private lateinit var wifiConnectivityManager: WiFiConnectivityManager
     private var alertHandler: Handler? = null
     private var alertCountdown = 10 // 10 segundos para cancelar
     private var isAlertActive = false
@@ -60,6 +62,7 @@ class EmergencyAlertActivity : ComponentActivity() {
         // Inicializar componentes
         vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         mqttHandler = MqttHandler(applicationContext)
+        wifiConnectivityManager = WiFiConnectivityManager(applicationContext)
         
         // Configurar botão de cancelar
         btnCancelEmergency.setOnClickListener {
@@ -116,6 +119,61 @@ class EmergencyAlertActivity : ComponentActivity() {
     }
     
     private fun sendEmergencyAlert() {
+        Log.d("EmergencyAlert", "Verificando WiFi antes de enviar alerta de queda...")
+        
+        // Verificar conectividade WiFi antes de enviar
+        wifiConnectivityManager.checkFullConnectivity("192.168.0.109") { connectivityResult ->
+            when (connectivityResult) {
+                WiFiConnectivityManager.ConnectivityResult.FULL_CONNECTIVITY -> {
+                    Log.d("EmergencyAlert", "✅ WiFi conectado e servidor MQTT alcançável")
+                    sendEmergencyMessage()
+                }
+                WiFiConnectivityManager.ConnectivityResult.WIFI_ONLY -> {
+                    Log.w("EmergencyAlert", "⚠️ WiFi conectado mas servidor MQTT não alcançável")
+                    // Tentar enviar mesmo assim (pode ser problema temporário)
+                    sendEmergencyMessage()
+                }
+                WiFiConnectivityManager.ConnectivityResult.NO_WIFI -> {
+                    Log.w("EmergencyAlert", "📵 Sem WiFi - tentando reconectar...")
+                    attemptWiFiReconnection()
+                }
+            }
+        }
+    }
+    
+    private fun attemptWiFiReconnection() {
+        runOnUiThread {
+            txtEmergencyMessage.text = "SEM WIFI - TENTANDO RECONECTAR..."
+            txtCountdownBig.text = "📶"
+        }
+        
+        wifiConnectivityManager.attemptConnectionToKnownNetworks { wifiSuccess ->
+            if (wifiSuccess) {
+                Log.d("EmergencyAlert", "✅ WiFi reconectado com sucesso")
+                runOnUiThread {
+                    txtEmergencyMessage.text = "WIFI RECONECTADO - ENVIANDO ALERTA..."
+                    txtCountdownBig.text = "✓"
+                }
+                // Aguardar um pouco para estabilizar a conexão
+                Handler(Looper.getMainLooper()).postDelayed({
+                    sendEmergencyMessage()
+                }, 2000)
+            } else {
+                Log.e("EmergencyAlert", "❌ Falha ao reconectar WiFi")
+                runOnUiThread {
+                    txtEmergencyMessage.text = "FALHA AO RECONECTAR WIFI!"
+                    txtCountdownBig.text = "❌"
+                    
+                    // Fechar activity após 3 segundos
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        finish()
+                    }, 3000)
+                }
+            }
+        }
+    }
+    
+    private fun sendEmergencyMessage() {
         // Criar JSON com horário atual em formato ISO 8601 UTC
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")

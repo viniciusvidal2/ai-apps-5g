@@ -57,9 +57,9 @@ public class HealthPublisher(
     // SpO2 atual
     private var currentSpO2: Int? = null
 
-    // Intervalo de envio em milissegundos (10 minutos)
-//    var sendIntervalMs: Long = 60000L
-    var sendIntervalMs: Long = 600000L
+    // Intervalo de envio em milissegundos (1 minuto)
+    var sendIntervalMs: Long = 60000L
+//    var sendIntervalMs: Long = 600000L
 
     init {
         // Garantir que o DeviceIdManager está inicializado

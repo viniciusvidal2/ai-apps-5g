@@ -129,7 +129,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     
     // Timer para próximo envio MQTT
     private var mqttSendTimer: CountDownTimer? = null
-    private var nextSendTime: Long = 600000L // Será sincronizado com HealthPublisher no onCreate
+    private var nextSendTime: Long = 60000L // Será sincronizado com HealthPublisher no onCreate
     private var isWifiConnected = false
     private var currentWifiName: String? = null
 
@@ -260,8 +260,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         mqttHandler = MqttHandler(applicationContext)
         // HealthPublisher removido - será usado apenas no HealthForegroundService
         
-        // Configurar timer para 9 minutos (9min countdown + 1min "Enviando" = 10min total)
-        nextSendTime = 540000L
+        // Configurar timer para 54 segundos (54s countdown + 6s "Enviando" = 1min total)
+        nextSendTime = 54000L
         
         // Inicializar gerenciador de conectividade WiFi
         wifiConnectivityManager = WiFiConnectivityManager(applicationContext)
@@ -709,13 +709,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                                 txtStatus?.text = "Sem WiFi - Envio cancelado"
                             }
                             
-                            // Voltar ao status normal após 1 minuto e reiniciar timer (manter ciclo de 10min)
+                            // Voltar ao status normal após 6 segundos e reiniciar timer (manter ciclo de 1min)
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                                 if (mqttConnected) {
                                     updateConnectionStatus()
                                     startMqttSendTimer() // Reiniciar timer
                                 }
-                            }, 60000)
+                            }, 6000)
                         }
                     }
                 }

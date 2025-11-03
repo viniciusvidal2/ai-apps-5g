@@ -1,4 +1,4 @@
-package com.iagobiundini.mqttwifi.tile
+package com.iagoBiundini.mqttwifi.tile
 
 import android.content.Context
 import androidx.wear.protolayout.ColorBuilders.argb

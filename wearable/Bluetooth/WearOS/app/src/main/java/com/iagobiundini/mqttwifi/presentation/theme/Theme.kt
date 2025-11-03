@@ -1,4 +1,4 @@
-package com.iagobiundini.mqttwifi.presentation.theme
+package com.iagoBiundini.mqttwifi.presentation.theme
 
 import androidx.compose.runtime.Composable
 import androidx.wear.compose.material.MaterialTheme

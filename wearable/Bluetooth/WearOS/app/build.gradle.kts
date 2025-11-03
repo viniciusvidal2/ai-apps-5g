@@ -5,15 +5,15 @@ plugins {
 }
 
 android {
-    namespace = "com.iagobiundini.mqttwifi"
+    namespace = "com.iagoBiundini.mqttwifi"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.iagobiundini.mqttwifi"
+        applicationId = "com.iagoBiundini.mqttwifi"
         minSdk = 30
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 24
+        versionName = "24 Blue"
 
     }
 
@@ -36,11 +36,13 @@ android {
     useLibrary("wear-sdk")
     buildFeatures {
         compose = true
+        viewBinding = true
     }
 }
 
 dependencies {
 
+    implementation(libs.wear)
     implementation(libs.play.services.wearable)
     implementation(platform(libs.compose.bom))
     implementation(libs.ui)

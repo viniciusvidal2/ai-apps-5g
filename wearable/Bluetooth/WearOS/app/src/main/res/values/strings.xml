@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">mqttwifi</string>
+    <string name="app_name">ESP32 BLE</string>
     <!--
     This string is used for square devices and overridden by hello_world in
     values-round/strings.xml for round devices.
@@ -7,4 +7,16 @@
     <string name="hello_world">From the Square world,\nHello, %1$s!</string>
     <string name="tile_label">Example tile</string>
     <string name="complication_label">Example complication</string>
+    
+    <!-- BLE App Strings -->
+    <string name="button_connect">Conectar e Enviar</string>
+    <string name="status_ready">Pronto para conectar</string>
+    <string name="status_scanning">Procurando ESP32_Usina5G…</string>
+    <string name="status_connecting">Conectando…</string>
+    <string name="status_connected">Conectado!</string>
+    <string name="status_sending">Enviando horário…</string>
+    <string name="status_success">Horário enviado com sucesso!</string>
+    <string name="status_error">Erro: %1$s</string>
+    <string name="status_device_not_found">Dispositivo não encontrado</string>
+    <string name="status_permission_required">Permissões necessárias</string>
 </resources>

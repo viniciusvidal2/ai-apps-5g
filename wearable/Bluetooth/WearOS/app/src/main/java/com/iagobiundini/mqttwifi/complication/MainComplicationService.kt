@@ -1,4 +1,4 @@
-package com.iagobiundini.mqttwifi.complication
+package com.iagoBiundini.mqttwifi.complication
 
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType

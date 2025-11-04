@@ -8,6 +8,7 @@ import android.location.LocationListener
 import android.location.LocationManager as AndroidLocationManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
+import com.sae5g.mqttwearable.config.AppConfig
 
 class LocationManager(private val context: Context) {
     
@@ -56,8 +57,8 @@ class LocationManager(private val context: Context) {
             if (androidLocationManager?.isProviderEnabled(AndroidLocationManager.GPS_PROVIDER) == true) {
                 androidLocationManager?.requestLocationUpdates(
                     AndroidLocationManager.GPS_PROVIDER,
-                    10000L, // 10 segundos
-                    10f,    // 10 metros
+                    AppConfig.GPS_UPDATE_INTERVAL_MS,
+                    AppConfig.GPS_MIN_DISTANCE_METERS,
                     locationListener!!,
                     android.os.Looper.getMainLooper()
                 )
@@ -68,8 +69,8 @@ class LocationManager(private val context: Context) {
             if (androidLocationManager?.isProviderEnabled(AndroidLocationManager.NETWORK_PROVIDER) == true) {
                 androidLocationManager?.requestLocationUpdates(
                     AndroidLocationManager.NETWORK_PROVIDER,
-                    10000L, // 10 segundos
-                    10f,    // 10 metros
+                    AppConfig.GPS_UPDATE_INTERVAL_MS,
+                    AppConfig.GPS_MIN_DISTANCE_METERS,
                     locationListener!!,
                     android.os.Looper.getMainLooper()
                 )

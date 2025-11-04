@@ -1,6 +1,7 @@
 package com.sae5g.mqttwearable.data
 
 import android.util.Log
+import com.sae5g.mqttwearable.config.AppConfig
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
@@ -8,7 +9,7 @@ object SpO2DataManager {
     
     private val currentSpO2Value = AtomicInteger(0)
     private val lastMeasurementTime = AtomicLong(0)
-    private const val MEASUREMENT_VALIDITY_MS = 30 * 60 * 1000L // 30 minutos
+    private val MEASUREMENT_VALIDITY_MS = AppConfig.SPO2_DATA_VALIDITY_MS
     
     private val listeners = mutableListOf<SpO2DataListener>()
     

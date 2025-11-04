@@ -90,6 +90,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.CountDownTimer
+import com.sae5g.mqttwearable.config.AppConfig
 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
@@ -129,14 +130,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     
     // Timer para próximo envio MQTT
     private var mqttSendTimer: CountDownTimer? = null
-    private var nextSendTime: Long = 600000L // Será sincronizado com HealthPublisher no onCreate - 10 minutos
+    private var nextSendTime: Long = AppConfig.HEALTH_DATA_COUNTDOWN_MS // Configurado em AppConfig
     private var isWifiConnected = false
     private var currentWifiName: String? = null
 
     // Variáveis removidas - publicação do acelerômetro agora é feita pelo HealthForegroundService
 
-    private val spO2MeasurementDuration = 35000L
-    private val spO2MeasurementInterval = 3600000L  // 1 hora
+    private val spO2MeasurementDuration = AppConfig.SPO2_MEASUREMENT_DURATION_MS
+    private val spO2MeasurementInterval = AppConfig.SPO2_MEASUREMENT_INTERVAL_MS
     private val isSpO2MeasurementRunning = java.util.concurrent.atomic.AtomicBoolean(false)
     private lateinit var measurementHandler: android.os.Handler
     private var connectionManagerSpO2: com.sae5g.mqttwearable.sensors.ConnectionManager? = null
@@ -260,8 +261,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         mqttHandler = MqttHandler(applicationContext)
         // HealthPublisher removido - será usado apenas no HealthForegroundService
         
-        // Configurar timer para 594 segundos (594s countdown + 6s "Enviando" = 600s total = 10min)
-        nextSendTime = 594000L
+        // Configurar timer a partir do AppConfig
+        nextSendTime = AppConfig.HEALTH_DATA_COUNTDOWN_MS
         
         // Inicializar gerenciador de conectividade WiFi
         wifiConnectivityManager = WiFiConnectivityManager(applicationContext)
@@ -399,10 +400,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                             updateConnectionStatus()
                             // Iniciar detecção de queda quando conectado
                             startFallDetection()
-                            // Aguardar 3 segundos antes de iniciar timer (sincronizar com HealthPublisher)
+                            // Aguardar antes de iniciar timer (sincronizar com HealthPublisher)
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                                 startMqttSendTimer()
-                            }, 3000)
+                            }, AppConfig.TIMER_SYNC_DELAY_MS)
                         } else {
                             btnConectar.text = "Conectar"
                             txtStatus?.text = "Falha ao conectar MQTT"
@@ -709,13 +710,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                                 txtStatus?.text = "Sem WiFi - Envio cancelado"
                             }
                             
-                            // Voltar ao status normal após alguns segundos e reiniciar timer (manter ciclo de 10min)
+                            // Voltar ao status normal após alguns segundos e reiniciar timer
                             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                                 if (mqttConnected) {
                                     updateConnectionStatus()
                                     startMqttSendTimer() // Reiniciar timer
                                 }
-                            }, 6000) // 6 segundos para mostrar feedback "Enviando..."
+                            }, AppConfig.UI_SENDING_FEEDBACK_DELAY_MS) // Tempo para mostrar feedback "Enviando..."
                         }
                     }
                 }

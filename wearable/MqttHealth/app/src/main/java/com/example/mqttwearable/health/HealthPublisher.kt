@@ -24,6 +24,7 @@ import com.sae5g.mqttwearable.location.LocationManager
 import com.sae5g.mqttwearable.data.SpO2DataManager
 import com.sae5g.mqttwearable.data.DeviceIdManager
 import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
+import com.sae5g.mqttwearable.config.AppConfig
 import java.util.concurrent.CopyOnWriteArrayList
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -57,9 +58,8 @@ public class HealthPublisher(
     // SpO2 atual
     private var currentSpO2: Int? = null
 
-    // Intervalo de envio em milissegundos (10 minutos)
-//    var sendIntervalMs: Long = 60000L
-    var sendIntervalMs: Long = 600000L
+    // Intervalo de envio em milissegundos - configurado em AppConfig
+    var sendIntervalMs: Long = AppConfig.HEALTH_DATA_SEND_INTERVAL_MS
 
     init {
         // Garantir que o DeviceIdManager está inicializado
@@ -154,8 +154,8 @@ public class HealthPublisher(
         // Inicia o job de envio periódico
         if (senderJob == null) {
             senderJob = CoroutineScope(Dispatchers.IO).launch {
-                // Aguardar 3 segundos para sincronizar com timer visual
-                delay(3000)
+                // Aguardar alguns segundos para sincronizar com timer visual
+                delay(AppConfig.TIMER_SYNC_DELAY_MS)
                 while (true) {
                     if (latestData.isNotEmpty()) {
                         val toSend = latestData.toMap().toMutableMap()

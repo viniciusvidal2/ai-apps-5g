@@ -1,5 +1,6 @@
 package com.sae5g.mqttwearable.sensors
 
+import com.sae5g.mqttwearable.config.AppConfig
 import kotlin.math.sqrt
 
 class FallDetector {
@@ -8,7 +9,7 @@ class FallDetector {
     private val FREE_FALL_THRESHOLD = 4.0f  // m/s² - valor menos restritivo
     private val IMPACT_THRESHOLD = 15.0f    // m/s² - valor menos restritivo
     private val FREE_FALL_DURATION_MS = 100L // duração menor para testes
-    private val DETECTION_WINDOW_MS = 3000L  // janela maior para testes
+    private val DETECTION_WINDOW_MS = AppConfig.FALL_DETECTION_WINDOW_MS
     
 
     

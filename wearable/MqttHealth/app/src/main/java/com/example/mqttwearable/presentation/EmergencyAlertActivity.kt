@@ -15,6 +15,7 @@ import com.sae5g.mqttwearable.R
 import com.sae5g.mqttwearable.mqtt.MqttHandler
 import com.sae5g.mqttwearable.data.DeviceIdManager
 import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
+import com.sae5g.mqttwearable.config.AppConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,7 +31,7 @@ class EmergencyAlertActivity : ComponentActivity() {
     private lateinit var mqttHandler: MqttHandler
     private lateinit var wifiConnectivityManager: WiFiConnectivityManager
     private var alertHandler: Handler? = null
-    private var alertCountdown = 10 // 10 segundos para cancelar
+    private var alertCountdown = AppConfig.FALL_ALERT_COUNTDOWN_SECONDS
     private var isAlertActive = false
     
     // Localização recebida do MainActivity
@@ -77,7 +78,7 @@ class EmergencyAlertActivity : ComponentActivity() {
         if (isAlertActive) return
         
         isAlertActive = true
-        alertCountdown = 10
+        alertCountdown = AppConfig.FALL_ALERT_COUNTDOWN_SECONDS
         
         // Atualizar display
         updateCountdownDisplay()
@@ -99,7 +100,7 @@ class EmergencyAlertActivity : ComponentActivity() {
                 if (isAlertActive && alertCountdown > 0) {
                     // Vibrar
                     if (vibrator.hasVibrator()) {
-                        vibrator.vibrate(500) // Vibra por 500ms
+                        vibrator.vibrate(AppConfig.FALL_ALERT_VIBRATION_DURATION_MS)
                     }
                     
                     // Atualizar countdown
@@ -107,7 +108,7 @@ class EmergencyAlertActivity : ComponentActivity() {
                     alertCountdown--
                     
                     // Agendar próxima vibração
-                    alertHandler?.postDelayed(this, 1000)
+                    alertHandler?.postDelayed(this, AppConfig.FALL_ALERT_VIBRATION_INTERVAL_MS)
                 } else if (isAlertActive && alertCountdown <= 0) {
                     // Tempo esgotado - enviar alerta
                     sendEmergencyAlert()

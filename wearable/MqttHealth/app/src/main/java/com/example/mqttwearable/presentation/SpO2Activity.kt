@@ -17,13 +17,14 @@ import androidx.core.app.ActivityCompat
 import com.sae5g.mqttwearable.R
 import com.sae5g.mqttwearable.sensors.*
 import com.sae5g.mqttwearable.data.SpO2DataManager
+import com.sae5g.mqttwearable.config.AppConfig
 import com.samsung.android.service.health.tracking.HealthTrackerException
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SpO2Activity : Activity() {
 
     private val appTag = "SpO2Activity"
-    private val measurementDuration = 35000L
+    private val measurementDuration = AppConfig.SPO2_MEASUREMENT_DURATION_MS
     private val measurementTick = 250L
     
     private val isMeasurementRunning = AtomicBoolean(false)

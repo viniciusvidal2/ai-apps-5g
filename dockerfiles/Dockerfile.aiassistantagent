@@ -1,4 +1,8 @@
-FROM ubuntu:22.04
+# Argument that sets which model to use inside the container, passed in build command
+ARG MODEL_NAME=gemma3_27b
+
+# Base image
+FROM ubuntu:22.04 AS base
 
 # Set the working directory inside the container
 WORKDIR /app
@@ -18,17 +22,25 @@ RUN pip install --upgrade pip
 
 # Install ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
+ENV OLLAMA_MODELS="/app/ollama_models"
 
 # Copy code to inside the image
 RUN pip install --no-cache-dir setuptools==75.1.0
 COPY requirements/requirements_ai_assistant.txt /app/requirements_ai_assistant.txt
 RUN pip install --no-cache-dir --timeout=100 --retries=100 -r requirements_ai_assistant.txt
 
+# Expose the MQTT port
+EXPOSE 1883
+
 # Set the ollama models custom directory and copy models to it
-RUN mkdir -p /app/ollama_models/blobs && \
-    mkdir -p /app/ollama_models/manifests/registry.ollama.ai/library/gemma3 && \
-    mkdir -p /app/ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding
-# Blobs
+RUN mkdir -p /app/ollama_models/blobs \
+    /app/ollama_models/manifests/registry.ollama.ai/library/gemma3 \
+    /app/ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding
+# Embedding model manifests
+COPY ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding/latest /app/ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding/latest
+
+# Blobs and manifests for the selected model
+FROM base AS gemma3_27b
 COPY ollama_models/blobs/sha256-0a3d61b01340ca9dceb4a661e21b3dfe1418ed5206d91291ab933a3762f8bb89 /app/ollama_models/blobs/sha256-0a3d61b01340ca9dceb4a661e21b3dfe1418ed5206d91291ab933a3762f8bb89
 COPY ollama_models/blobs/sha256-3fcd3febec8b3fd64435204db75bf0dd73b91e8d0661e0331acfe7e7c3120b85 /app/ollama_models/blobs/sha256-3fcd3febec8b3fd64435204db75bf0dd73b91e8d0661e0331acfe7e7c3120b85
 COPY ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b /app/ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b
@@ -36,26 +48,29 @@ COPY ollama_models/blobs/sha256-dd084c7d92a3c1c14cc09ae77153b903fd2024b64a100a0c
 COPY ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348 /app/ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348
 COPY ollama_models/blobs/sha256-e796792eba26c4d3b04b0ac5adb01a453dd9ec2dfd83b6c59cbf6fe5f30b0f68 /app/ollama_models/blobs/sha256-e796792eba26c4d3b04b0ac5adb01a453dd9ec2dfd83b6c59cbf6fe5f30b0f68
 COPY ollama_models/blobs/sha256-f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31 /app/ollama_models/blobs/sha256-f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31
-# Manifests
 COPY ollama_models/manifests/registry.ollama.ai/library/gemma3/27b /app/ollama_models/manifests/registry.ollama.ai/library/gemma3/27b
-COPY ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding/latest /app/ollama_models/manifests/registry.ollama.ai/library/qwen3-embedding/latest
-ENV OLLAMA_MODELS="/app/ollama_models"
+FROM base AS gemma3_4b
+COPY ollama_models/blobs/sha256-b6ae5839783f2ba248e65e4b960ab15f9c4b7118db285827dba6cba9754759e2 /app/ollama_models/blobs/sha256-b6ae5839783f2ba248e65e4b960ab15f9c4b7118db285827dba6cba9754759e2
+COPY ollama_models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25 /app/ollama_models/blobs/sha256-aeda25e63ebd698fab8638ffb778e68bed908b960d39d0becc650fa981609d25
+COPY ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348 /app/ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348
+COPY ollama_models/blobs/sha256-dd084c7d92a3c1c14cc09ae77153b903fd2024b64a100a0cc8ec9316063d2dbc /app/ollama_models/blobs/sha256-dd084c7d92a3c1c14cc09ae77153b903fd2024b64a100a0cc8ec9316063d2dbc
+COPY ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b /app/ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b
+COPY ollama_models/manifests/registry.ollama.ai/library/gemma3/4b /app/ollama_models/manifests/registry.ollama.ai/library/gemma3/4b
+
+# Final stage based on the selected model
+FROM ${MODEL_NAME} AS final
 
 # Copy the database files
 RUN mkdir -p /app/dbs
 COPY dbs /app/dbs
 
 # Copy interesting folders and app file
-RUN mkdir -p /app/ai_apis && \
-    mkdir -p /app/agents
+RUN mkdir -p /app/ai_apis /app/agents
 COPY ai_apis/ai_assistant.py /app/ai_apis/ai_assistant.py
 COPY agents/ai_assistant_agent.py /app/agents/ai_assistant_agent.py
-COPY agents/start_ai_assistant_docker.sh /app/agents/start_ai_assistant_docker.sh
 RUN chmod +x /app/ai_apis/ai_assistant.py /app/agents/ai_assistant_agent.py
+COPY agents/start_ai_assistant_docker.sh /app/agents/start_ai_assistant_docker.sh
 RUN chmod +x /app/agents/start_ai_assistant_docker.sh
-
-# Expose the MQTT port
-EXPOSE 1883
 
 # Set the command to run the agent as a module
 ENTRYPOINT ["/app/agents/start_ai_assistant_docker.sh"]

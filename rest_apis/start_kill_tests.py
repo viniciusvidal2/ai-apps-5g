@@ -53,7 +53,7 @@ def main():
 
     if args.action == "start":
         response = start_ai_assistant_agent(
-            broker="0.0.0.0", port=1883, user_id=1, input_topic="input/topic", output_topic="output/topic", inference_model_name="gemma3:27b"
+            broker="0.0.0.0", port=1883, user_id=1, input_topic="input", output_topic="output", inference_model_name="gemma3:27b"
         )
         print("Start AI Assistant Agent Response:")
     elif args.action == "kill":

@@ -15,7 +15,35 @@ Finally, some arguments can be passed in the MQTT topic pyload to improve the ag
 - __use_history__: if we should use the conversation history in the current query or not; can give faster performance and reduce tokens, which avoids allucinations
 - __n_chunks__: the ammount of database matches we will use to perform RAG; balance between fast and accurate versus slow, but broader knowledge in the answer. Ranges from 1 to 10.
 
+## Installing the environment
+
+Some python dependencies are needed to run several commands, involving database generation and agent testing, for example. Create a virtual environment of your preference and run the following commands to install them:
+
+```bash
+cd ai_apps_5g
+pip install -r requirements/requirements_ai_assistant.py
+```
+
 ## Generating the database
+
+The database should reside in the __dbs__ folder, located in the root folder (if you don't have one already, please create so to be safe). There will be one for PDF files (chroma_documents_db), and another one for URLs (chroma_url_db).
+
+Using the workflow that creates the database should be enough to vectorize your desired documents and URLs. Follow the instructions
+
+### Setting the data
+
+Go to __workflows/config/database_inputs.yaml__ and fill in your desired PDFs and URLs. They should follow the existing pattern to be read as lists.
+
+### Calling the python module
+
+Once the config file is done, run the command to generate your database in the proper format:
+
+```bash
+cd ai_apps_5g
+python -m workflows.generate_rag_database
+```
+
+The __dbs__ folder should be now filled in your root directory, and your can now build the docker image or run the agent locally using RAG.
 
 ## Setting ollama models
 
@@ -62,14 +90,7 @@ The docker runs in detached mode and is ready to exchange information.
 
 ## Verifying
 
-Use the agent test script to check if the agent is properly responding. Make sure you have the dependencies set in a virtual (or conda) environment.
-
-```bash
-cd ai_apps_5g
-pip install -r requirements/requirements_ai_assistant.py
-```
-
-To run the basic test __(again, make sure MQTT broker is running and active to exchange messages with the agent docker)__:
+Use the agent test script to check if the agent is properly responding. To run the basic test __(again, make sure MQTT broker is running and active to exchange messages with the agent docker)__, do the following in a terminal:
 
 ```bash
 cd ai_apps_5g

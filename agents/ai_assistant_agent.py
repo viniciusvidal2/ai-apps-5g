@@ -7,7 +7,7 @@ from ai_apis.ai_assistant import AiAssistant
 
 
 class AiAssistantAgent:
-    def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int, input_topic: str, output_topic: str) -> None:
+    def __init__(self, mqtt_address: str, mqtt_port: int, user_id: int, input_topic: str, output_topic: str, inference_model_name: str) -> None:
         """Initializes a AiAssistantAgent object to handle user requests.
 
         Args:
@@ -16,12 +16,13 @@ class AiAssistantAgent:
             user_id (int): The user ID associated with the agent.
             input_topic (str): The MQTT topic to subscribe for input data.
             output_topic (str): The MQTT topic to publish output data.
+            inference_model_name (str): The name of the inference model to use.
         """
         # Initialize the AI Assistant
         print("Initializing AI Assistant...")
         self.ai_assistant = AiAssistant(
             embedding_model_name="qwen3-embedding:latest",
-            inference_model_name="gemma3:27b",
+            inference_model_name=inference_model_name,
             documents_db_path="./dbs/chroma_documents_db",
             url_db_path="./dbs/chroma_url_db",
             collection_name="dev_collection"
@@ -160,6 +161,12 @@ def main() -> None:
         default="output",
         help="MQTT output topic"
     )
+    parser.add_argument(
+        "--inference_model_name", "-m",
+        type=str,
+        default="gemma3:27b",
+        help="Name of the inference model to use"
+    )
     args = parser.parse_args()
     # Create an instance of the agent with the provided MQTT broker address, port, and user ID
     agent = AiAssistantAgent(
@@ -167,7 +174,8 @@ def main() -> None:
         mqtt_port=args.port,
         user_id=args.user_id,
         input_topic=args.input_topic,
-        output_topic=args.output_topic
+        output_topic=args.output_topic,
+        inference_model_name=args.inference_model_name
     )
     try:
         # Keep the agent running to listen for incoming messages

@@ -35,6 +35,7 @@ def start_ai_assistant_agent_docker():
             f"--user_id={input_data.user_id}",
             f"--input_topic={input_data.input_topic}",
             f"--output_topic={input_data.output_topic}",
+            f"--inference_model_name={input_data.inference_model_name}"
         ]
         result = subprocess.run(
             command,

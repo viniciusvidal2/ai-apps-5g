@@ -2,7 +2,7 @@ import requests
 import argparse
 
 
-def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: str, output_topic: str) -> requests.Response:
+def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: str, output_topic: str, inference_model_name: str) -> requests.Response:
     """Sends a request to start an AiAssistant agent inside a Docker container.
 
     Args:
@@ -11,6 +11,7 @@ def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: 
         user_id (int): The user ID for the AiAssistant agent.
         input_topic (str): The MQTT input topic.
         output_topic (str): The MQTT output topic.
+        inference_model_name (str): The name of the inference model to use.
 
     Returns:
         requests.Response: The response from the REST API.
@@ -21,7 +22,8 @@ def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: 
         "port": port,
         "user_id": user_id,
         "input_topic": input_topic,
-        "output_topic": output_topic
+        "output_topic": output_topic,
+        "inference_model_name": inference_model_name
     }
     response = requests.post(url, json=payload)
     return response
@@ -51,7 +53,8 @@ def main():
 
     if args.action == "start":
         response = start_ai_assistant_agent(
-            broker="0.0.0.0", port=1883, user_id=1, input_topic="input/topic", output_topic="output/topic")
+            broker="0.0.0.0", port=1883, user_id=1, input_topic="input/topic", output_topic="output/topic", inference_model_name="gemma3:27b"
+        )
         print("Start AI Assistant Agent Response:")
     elif args.action == "kill":
         response = kill_ai_assistant_agent(user_id=1)

@@ -14,6 +14,7 @@ class AiAssistantInputData(BaseModel, extra=Extra.forbid):
     user_id: int
     input_topic: str
     output_topic: str
+    inference_model_name: str
 
 
 class AiAssistantKillData(BaseModel, extra=Extra.forbid):

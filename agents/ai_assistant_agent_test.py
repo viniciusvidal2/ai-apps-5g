@@ -9,7 +9,7 @@ class AiAssistantAgentTest:
         """Initializes a AiAssistantAgentTest object to test assistant interactions
         """
         # Start the MQTT client and connect to the broker
-        self.mqtt_address = "localhost"
+        self.mqtt_address = "0.0.0.0"
         self.mqtt_port = 1883
         self.client = mqtt.Client(
             callback_api_version=CallbackAPIVersion.VERSION2)

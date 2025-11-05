@@ -15,7 +15,7 @@ def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: 
     Returns:
         requests.Response: The response from the REST API.
     """
-    url = "http://localhost:8000/ai_assistant/start_docker"
+    url = "http://localhost:8002/ai_assistant/start_docker"
     payload = {
         "broker": broker,
         "port": port,

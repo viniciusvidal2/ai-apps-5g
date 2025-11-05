@@ -50,4 +50,4 @@ def start_ai_assistant_agent_docker():
 
 if __name__ == "__main__":
     # listen on all interfaces so it's reachable from containers/other hosts
-    app.run(host="0.0.0.0", port=8000, debug=False)
+    app.run(host="0.0.0.0", port=8002, debug=False)

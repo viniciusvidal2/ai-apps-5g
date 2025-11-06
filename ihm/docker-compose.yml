@@ -1,4 +1,19 @@
 services:
+  # MQTT Broker (Mosquitto)
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
   # PostgreSQL Database
   postgres:
     image: postgres:15
@@ -72,6 +87,8 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  mqtt_data:
+  mqtt_log:
 
 networks:
   chatbot-network:

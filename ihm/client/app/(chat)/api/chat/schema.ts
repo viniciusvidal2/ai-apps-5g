@@ -14,6 +14,13 @@ const filePartSchema = z.object({
 
 const partSchema = z.union([textPartSchema, filePartSchema]);
 
+const ragParamsSchema = z.object({
+  use_history: z.boolean().optional(),
+  search_db: z.boolean().optional(),
+  search_urls: z.boolean().optional(),
+  n_chunks: z.number().optional(),
+}).optional();
+
 export const postRequestBodySchema = z.object({
   id: z.string().uuid(),
   message: z.object({
@@ -21,8 +28,9 @@ export const postRequestBodySchema = z.object({
     role: z.enum(["user"]),
     parts: z.array(partSchema),
   }),
-  selectedChatModel: z.enum(["chat-model"]),
+  selectedChatModel: z.enum(["search-mode-default", "search-mode-wide"]),
   selectedVisibilityType: z.enum(["public", "private"]),
+  ragParams: ragParamsSchema,
 });
 
 export type PostRequestBody = z.infer<typeof postRequestBodySchema>;

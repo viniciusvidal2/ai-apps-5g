@@ -20,6 +20,7 @@ import {
 import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
+import { chatModels } from "@/lib/ai/models";
 import type { Vote } from "@/lib/db/schema";
 import { ChatSDKError } from "@/lib/errors";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -29,6 +30,7 @@ import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
+import { type RAGParams } from "./rag-controls";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
@@ -62,11 +64,59 @@ export function Chat({
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
+  
+  // Helper function to get n_chunks from model
+  const getNChunksFromModel = (modelId: string): number => {
+    const model = chatModels.find((m) => m.id === modelId);
+    return model?.n_chunks ?? 3; // Default to 3 if model not found
+  };
+  
+  // RAG parameters with localStorage persistence
+  const [ragParams, setRAGParams] = useState<RAGParams>(() => {
+    const defaultParams = {
+      use_history: true,
+      search_db: true,
+      search_urls: false,
+      n_chunks: getNChunksFromModel(initialChatModel),
+    };
+    
+    if (typeof window === "undefined") {
+      return defaultParams;
+    }
+    const stored = localStorage.getItem("rag-params");
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        // Ensure n_chunks is set based on current model
+        return { ...parsed, n_chunks: getNChunksFromModel(initialChatModel) };
+      } catch {
+        return defaultParams;
+      }
+    }
+    return defaultParams;
+  });
+  
+  // Sync n_chunks when model changes
+  useEffect(() => {
+    const newNChunks = getNChunksFromModel(currentModelId);
+    if (ragParams.n_chunks !== newNChunks) {
+      setRAGParams((prev) => ({ ...prev, n_chunks: newNChunks }));
+    }
+  }, [currentModelId, ragParams.n_chunks]);
+
+  useEffect(() => {
+    localStorage.setItem("rag-params", JSON.stringify(ragParams));
+  }, [ragParams]);
   const currentModelIdRef = useRef(currentModelId);
+  const ragParamsRef = useRef(ragParams);
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
+
+  useEffect(() => {
+    ragParamsRef.current = ragParams;
+  }, [ragParams]);
 
   const {
     messages,
@@ -91,6 +141,7 @@ export function Chat({
             message: request.messages.at(-1),
             selectedChatModel: currentModelIdRef.current,
             selectedVisibilityType: visibilityType,
+            ragParams: ragParamsRef.current,
             ...request.body,
           },
         };
@@ -192,6 +243,8 @@ export function Chat({
               status={status}
               stop={stop}
               usage={usage}
+              ragParams={ragParams}
+              onRAGParamsChange={setRAGParams}
             />
           )}
         </div>

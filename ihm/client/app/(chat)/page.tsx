@@ -19,7 +19,10 @@ export default async function Page() {
   const modelIdFromCookie = cookieStore.get("chat-model");
 
   // Force use of DEFAULT_CHAT_MODEL if cookie contains invalid model
-  const validModelId = modelIdFromCookie?.value === "chat-model" ? "chat-model" : DEFAULT_CHAT_MODEL;
+  const validModelIds = ["search-mode-default", "search-mode-wide"];
+  const validModelId = modelIdFromCookie?.value && validModelIds.includes(modelIdFromCookie.value)
+    ? modelIdFromCookie.value
+    : DEFAULT_CHAT_MODEL;
 
   return (
     <>

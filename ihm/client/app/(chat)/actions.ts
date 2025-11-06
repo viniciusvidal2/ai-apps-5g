@@ -12,7 +12,7 @@ import {
 export async function saveChatModelAsCookie(model: string) {
   const cookieStore = await cookies();
   // Only save valid models
-  if (model === "chat-model") {
+  if (model === "search-mode-default" || model === "search-mode-wide") {
     cookieStore.set("chat-model", model);
   } else {
     // Clear invalid cookie

@@ -173,18 +173,28 @@ export async function POST(request: Request) {
     const textPart = message.parts.find((p) => p.type === "text");
     const query = textPart && "text" in textPart ? textPart.text : "";
 
+    // Extract RAG parameters from request body (with defaults)
+    const ragParams = requestBody.ragParams || {};
+    const search_db = ragParams.search_db ?? true;
+    const use_history = ragParams.use_history ?? true;
+    const search_urls = ragParams.search_urls ?? false;
+    const n_chunks = ragParams.n_chunks ?? 3;
+
     // Call FastAPI backend
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
     console.log(`[API Route] Calling FastAPI backend at ${backendUrl}/inference`);
     console.log(`[API Route] Query: ${query}`);
+    console.log(`[API Route] RAG Params: search_db=${search_db}, use_history=${use_history}, search_urls=${search_urls}, n_chunks=${n_chunks}`);
 
     const backendResponse = await fetch(`${backendUrl}/inference`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: query,
-        search_db: true,
-        use_history: true,
+        search_db: search_db,
+        use_history: use_history,
+        search_urls: search_urls,
+        n_chunks: n_chunks,
       }),
     });
 

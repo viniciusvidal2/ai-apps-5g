@@ -21,7 +21,6 @@ import { useLocalStorage, useWindowSize } from "usehooks-ts";
 import { saveChatModelAsCookie } from "@/app/(chat)/actions";
 import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
-import { myProvider } from "@/lib/ai/providers";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { cn } from "@/lib/utils";
@@ -43,6 +42,7 @@ import {
   StopIcon,
 } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
+import { RAGControls, type RAGParams } from "./rag-controls";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
@@ -63,6 +63,8 @@ function PureMultimodalInput({
   selectedModelId,
   onModelChange,
   usage,
+  ragParams,
+  onRAGParamsChange,
 }: {
   chatId: string;
   input: string;
@@ -79,6 +81,8 @@ function PureMultimodalInput({
   selectedModelId: string;
   onModelChange?: (modelId: string) => void;
   usage?: AppUsage;
+  ragParams: RAGParams;
+  onRAGParamsChange: (params: RAGParams) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
@@ -195,10 +199,6 @@ function PureMultimodalInput({
     }
   }, []);
 
-  const _modelResolver = useMemo(() => {
-    return myProvider.languageModel(selectedModelId);
-  }, [selectedModelId]);
-
   const contextProps = useMemo(
     () => ({
       usage,
@@ -313,6 +313,11 @@ function PureMultimodalInput({
           />{" "}
           <Context {...contextProps} />
         </div>
+        <RAGControls
+          params={ragParams}
+          onParamsChange={onRAGParamsChange}
+          className="mt-1"
+        />
         <PromptInputToolbar className="!border-top-0 border-t-0! p-0 shadow-none dark:border-0 dark:border-transparent!">
           <PromptInputTools className="gap-0 sm:gap-0.5">
             <AttachmentsButton
@@ -359,6 +364,9 @@ export const MultimodalInput = memo(
       return false;
     }
     if (prevProps.selectedModelId !== nextProps.selectedModelId) {
+      return false;
+    }
+    if (!equal(prevProps.ragParams, nextProps.ragParams)) {
       return false;
     }
 

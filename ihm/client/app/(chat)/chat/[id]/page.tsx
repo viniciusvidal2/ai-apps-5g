@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { auth } from "@/app/(auth)/auth";
 import { Chat } from "@/components/chat";
 import { DataStreamHandler } from "@/components/data-stream-handler";
-import { DEFAULT_CHAT_MODEL } from "@/lib/ai/models";
+import { DEFAULT_CHAT_MODEL, chatModels } from "@/lib/ai/models";
 import { getChatById, getMessagesByChatId } from "@/lib/db/queries";
 import { convertToUIMessages } from "@/lib/utils";
 
@@ -51,7 +51,10 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
   const chatModelFromCookie = cookieStore.get("chat-model");
 
   // Force use of DEFAULT_CHAT_MODEL if cookie contains invalid model
-  const validModelId = chatModelFromCookie?.value === "chat-model" ? "chat-model" : DEFAULT_CHAT_MODEL;
+  const validModelIds = chatModels.map((m) => m.id);
+  const validModelId = chatModelFromCookie?.value && validModelIds.includes(chatModelFromCookie.value)
+    ? chatModelFromCookie.value
+    : DEFAULT_CHAT_MODEL;
 
   return (
     <>

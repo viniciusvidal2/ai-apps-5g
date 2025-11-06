@@ -195,7 +195,7 @@ class AiAssistant:
                         print(
                             f"Content from '{url}' already exists in the database. Skipping addition.")
                         return
-                    
+
             # Loading from web and adding the chunks to the DB
             try:
                 loader = WebBaseLoader(url)
@@ -593,13 +593,21 @@ if __name__ == "__main__":
 
     ############ Database formation ############
     # Example PDF files to add to the database
+    # pdf_files = [
+    #     "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
+    #     "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
+    #     "/home/vini/Downloads/box 31 servicos.pdf",
+    #     "/home/vini/Downloads/contrato natal.pdf",
+    #     "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+    #     "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
+    # ]
     pdf_files = [
-        "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-        "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-        "/home/vini/Downloads/box 31 servicos.pdf",
-        "/home/vini/Downloads/contrato natal.pdf",
-        "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
-        "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
+        "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
+        "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
+        "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
+        "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
     ]
     # Example URLs to add to the web-based search
     urls = [
@@ -607,35 +615,39 @@ if __name__ == "__main__":
         # "https://www.gov.br/aneel/pt-br/assuntos/noticias/2025/aneel-publica-resolucao-sobre-tratamento-especifico-a-empreendimentos-de-geracao",
     ]
     # Example queries to test
-    querys = [
-        # {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
-        #     "search_db": True, "use_history": True, "search_urls": False},
-        # {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True, "search_urls": False},
-        {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
-            "search_db": False, "use_history": False, "search_urls": True}
-    ]
-    # pdf_files = [
-    #     "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
-    #     "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
-    #     "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
-    # ]
     # querys = [
-    #     "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
-    #     "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
-    #     "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
-    #     "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
-    #     "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
-    #     "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
-    #     "Quais são os limites de reembolso para refeições durante viagens corporativas?",
-    #     "Quais despesas não são reembolsáveis segundo o procedimento?",
-    #     "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
-    #     "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
-    #     "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
-    #     "Quais práticas são proibidas nas relações com agentes públicos?",
+    #     # {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
+    #     #     "search_db": True, "use_history": True, "search_urls": False},
+    #     # {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True, "search_urls": False},
+    #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
+    #         "search_db": False, "use_history": False, "search_urls": True}
     # ]
+    querys = [
+        {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais despesas não são reembolsáveis segundo o procedimento?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
+            "search_db": True, "use_history": False, "search_urls": False},
+        {"question": "Quais práticas são proibidas nas relações com agentes públicos?",
+            "search_db": True, "use_history": False, "search_urls": False}
+    ]
 
     ############ Adding documents to the database ############
     for pdf_file in pdf_files:
@@ -652,6 +664,7 @@ if __name__ == "__main__":
     ai_assistant.create_database_from_urls()
 
     ############ Running Inference ############
+    q_a = []
     for query in querys:
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
@@ -672,6 +685,19 @@ if __name__ == "__main__":
                 f"- TITLE: {doc.metadata.get('title', 'Unknown')}, URL: {doc.metadata.get('source', 'Unknown')}")
         print("-" * 80)
 
+        q_a.append({"question": query['question'],
+                   "answer": response_data['answer']})
+    ############ Cleanup ############
     # Close the assistant and clean up resources
     ai_assistant.close_assistant()
+
+    # Save answers to a file or database
+    with open("q_and_a_ai_assistant.md", "w") as f:
+        for item in q_a:
+            f.write("-" * 80 + "\n")
+            f.write("-" * 80 + "\n")
+            f.write("-" * 80 + "\n")
+            f.write(f"QUESTION: {item['question']}\n")
+            f.write(f"ANSWER: {item['answer']}\n\n")
+
 # endregion

@@ -70,7 +70,7 @@ We must have the dependencies set to build the image:
 Use the following command to build the image:
 
 ```bash
-docker build -t ai_assistant_agent -f dockerfiles/Dockerfile.aiassistantagent --build-arg MODEL_NAME=[YOUR_MODEL_NAME] .
+docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent --build-arg MODEL_NAME=[YOUR_MODEL_NAME] .
 ```
 
 Replace __[YOUR_MODEL_NAME]__ with one of the currently supported models for ai assistant inference:

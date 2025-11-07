@@ -37,15 +37,3 @@ def generate_docker_name(user_id: int) -> str:
         str: The generated container name.
     """
     return f"ai_assistant_{user_id}"
-
-
-def generate_topics_header_section(user_id: int) -> str:
-    """Generates the topics header section for the AI Assistant configuration.
-
-    Args:
-        user_id (int): The user ID.
-
-    Returns:
-        str: The generated topics header section.
-    """
-    return f"ai_assistant_{user_id}"

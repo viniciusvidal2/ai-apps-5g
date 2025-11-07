@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from pydantic import ValidationError, Extra
 import subprocess
-from common import AiAssistantInputData, generate_docker_name, generate_topics_header_section
+from common import AiAssistantInputData, generate_docker_name
 
 
 app = Flask(__name__)
@@ -24,11 +24,6 @@ def start_ai_assistant_agent_docker():
     # Create a name for the Docker container with the user id
     container_name = generate_docker_name(input_data.user_id)
 
-    # Create the topics header section
-    topics_header = generate_topics_header_section(input_data.user_id)
-    input_topic = f"{topics_header}/{input_data.input_topic}"
-    output_topic = f"{topics_header}/{input_data.output_topic}"
-
     # Call the docker with the provided parameters
     try:
         command = [
@@ -38,10 +33,11 @@ def start_ai_assistant_agent_docker():
             f"--broker={input_data.broker}",
             f"--port={input_data.port}",
             f"--user_id={input_data.user_id}",
-            f"--input_topic={input_topic}",
-            f"--output_topic={output_topic}",
+            f"--input_topic={input_data.input_topic}",
+            f"--output_topic={input_data.output_topic}",
             f"--inference_model_name={input_data.inference_model_name}"
         ]
+        # command = ["docker", "run", "-d","--network=host", "--name", "ai_assistant_1", "ai_assistant_image", "--broker=0.0.0.0", "--port=1883", "--user_id=1", "--input_topic=input", "--output_topic=output", "--inference_model_name=gemma3:4b"]
         result = subprocess.run(
             command,
             capture_output=True,

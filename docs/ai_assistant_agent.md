@@ -83,8 +83,13 @@ Replace __[YOUR_MODEL_NAME]__ with one of the currently supported models for ai 
 Use the following command to run the docker container from the built image. __This command assumes you have a MQTT brocker running in your host machine, so it can connect to it and start exchanging messages.__
 
 ```bash
-docker run --rm -d --network=host --name ai_assistant_agent ai_assistant_image --broker=0.0.0.0 --port=1883 --user_id=1 --input_topic=input --output_topic=output
+docker run --rm -d --network=host --name ai_assistant_agent ai_assistant_image --broker=0.0.0.0 --port=1883 --user_id=1 --input_topic=input --output_topic=output --inference_model_name "[YOUR_MODEL_NAME]"
 ```
+
+The currently supported models for inference are:
+
+- gemma3:27b
+- gemma3:4b
 
 The docker runs in detached mode and is ready to exchange information.
 

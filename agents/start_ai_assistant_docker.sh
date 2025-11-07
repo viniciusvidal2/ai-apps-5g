@@ -1,11 +1,29 @@
 #!/bin/bash
+set -e
 
-# Start ollama in the background
-ollama serve &
+# Ensure local Ollama setup (self-contained)
+export OLLAMA_MODELS=/app/ollama_models
+export OLLAMA_HOST=127.0.0.1
+export OLLAMA_PORT=11434
 
-# Optional: wait for ollama to start
-sleep 5
+# Start Ollama server in background (internal only)
+echo "Starting Ollama server..."
+ollama serve > /var/log/ollama.log 2>&1 &
 
-# Now run your Python module, passing ALL arguments
+# Wait until Ollama API responds
+echo "Waiting for Ollama service to become available..."
+until curl -s http://127.0.0.1:${OLLAMA_PORT}/api/tags >/dev/null 2>&1; do
+    sleep 1
+done
+echo "Ollama is ready."
+
+# (Optional) preload the local model if provided as argument or env
+if [ -n "$MODEL_NAME" ]; then
+    echo "Preloading model: $MODEL_NAME"
+    ollama pull "$MODEL_NAME" || true
+fi
+
+# Launch your AI assistant agent
 cd /app
-python3 -m agents.ai_assistant_agent "$@"
+echo "Starting AI assistant agent..."
+exec python3 -m agents.ai_assistant_agent "$@"

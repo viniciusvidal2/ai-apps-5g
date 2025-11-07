@@ -23,6 +23,8 @@ RUN pip install --upgrade pip
 # Install ollama
 RUN curl -fsSL https://ollama.com/install.sh | sh
 ENV OLLAMA_MODELS="/app/ollama_models"
+ENV OLLAMA_HOST=127.0.0.1
+ENV OLLAMA_PORT=11434
 
 # Copy code to inside the image
 RUN pip install --no-cache-dir setuptools==75.1.0

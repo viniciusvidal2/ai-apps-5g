@@ -35,11 +35,21 @@ def kill_ai_assistant_agent_docker():
             text=True,
             check=True
         )
+        command = [
+            "docker", "rm", container_name
+        ]
+        result_rm = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True
+        )
     except subprocess.CalledProcessError as e:
         return jsonify({"error": "Failed to kill Docker container", "details": e.stderr}), 500
 
     return jsonify({"message": "Docker container killed successfully",
-                    "output_stop": result_stop.stdout}), 200
+                    "output_stop": result_stop.stdout,
+                    "output_rm": result_rm.stdout}), 200
 
 
 

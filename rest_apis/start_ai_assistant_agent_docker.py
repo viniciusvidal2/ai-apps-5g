@@ -32,7 +32,7 @@ def start_ai_assistant_agent_docker():
     # Call the docker with the provided parameters
     try:
         command = [
-            "docker", "run", "--rm", "-d", "--network=host",
+            "docker", "run", "-d", "--network=host",
             "--name", container_name,
             "ai_assistant_image",
             f"--broker={input_data.broker}",

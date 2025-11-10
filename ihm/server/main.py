@@ -543,7 +543,7 @@ def start_docker_container(user_id: str = "1") -> bool:
     try:
         # Get configuration from environment
         print("\n📋 Lendo configuração do ambiente...")
-        docker_image = os.getenv("DOCKER_IMAGE_NAME", "ai_assistant_agent")
+        docker_image = os.getenv("DOCKER_IMAGE_NAME", "ai_assistant_image")
         mqtt_broker = os.getenv("MQTT_BROKER", "0.0.0.0")
         mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
         inference_model = os.getenv("INFERENCE_MODEL", "gemma3:4b")
@@ -555,7 +555,7 @@ def start_docker_container(user_id: str = "1") -> bool:
         
         # Build docker command
         command = [
-            "docker", "run", "--rm", "-d", "--network=host",
+            "docker", "run", "-d", "--network=host",
             "--name", docker_container_name,
             docker_image,
             f"--broker={mqtt_broker}",

@@ -1,7 +1,7 @@
 # FastAPI and server dependencies
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-pydantic==2.5.0
+pydantic>=2.7.4,<3.0.0
 
 # Additional dependencies for functionality
 python-multipart==0.0.6
@@ -12,3 +12,9 @@ redis==5.0.1
 
 # Environment and configuration
 python-dotenv==1.0.0
+
+# MQTT client for AI Assistant agent communication
+paho-mqtt>=2.0.0
+
+# Note: Langchain dependencies are not needed here as AI Assistant runs in Docker container
+# All langchain dependencies are installed in the Docker container image

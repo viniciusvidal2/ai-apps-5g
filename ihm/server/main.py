@@ -553,10 +553,26 @@ def start_docker_container(user_id: str = "1") -> bool:
         print(f"   - MQTT_PORT: {mqtt_port}")
         print(f"   - INFERENCE_MODEL: {inference_model}")
         
-        # Build docker command
+        # Get absolute paths for ChromaDB databases
+        # The databases should be in dbs/ (as expected by Dockerfile)
+        documents_db_path = project_root / "dbs" / "chroma_documents_db"
+        urls_db_path = project_root / "dbs" / "chroma_url_db"
+        
+        # Ensure directories exist (create empty if they don't)
+        documents_db_path.mkdir(parents=True, exist_ok=True)
+        urls_db_path.mkdir(parents=True, exist_ok=True)
+        
+        print(f"   - ChromaDB documents path: {documents_db_path}")
+        print(f"   - ChromaDB URLs path: {urls_db_path}")
+        
+        # Build docker command with volume mounts for ChromaDB databases
         command = [
             "docker", "run", "-d", "--network=host",
             "--name", docker_container_name,
+            # Mount ChromaDB databases from host to container
+            # The code expects ./dbs/chroma_documents_db and ./dbs/chroma_url_db
+            "-v", f"{documents_db_path}:/app/dbs/chroma_documents_db",
+            "-v", f"{urls_db_path}:/app/dbs/chroma_url_db",
             docker_image,
             f"--broker={mqtt_broker}",
             f"--port={mqtt_port}",

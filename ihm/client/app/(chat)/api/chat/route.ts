@@ -47,7 +47,7 @@ import { generateUUID } from "@/lib/utils";
 import { generateTitleFromUserMessage } from "../../actions";
 import { type PostRequestBody, postRequestBodySchema } from "./schema";
 
-export const maxDuration = 60;
+export const maxDuration = 600; // 10 minutes timeout
 
 // let globalStreamContext: ResumableStreamContext | null = null;
 
@@ -186,17 +186,33 @@ export async function POST(request: Request) {
     console.log(`[API Route] Query: ${query}`);
     console.log(`[API Route] RAG Params: search_db=${search_db}, use_history=${use_history}, search_urls=${search_urls}, n_chunks=${n_chunks}`);
 
-    const backendResponse = await fetch(`${backendUrl}/inference`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: query,
-        search_db: search_db,
-        use_history: use_history,
-        search_urls: search_urls,
-        n_chunks: n_chunks,
-      }),
-    });
+    // Create AbortController with 10 minute timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 600 * 1000); // 10 minutes
+
+    let backendResponse: Response;
+    try {
+      backendResponse = await fetch(`${backendUrl}/inference`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: query,
+          search_db: search_db,
+          use_history: use_history,
+          search_urls: search_urls,
+          n_chunks: n_chunks,
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        throw new Error('Request timeout: Backend took longer than 10 minutes to respond');
+      }
+      throw fetchError;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.statusText}`);

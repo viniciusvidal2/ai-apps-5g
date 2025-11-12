@@ -242,7 +242,7 @@ class MQTTClientManager:
         self.loop_started = False
         print("🔌 MQTT Client disconnected")
     
-    async def publish_and_wait(self, message: Dict[str, Any], timeout: int = 30) -> Dict[str, Any]:
+    async def publish_and_wait(self, message: Dict[str, Any], timeout: int = 600) -> Dict[str, Any]:
         """Publish message and wait for response"""
         if not self.connected:
             raise HTTPException(status_code=503, detail="MQTT broker not connected")
@@ -1285,7 +1285,7 @@ async def run_inference(request: InferenceRequest):
             
             # Publish message and wait for response via MQTT
             try:
-                result = await mqtt_client_manager.publish_and_wait(mqtt_message, timeout=60)
+                result = await mqtt_client_manager.publish_and_wait(mqtt_message, timeout=600)
                 
                 # Extract response data
                 ai_response = result.get("answer", "No response generated")

@@ -11,13 +11,13 @@ export const chatModels: ChatModel[] = [
   {
     id: "search-mode-default",
     name: "Padrão",
-    description: "Busca padrão com 3 chunks (mais rápido)",
+    description: "Respostas rápidas e diretas",
     n_chunks: 3,
   },
   {
     id: "search-mode-wide",
     name: "Busca ampla",
-    description: "Busca ampla com 10 chunks (mais completo)",
+    description: "Análise mais detalhada e abrangente",
     n_chunks: 10,
   },
 ];

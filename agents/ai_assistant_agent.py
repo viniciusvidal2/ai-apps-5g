@@ -89,17 +89,17 @@ class AiAssistantAgent:
                                                                  use_history=data.get(
                                                                      "use_history", True),
                                                                  )
-        # Preparing the output for the user with all necessary information
-        document_sources = [
-            {"document": doc.get('source', 'Unknown'), "page": {doc.get('page', 'N/A')}} for doc in response_data["history_sources"]
-        ]
-        url_sources = [
-            {"title": doc.metadata.get('title', 'Unknown'), "url": doc.metadata.get('source', 'Unknown')} for doc in response_data["urls_used"]
-        ]
+        # # Preparing the output for the user with all necessary information
+        # document_sources = [
+        #     {"document": doc.get('source', 'Unknown'), "page": {doc.get('page', 'N/A')}} for doc in response_data["history_sources"]
+        # ]
+        # url_sources = [
+        #     {"title": doc.metadata.get('title', 'Unknown'), "url": doc.metadata.get('source', 'Unknown')} for doc in response_data["urls_used"]
+        # ]
         output_dict = {
             "answer": response_data["answer"],
-            "document_sources": document_sources,
-            "url_sources": url_sources
+            # "document_sources": document_sources,
+            # "url_sources": url_sources
         }
         # Publish the response to the MQTT broker
         self.client.publish(
@@ -164,7 +164,7 @@ def main() -> None:
     parser.add_argument(
         "--inference_model_name", "-m",
         type=str,
-        default="gemma3:27b",
+        default="gemma3:4b",
         help="Name of the inference model to use"
     )
     args = parser.parse_args()

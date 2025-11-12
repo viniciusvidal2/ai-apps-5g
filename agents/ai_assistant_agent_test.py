@@ -39,11 +39,11 @@ class AiAssistantAgentTest:
             f"Connected to MQTT broker at {self.mqtt_address}:{self.mqtt_port} for user id {self.user_id}")
         # Creates data for testing
         message = {
-            "query": "Hello, how are you?",
-            "search_db": False,
+            "query": "O que acontece quando um fornecedor obtém um IDF inferior a 70? Cite o documento na base de dados em que isso se encontra.",
+            "search_db": True,
             "search_urls": False,
-            "use_history": False,
-            "n_chunks": 1,
+            "use_history": True,
+            "n_chunks": 10,
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)

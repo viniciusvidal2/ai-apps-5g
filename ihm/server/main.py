@@ -897,12 +897,14 @@ async def turn_on_services(request: ServiceRequest):
         print(f"   - active_sessions keys (depois): {list(active_sessions.keys())}")
         
         # Start Docker container if this is the first active session
+        # Only start container if AI Assistant is enabled
         print(f"\n🔍 Verificando se precisa iniciar Docker container...")
+        print(f"   - USE_AI_ASSISTANT: {USE_AI_ASSISTANT}")
         print(f"   - active_count == 1: {active_count == 1}")
         print(f"   - not docker_container_running: {not docker_container_running}")
-        print(f"   - Condição (active_count == 1 and not docker_container_running): {active_count == 1 and not docker_container_running}")
+        print(f"   - Condição (USE_AI_ASSISTANT and active_count == 1 and not docker_container_running): {USE_AI_ASSISTANT and active_count == 1 and not docker_container_running}")
         
-        if active_count == 1 and not docker_container_running:
+        if USE_AI_ASSISTANT and active_count == 1 and not docker_container_running:
             print("\n🚀 First active session detected - starting Docker container...")
             print(f"   - user_id para container: {request.user_id}")
             
@@ -1299,66 +1301,46 @@ async def run_inference(request: InferenceRequest):
             
             print(f"📋 Publishing message: {mqtt_message}")
             
-            # Publish message and wait for response via MQTT with heartbeat
+            # Publish message and wait for response via MQTT
+            # While waiting, we'll generate an SSE stream that sends heartbeats
             try:
-                # Create event to signal when response is received
-                response_received = asyncio.Event()
-                mqtt_result = None
-                mqtt_error = None
+                # Create a task to wait for MQTT response
+                mqtt_task = asyncio.create_task(
+                    mqtt_client_manager.publish_and_wait(mqtt_message, timeout=600)
+                )
                 
-                # Task to wait for MQTT response
-                async def wait_for_mqtt_response():
-                    nonlocal mqtt_result, mqtt_error
-                    try:
-                        mqtt_result = await mqtt_client_manager.publish_and_wait(mqtt_message, timeout=600)
-                        response_received.set()
-                    except Exception as e:
-                        mqtt_error = e
-                        response_received.set()
-                
-                # Start MQTT task
-                mqtt_task = asyncio.create_task(wait_for_mqtt_response())
-                
-                # Convert AI response to SSE format with heartbeat
-                message_id = "ai-" + str(__import__('uuid').uuid4())
-                
-                async def generate_ai_sse():
-                    """Generator que produz eventos SSE do AI Assistant via MQTT com heartbeats"""
+                # Create generator that sends heartbeats while waiting
+                async def generate_ai_sse_with_heartbeat():
+                    """Generator that sends heartbeats while waiting for MQTT response"""
                     import json
                     
-                    # 1. Enviar start-step
+                    message_id = "ai-" + str(__import__('uuid').uuid4())
+                    
+                    # Send start-step
                     yield f"data: {json.dumps({'type': 'start-step'})}\n\n"
                     
-                    # Send heartbeats every 60 seconds while waiting for MQTT response
-                    heartbeat_interval = 60  # 1 minute
-                    last_heartbeat_time = asyncio.get_event_loop().time()
+                    # Send text-start
+                    yield f"data: {json.dumps({'type': 'text-start', 'id': message_id})}\n\n"
                     
-                    # Wait for response while sending heartbeats
-                    while not response_received.is_set():
-                        current_time = asyncio.get_event_loop().time()
-                        elapsed = current_time - last_heartbeat_time
-                        
-                        if elapsed >= heartbeat_interval:
-                            # Send heartbeat
-                            yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
-                            last_heartbeat_time = current_time
-                            print(f"💓 Heartbeat sent at {current_time}")
-                        
-                        # Wait a bit before checking again (to avoid busy waiting)
+                    # Wait for MQTT response with heartbeats every 30 seconds
+                    heartbeat_interval = 30
+                    while not mqtt_task.done():
                         try:
-                            await asyncio.wait_for(response_received.wait(), timeout=1.0)
+                            # Wait for task with timeout
+                            await asyncio.wait_for(asyncio.shield(mqtt_task), timeout=heartbeat_interval)
+                            break  # Task completed
                         except asyncio.TimeoutError:
-                            # Continue loop to send next heartbeat if needed
-                            pass
+                            # Send heartbeat
+                            yield f": heartbeat\n\n"
+                            print("💓 [AI Mode] Heartbeat sent while waiting for AI response", flush=True)
                     
-                    # Check if there was an error
-                    if mqtt_error:
-                        raise mqtt_error
+                    # Get the result
+                    result = await mqtt_task
                     
                     # Extract response data
-                    ai_response = mqtt_result.get("answer", "No response generated")
-                    document_sources = mqtt_result.get("document_sources", [])
-                    url_sources = mqtt_result.get("url_sources", [])
+                    ai_response = result.get("answer", "No response generated")
+                    document_sources = result.get("document_sources", [])
+                    url_sources = result.get("url_sources", [])
                     
                     print("SOURCES:")
                     if document_sources:
@@ -1369,30 +1351,28 @@ async def run_inference(request: InferenceRequest):
                             print(f"- URL: {url}")
                     print("-" * 80)
                     
-                    # 2. Enviar text-start
-                    yield f"data: {json.dumps({'type': 'text-start', 'id': message_id})}\n\n"
-                    
-                    # 3. Enviar cada palavra como text-delta
+                    # Now stream the AI response
+                    # Send each word as text-delta
                     words = ai_response.split()
                     for word in words:
                         yield f"data: {json.dumps({'type': 'text-delta', 'id': message_id, 'delta': word + ' '})}\n\n"
                         await asyncio.sleep(0.05)  # Faster streaming for AI
                     
-                    # 4. Enviar text-end
+                    # Send text-end
                     yield f"data: {json.dumps({'type': 'text-end', 'id': message_id})}\n\n"
                     
-                    # 5. Enviar finish-step
+                    # Send finish-step
                     yield f"data: {json.dumps({'type': 'finish-step'})}\n\n"
                     
-                    # 6. Enviar finish
+                    # Send finish
                     yield f"data: {json.dumps({'type': 'finish'})}\n\n"
                     
-                    # 7. Enviar [DONE]
+                    # Send [DONE]
                     yield "data: [DONE]\n\n"
                 
                 from fastapi.responses import StreamingResponse
                 return StreamingResponse(
-                    generate_ai_sse(),
+                    generate_ai_sse_with_heartbeat(),
                     media_type="text/event-stream",
                     headers={
                         "Cache-Control": "no-cache",
@@ -1419,6 +1399,37 @@ async def run_inference(request: InferenceRequest):
             async def generate_mock_sse():
                 """Generator que produz eventos SSE compatíveis com AI SDK"""
                 import json
+                from datetime import datetime
+                import sys
+                
+                # 🧪 TESTE: Aguardar 9 minutos antes de responder
+                print(f"⏰ [TESTE] Iniciando delay de 9 minutos às {datetime.now().strftime('%H:%M:%S')}", flush=True)
+                sys.stdout.flush()
+                print(f"📊 [TESTE] Esperando 540 segundos...", flush=True)
+                sys.stdout.flush()
+                
+                # Aguardar 9 minutos (540 segundos) enviando heartbeats a cada 30s
+                # para manter a conexão viva e evitar body timeout
+                total_time = 540  # 9 minutos
+                heartbeat_interval = 30  # 30 segundos
+                elapsed = 0
+                
+                while elapsed < total_time:
+                    # Aguardar o intervalo do heartbeat ou o tempo restante
+                    wait_time = min(heartbeat_interval, total_time - elapsed)
+                    await asyncio.sleep(wait_time)
+                    elapsed += wait_time
+                    
+                    # Enviar comentário SSE como heartbeat (comentários são ignorados pelo cliente)
+                    if elapsed < total_time:
+                        yield f": heartbeat {elapsed}/{total_time}s\n\n"
+                        print(f"💓 [TESTE] Heartbeat enviado: {elapsed}/{total_time}s", flush=True)
+                        sys.stdout.flush()
+                
+                print(f"✅ [TESTE] Delay completado às {datetime.now().strftime('%H:%M:%S')}", flush=True)
+                sys.stdout.flush()
+                print(f"📤 [TESTE] Enviando resposta: '{example_message}'", flush=True)
+                sys.stdout.flush()
                 
                 # 1. Enviar start-step
                 yield f"data: {json.dumps({'type': 'start-step'})}\n\n"

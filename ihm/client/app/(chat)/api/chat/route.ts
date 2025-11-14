@@ -253,7 +253,9 @@ export async function POST(request: Request) {
     const decoder = new TextDecoder();
     
     const interceptedStream = new ReadableStream({
-      async start(streamController) {
+      async start(controller) {
+        let isClosed = false;
+        
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -262,24 +264,31 @@ export async function POST(request: Request) {
               // Save the complete assistant response to database
               if (assistantResponse.trim()) {
                 console.log(`[API Route] Saving assistant response: ${assistantResponse.substring(0, 100)}...`);
-                await saveMessages({
-                  messages: [{
-                    chatId: id,
-                    id: generateUUID(),
-                    role: "assistant",
-                    parts: [{ type: "text", text: assistantResponse }],
-                    attachments: [],
-                    createdAt: new Date(),
-                  }],
-                });
+                try {
+                  await saveMessages({
+                    messages: [{
+                      chatId: id,
+                      id: generateUUID(),
+                      role: "assistant",
+                      parts: [{ type: "text", text: assistantResponse }],
+                      attachments: [],
+                      createdAt: new Date(),
+                    }],
+                  });
+                } catch (dbError) {
+                  console.error("[API Route] Error saving message to database:", dbError);
+                  // Continue anyway - don't fail the stream if DB save fails
+                }
               }
-              if (timeoutId) {
-                clearTimeout(timeoutId);
+              
+              if (!isClosed) {
+                controller.close();
+                isClosed = true;
               }
-              streamController.close();
               break;
             }
             
+            // Parse chunk for text content before enqueuing
             const chunk = decoder.decode(value, { stream: true });
             
             // Parse SSE events to extract text content and handle heartbeats
@@ -305,14 +314,20 @@ export async function POST(request: Request) {
               }
             }
             
-            streamController.enqueue(value);
+            // Only enqueue if controller is still open
+            if (!isClosed) {
+              controller.enqueue(value);
+            }
           }
         } catch (error) {
           if (timeoutId) {
             clearTimeout(timeoutId);
           }
           console.error("[API Route] Error processing stream:", error);
-          streamController.error(error);
+          if (!isClosed) {
+            controller.error(error);
+            isClosed = true;
+          }
         }
       }
     });

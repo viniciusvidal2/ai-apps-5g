@@ -1299,33 +1299,75 @@ async def run_inference(request: InferenceRequest):
             
             print(f"📋 Publishing message: {mqtt_message}")
             
-            # Publish message and wait for response via MQTT
+            # Publish message and wait for response via MQTT with heartbeat
             try:
-                result = await mqtt_client_manager.publish_and_wait(mqtt_message, timeout=600)
+                # Create event to signal when response is received
+                response_received = asyncio.Event()
+                mqtt_result = None
+                mqtt_error = None
                 
-                # Extract response data
-                ai_response = result.get("answer", "No response generated")
-                document_sources = result.get("document_sources", [])
-                url_sources = result.get("url_sources", [])
+                # Task to wait for MQTT response
+                async def wait_for_mqtt_response():
+                    nonlocal mqtt_result, mqtt_error
+                    try:
+                        mqtt_result = await mqtt_client_manager.publish_and_wait(mqtt_message, timeout=600)
+                        response_received.set()
+                    except Exception as e:
+                        mqtt_error = e
+                        response_received.set()
                 
-                print("SOURCES:")
-                if document_sources:
-                    for doc in document_sources:
-                        print(f"- Document: {doc}")
-                if url_sources:
-                    for url in url_sources:
-                        print(f"- URL: {url}")
-                print("-" * 80)
+                # Start MQTT task
+                mqtt_task = asyncio.create_task(wait_for_mqtt_response())
                 
-                # Convert AI response to SSE format
+                # Convert AI response to SSE format with heartbeat
                 message_id = "ai-" + str(__import__('uuid').uuid4())
                 
                 async def generate_ai_sse():
-                    """Generator que produz eventos SSE do AI Assistant via MQTT"""
+                    """Generator que produz eventos SSE do AI Assistant via MQTT com heartbeats"""
                     import json
                     
                     # 1. Enviar start-step
                     yield f"data: {json.dumps({'type': 'start-step'})}\n\n"
+                    
+                    # Send heartbeats every 60 seconds while waiting for MQTT response
+                    heartbeat_interval = 60  # 1 minute
+                    last_heartbeat_time = asyncio.get_event_loop().time()
+                    
+                    # Wait for response while sending heartbeats
+                    while not response_received.is_set():
+                        current_time = asyncio.get_event_loop().time()
+                        elapsed = current_time - last_heartbeat_time
+                        
+                        if elapsed >= heartbeat_interval:
+                            # Send heartbeat
+                            yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                            last_heartbeat_time = current_time
+                            print(f"💓 Heartbeat sent at {current_time}")
+                        
+                        # Wait a bit before checking again (to avoid busy waiting)
+                        try:
+                            await asyncio.wait_for(response_received.wait(), timeout=1.0)
+                        except asyncio.TimeoutError:
+                            # Continue loop to send next heartbeat if needed
+                            pass
+                    
+                    # Check if there was an error
+                    if mqtt_error:
+                        raise mqtt_error
+                    
+                    # Extract response data
+                    ai_response = mqtt_result.get("answer", "No response generated")
+                    document_sources = mqtt_result.get("document_sources", [])
+                    url_sources = mqtt_result.get("url_sources", [])
+                    
+                    print("SOURCES:")
+                    if document_sources:
+                        for doc in document_sources:
+                            print(f"- Document: {doc}")
+                    if url_sources:
+                        for url in url_sources:
+                            print(f"- URL: {url}")
+                    print("-" * 80)
                     
                     # 2. Enviar text-start
                     yield f"data: {json.dumps({'type': 'text-start', 'id': message_id})}\n\n"

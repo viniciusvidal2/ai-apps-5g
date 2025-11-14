@@ -188,7 +188,20 @@ export async function POST(request: Request) {
 
     // Create AbortController with 10 minute timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 600 * 1000); // 10 minutes
+    let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+      controller.abort();
+    }, 600 * 1000); // 10 minutes
+
+    // Function to reset timeout when heartbeat is received
+    const resetTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = setTimeout(() => {
+        controller.abort();
+      }, 600 * 1000); // Reset to 10 minutes
+      console.log("[API Route] Timeout reset due to heartbeat");
+    };
 
     let backendResponse: Response;
     try {
@@ -205,16 +218,19 @@ export async function POST(request: Request) {
         signal: controller.signal,
       });
     } catch (fetchError) {
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         throw new Error('Request timeout: Backend took longer than 10 minutes to respond');
       }
       throw fetchError;
-    } finally {
-      clearTimeout(timeoutId);
     }
 
     if (!backendResponse.ok) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       throw new Error(`Backend error: ${backendResponse.statusText}`);
     }
 
@@ -225,6 +241,9 @@ export async function POST(request: Request) {
     const stream = backendResponse.body;
     
     if (!stream) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       throw new Error("No response body from backend");
     }
 
@@ -234,7 +253,7 @@ export async function POST(request: Request) {
     const decoder = new TextDecoder();
     
     const interceptedStream = new ReadableStream({
-      async start(controller) {
+      async start(streamController) {
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -254,18 +273,29 @@ export async function POST(request: Request) {
                   }],
                 });
               }
-              controller.close();
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              streamController.close();
               break;
             }
             
             const chunk = decoder.decode(value, { stream: true });
             
-            // Parse SSE events to extract text content
+            // Parse SSE events to extract text content and handle heartbeats
             const lines = chunk.split('\n');
             for (const line of lines) {
               if (line.startsWith('data: ')) {
                 try {
                   const data = JSON.parse(line.substring(6));
+                  
+                  // Handle heartbeat - reset timeout
+                  if (data.type === 'heartbeat') {
+                    resetTimeout();
+                    continue;
+                  }
+                  
+                  // Extract text content
                   if (data.type === 'text-delta' && data.delta) {
                     assistantResponse += data.delta;
                   }
@@ -275,11 +305,14 @@ export async function POST(request: Request) {
               }
             }
             
-            controller.enqueue(value);
+            streamController.enqueue(value);
           }
         } catch (error) {
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
           console.error("[API Route] Error processing stream:", error);
-          controller.error(error);
+          streamController.error(error);
         }
       }
     });

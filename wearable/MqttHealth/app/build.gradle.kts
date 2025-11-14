@@ -17,8 +17,8 @@ android {
         applicationId = "com.sae5g.mqttwearable"
         minSdk = 30
         targetSdk = 34
-        versionCode = 26
-        versionName = "0.0.26"
+        versionCode = 27
+        versionName = "0.0.27"
 
     }
 

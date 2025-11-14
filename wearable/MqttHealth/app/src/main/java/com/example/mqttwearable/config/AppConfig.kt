@@ -15,18 +15,20 @@ object AppConfig {
      * - 300000L = 5 minutos
      * - 600000L = 10 minutos (PADRÃO)
      */
-    const val HEALTH_DATA_SEND_INTERVAL_MS = 600000L  // 10 minutos
+    const val HEALTH_DATA_SEND_INTERVAL_MS = 3*600000L  // 10 minutos
+
+    /**
+     * Tempo que mostra "Enviando..." na UI antes de reiniciar o contador
+     */
+    const val UI_SENDING_FEEDBACK_DELAY_MS = 6000L  // 6 segundos
     
     /**
      * Tempo do countdown visual na MainActivity
      * Deve ser = HEALTH_DATA_SEND_INTERVAL_MS - UI_SENDING_FEEDBACK_DELAY_MS
      */
-    const val HEALTH_DATA_COUNTDOWN_MS = 594000L  // 9 min 54s
+    const val HEALTH_DATA_COUNTDOWN_MS = HEALTH_DATA_SEND_INTERVAL_MS - UI_SENDING_FEEDBACK_DELAY_MS  // 9 min 54s
     
-    /**
-     * Tempo que mostra "Enviando..." na UI antes de reiniciar o contador
-     */
-    const val UI_SENDING_FEEDBACK_DELAY_MS = 6000L  // 6 segundos
+
     
     /**
      * Delay inicial antes de começar o timer (sincronização com HealthPublisher)
@@ -44,12 +46,12 @@ object AppConfig {
     /**
      * Intervalo entre medições automáticas de SpO2
      */
-    const val SPO2_MEASUREMENT_INTERVAL_MS = 3600000L  // 1 hora
+    const val SPO2_MEASUREMENT_INTERVAL_MS = 2*3600000L  // 1 hora
     
     /**
      * Tempo de validade dos dados de SpO2 armazenados
      */
-    const val SPO2_DATA_VALIDITY_MS = 1800000L  // 30 minutos
+    const val SPO2_DATA_VALIDITY_MS = 2*3600000L   // 30 minutos
     
     
     // ========== DETECÇÃO DE QUEDA ==========
@@ -57,7 +59,7 @@ object AppConfig {
     /**
      * Janela de tempo para detecção de padrão de queda
      */
-    const val FALL_DETECTION_WINDOW_MS = 3000L  // 3 segundos
+    const val FALL_DETECTION_WINDOW_MS = 10*3000L  // 3 segundos
     
     /**
      * Countdown antes de enviar alerta de emergência após queda detectada
@@ -80,7 +82,7 @@ object AppConfig {
     /**
      * Intervalo mínimo entre atualizações de GPS
      */
-    const val GPS_UPDATE_INTERVAL_MS = 10000L  // 10 segundos
+    const val GPS_UPDATE_INTERVAL_MS = 2*600000L  // 10 segundos
     
     /**
      * Distância mínima para atualização de GPS (em metros)
@@ -107,7 +109,7 @@ object AppConfig {
      * Intervalo de publicação de dados do acelerômetro (quando ativado)
      * NOTA: Atualmente desativado no app
      */
-    const val ACCELEROMETER_PUBLISH_INTERVAL_MS = 1000L  // 1 segundo
+    const val ACCELEROMETER_PUBLISH_INTERVAL_MS = 100000L  // 1 segundo
     
     
     // ========== HELPERS ==========

@@ -15,7 +15,7 @@ object AppConfig {
      * - 300000L = 5 minutos
      * - 600000L = 10 minutos (PADRÃO)
      */
-    const val HEALTH_DATA_SEND_INTERVAL_MS = 3*600000L  // 10 minutos
+    const val HEALTH_DATA_SEND_INTERVAL_MS = 1*600000L  // 10 minutos
 
     /**
      * Tempo que mostra "Enviando..." na UI antes de reiniciar o contador

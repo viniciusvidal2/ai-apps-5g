@@ -2,6 +2,7 @@ import paho.mqtt.client as mqtt
 from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import json
+from time import time
 
 
 class AiAssistantAgentTest:
@@ -22,6 +23,8 @@ class AiAssistantAgentTest:
         self.client.on_message = self.on_message
         self.client.on_connect = self.on_connect
         self.client.subscribe(self.output_topic, qos=2)
+        # Count time between messages
+        self.last_message_time = time()
         # Start the publisher to send messages to the MQTT broker
         self.client.loop_start()
 
@@ -47,6 +50,8 @@ class AiAssistantAgentTest:
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
+        self.last_message_time = time()
+
 
     def on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
         """Callback function for when a message is received on the subscribed topic.
@@ -56,6 +61,12 @@ class AiAssistantAgentTest:
             userdata (Any): User-defined data of any type.
             msg (mqtt.MQTTMessage): The received MQTT message.
         """
+        # Update time since last message
+        current_time = time()
+        time_diff = current_time - self.last_message_time
+        print(f"Time since last message: {time_diff:.2f} seconds")
+        self.last_message_time = current_time
+        # Parse the incoming message payload as JSON
         payload = msg.payload.decode('utf-8')
         data = json.loads(payload)
         # Obtain the agent response from the message payload
@@ -72,6 +83,16 @@ class AiAssistantAgentTest:
                 print("")
         else:
             print("No response received from agent.")
+        # Sends a new message to the agent for testing
+        message = {
+            "query": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+            "search_db": True,
+            "search_urls": False,
+            "use_history": True,
+            "n_chunks": 10,
+        }
+        # Publish the message to the assistant input topic
+        self.client.publish(self.input_topic, json.dumps(message), qos=2)
 
 
 if __name__ == "__main__":

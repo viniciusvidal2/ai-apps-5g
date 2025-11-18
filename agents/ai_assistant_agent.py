@@ -3,6 +3,7 @@ from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import argparse
 import json
+from concurrent.futures import ThreadPoolExecutor
 from ai_apis.ai_assistant import AiAssistant
 
 
@@ -37,6 +38,8 @@ class AiAssistantAgent:
         self.user_id = user_id
         self.input_topic = input_topic
         self.output_topic = output_topic
+        # Executor to handle incoming messages concurrently
+        self.executor = ThreadPoolExecutor()
         # Start the subscriber to listen for incoming messages
         self.client.subscribe(self.input_topic, qos=1)
         self.client.on_message = self.on_message
@@ -77,6 +80,15 @@ class AiAssistantAgent:
         except json.JSONDecodeError:
             print("Received message is not valid JSON.")
             return
+        # Handle the incoming message in a separate thread
+        self.executor.submit(self.handle_incoming_message, data)
+
+    def handle_incoming_message(self, data: dict) -> None:
+        """Handles an incoming message by sending it to the AI Assistant and publishing the response.
+
+        Args:
+            data (dict): The parsed JSON data from the incoming message.
+        """
         # Set the chunking parameters
         self.ai_assistant.set_chunks_to_retrieve(
             n_chunks=data.get("n_chunks", 3))

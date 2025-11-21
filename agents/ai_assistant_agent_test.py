@@ -47,6 +47,7 @@ class AiAssistantAgentTest:
             "search_urls": False,
             "use_history": True,
             "n_chunks": 10,
+            "inference_model_name": "gemma3:4b",
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
@@ -90,6 +91,7 @@ class AiAssistantAgentTest:
             "search_urls": False,
             "use_history": True,
             "n_chunks": 10,
+            "inference_model_name": "gemma3:12b",
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)

@@ -28,6 +28,8 @@ class AiAssistantAgent:
             url_db_path="./dbs/chroma_url_db",
             collection_name="dev_collection"
         )
+        # Storing model name so we can check later if we need to switch models
+        self.current_inference_model_name = inference_model_name
         # Start the MQTT client and connect to the broker
         self.mqtt_address = mqtt_address
         self.mqtt_port = mqtt_port
@@ -101,7 +103,14 @@ class AiAssistantAgent:
                                                                  use_history=data.get(
                                                                      "use_history", True),
                                                                  )
-        # # Preparing the output for the user with all necessary information
+        # Checking if we need to switch models
+        if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
+            print("Switching inference model...")
+            self.ai_assistant.set_assistant_model(
+                data["inference_model_name"])
+            self.current_inference_model_name = data["inference_model_name"]
+
+        # Preparing the output for the user with all necessary information
         document_sources = [
             {"document": doc.get('source', 'Unknown'), "page": {doc.get('page', 'N/A')}} for doc in response_data["history_sources"]
         ]

@@ -155,18 +155,9 @@ class AiAssistant:
                 embedding_function=self.embedding_function,
                 collection_name=collection_name,
             )
-            if db._collection.count() > 0:
-                print(
-                    f"✅ Existing database loaded with {db._collection.count()} items.")
-            else:
-                # Initialize an empty DB structure if the folder exists but is empty
-                print(
-                    "Database directory exists but is empty. Initializing new structure.")
             return db
         except Exception:
             # Create a new, empty Chroma instance for the first run
-            print(
-                f"Creating new Chroma database structure at {path}.")
             return Chroma(
                 persist_directory=path,
                 embedding_function=self.embedding_function,

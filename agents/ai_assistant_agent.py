@@ -3,8 +3,23 @@ from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import argparse
 import json
+from pydantic import BaseModel, ValidationError
 from concurrent.futures import ThreadPoolExecutor
 from ai_apis.ai_assistant import AiAssistant
+
+
+class AiAssistantTopicData(BaseModel):
+    """A class to validate the input data that comes in the ai assistant topic.
+
+    Args:
+        BaseModel: _BaseModel_ from pydantic library.
+    """
+    query: str
+    search_db: bool
+    search_urls: bool
+    use_history: bool
+    n_chunks: int
+    inference_model_name: str
 
 
 class AiAssistantAgent:
@@ -79,11 +94,23 @@ class AiAssistantAgent:
         # Parse the incoming message payload as JSON
         try:
             data = json.loads(msg.payload.decode('utf-8'))
-        except json.JSONDecodeError:
-            print("Received message is not valid JSON.")
+            validated_data = AiAssistantTopicData(**data).model_dump()
+        except (json.JSONDecodeError, ValidationError) as e:
+            print("Error parsing message payload:", str(e))
+            output_dict = {
+                "answer": f"Error: Invalid input data - {str(e)}",
+                "document_sources": [],
+                "url_sources": []
+            }
+            # Publish the response to the MQTT broker
+            self.client.publish(
+                self.output_topic,
+                payload=json.dumps(output_dict),
+                qos=2
+            )
             return
         # Handle the incoming message in a separate thread
-        self.executor.submit(self.handle_incoming_message, data)
+        self.executor.submit(self.handle_incoming_message, validated_data)
 
     def handle_incoming_message(self, data: dict) -> None:
         """Handles an incoming message by sending it to the AI Assistant and publishing the response.
@@ -105,7 +132,6 @@ class AiAssistantAgent:
                                                                  )
         # Checking if we need to switch models
         if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
-            print("Switching inference model...")
             self.ai_assistant.set_assistant_model(
                 data["inference_model_name"])
             self.current_inference_model_name = data["inference_model_name"]

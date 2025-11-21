@@ -56,6 +56,7 @@ The mandatory model to deal with embedding is __qwen3-embedding__. You should pu
 The currently supported models for inference are:
 
 - gemma3:27b
+- gemma3:12b
 - gemma3:4b
 
 For a quick and dirty test, use [this google drive link](https://drive.google.com/file/d/1MO-R0tJ2aTWDEf4gy12njLsZlOtIKbJD/view?usp=sharing) to download the zipped __gemma3:4b__ plus __qwen3-embedding__, and unzip it inside the __ollama_models__ folder.
@@ -65,18 +66,13 @@ For a quick and dirty test, use [this google drive link](https://drive.google.co
 We must have the dependencies set to build the image:
 
 - A generated database inside the __dbs__ folder
-- Ollama models properly placed inside the __ollama_models__ folder
+- Ollama models properly placed inside the __ollama_models__ folder (all models will go inside the docker image so we can select them in runtime)
 
 Use the following command to build the image:
 
 ```bash
-docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent --build-arg MODEL_NAME=[YOUR_MODEL_NAME] .
+docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent .
 ```
-
-Replace __[YOUR_MODEL_NAME]__ with one of the currently supported models for ai assistant inference:
-
-- gemma3_27b
-- gemma3_4b
 
 ## Running the docker container
 
@@ -89,6 +85,7 @@ docker run --rm -d --network=host --name ai_assistant_agent ai_assistant_image -
 The currently supported models for inference are:
 
 - gemma3:27b
+- gemma3:12b
 - gemma3:4b
 
 The docker runs in detached mode and is ready to exchange information.

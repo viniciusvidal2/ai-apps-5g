@@ -3,12 +3,15 @@ from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import json
 from time import time
+from random import randint
 
 
 class AiAssistantAgentTest:
     def __init__(self) -> None:
         """Initializes a AiAssistantAgentTest object to test assistant interactions
         """
+        # Available models that we can test
+        self.available_models = ["gemma3:4b", "gemma3:12b", "gemma3:27b"]
         # Start the MQTT client and connect to the broker
         self.mqtt_address = "0.0.0.0"
         self.mqtt_port = 1883
@@ -47,12 +50,11 @@ class AiAssistantAgentTest:
             "search_urls": False,
             "use_history": True,
             "n_chunks": 10,
-            "inference_model_name": "gemma3:4b",
+            "inference_model_name": self.choose_random_model(),
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
         self.last_message_time = time()
-
 
     def on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage) -> None:
         """Callback function for when a message is received on the subscribed topic.
@@ -62,6 +64,7 @@ class AiAssistantAgentTest:
             userdata (Any): User-defined data of any type.
             msg (mqtt.MQTTMessage): The received MQTT message.
         """
+        print("\n\n\n-------------------------------- New message received from agent --------------------------------\n\n\n")
         # Update time since last message
         current_time = time()
         time_diff = current_time - self.last_message_time
@@ -91,10 +94,28 @@ class AiAssistantAgentTest:
             "search_urls": False,
             "use_history": True,
             "n_chunks": 10,
-            "inference_model_name": "gemma3:12b",
+            "inference_model_name": self.choose_random_model(),
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
+
+    def choose_random_model(self) -> str:
+        """Chooses a random model from the available models.
+
+        Returns:
+            str: The name of the randomly selected model.
+        """
+        model_index = randint(0, len(self.available_models) - 1)
+        model_name = self.available_models[model_index]
+        print(f"Model chosen for tests: {model_name}")
+        return model_name
+
+    def close(self) -> None:
+        """Cleans up the MQTT client and stops the agent.
+        """
+        self.client.loop_stop()
+        self.client.disconnect()
+        print("Test Agent stopped.")
 
 
 if __name__ == "__main__":
@@ -106,15 +127,11 @@ if __name__ == "__main__":
             pass
     except KeyboardInterrupt:
         print("Exiting...")
-        agent.client.loop_stop()
-        agent.client.disconnect()
+        agent.close()
     except Exception as e:
         print(f"An error occurred: {e}")
-        agent.client.loop_stop()
-        agent.client.disconnect()
+        agent.close()
     finally:
         print("MQTT client disconnected.")
-        agent.client.loop_stop()
-        agent.client.disconnect()
-        print("Agent stopped.")
+        agent.close()
         agent = None

@@ -66,7 +66,7 @@ class AiAssistant:
         # Chunk parameters
         self.model_tokenizer = tiktoken.get_encoding("cl100k_base")
         self.max_token_count_per_model = {
-            "gemma3:4b": 128000, "gemma3:27b": 128000}
+            "gemma3:4b": 128000, "gemma3:12b": 128000, "gemma3:27b": 128000}
         self.max_token_count = self.max_token_count_per_model.get(
             self.inference_model_name, 128000)
         self.chunk_size = 10000  # tokens
@@ -105,6 +105,18 @@ class AiAssistant:
             threshold (float): The minimum similarity score to consider a match.
         """
         self.similarity_score_threshold = threshold
+
+    def set_assistant_model(self, inference_model_name: str) -> None:
+        """
+        Sets the inference model for the assistant.
+
+        Args:
+            inference_model_name (str): The name of the Ollama inference model to use.
+        """
+        self.inference_model_name = inference_model_name
+        self.llm = ChatOllama(model=self.inference_model_name)
+        self.max_token_count = self.max_token_count_per_model.get(
+            self.inference_model_name, 128000)
 
     def get_chunk_size(self) -> int:
         """

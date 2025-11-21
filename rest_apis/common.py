@@ -1,13 +1,12 @@
 
-from pydantic import BaseModel, Extra
+from pydantic import BaseModel
 
 
-class AiAssistantInputData(BaseModel, extra=Extra.forbid):
+class AiAssistantInputData(BaseModel):
     """A class to validate the input data that creates an AiAssistant agent instance.
 
     Args:
         BaseModel: _BaseModel_ from pydantic library.
-        extra (Extra, optional): _Extra_ from pydantic library. Defaults to Extra.forbid.
     """
     broker: str
     port: int
@@ -17,12 +16,11 @@ class AiAssistantInputData(BaseModel, extra=Extra.forbid):
     inference_model_name: str
 
 
-class AiAssistantKillData(BaseModel, extra=Extra.forbid):
+class AiAssistantKillData(BaseModel):
     """A class to validate the input data that kills an AiAssistant agent instance.
 
     Args:
         BaseModel: _BaseModel_ from pydantic library.
-        extra (Extra, optional): _Extra_ from pydantic library. Defaults to Extra.forbid.
     """
     user_id: int
 

@@ -11,6 +11,7 @@ import tiktoken
 from typing import Dict, Any, List
 import os
 import subprocess
+from time import sleep
 
 
 class AiAssistant:
@@ -113,6 +114,9 @@ class AiAssistant:
         Args:
             inference_model_name (str): The name of the Ollama inference model to use.
         """
+        # Stop the current model before switching
+        subprocess.run(["ollama", "stop", self.inference_model_name])
+        sleep(5)
         self.inference_model_name = inference_model_name
         self.llm = ChatOllama(model=self.inference_model_name)
         self.max_token_count = self.max_token_count_per_model.get(

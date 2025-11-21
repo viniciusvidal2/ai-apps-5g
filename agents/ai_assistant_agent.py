@@ -121,6 +121,11 @@ class AiAssistantAgent:
         # Set the chunking parameters
         self.ai_assistant.set_chunks_to_retrieve(
             n_chunks=data.get("n_chunks", 3))
+        # Checking if we need to switch models
+        if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
+            self.ai_assistant.set_assistant_model(
+                data["inference_model_name"])
+            self.current_inference_model_name = data["inference_model_name"]
         # Sending the query to the agent for testing
         response_data = self.ai_assistant.run_inference_pipeline(user_query=data.get("query", "Any"),
                                                                  search_db=data.get(
@@ -130,11 +135,6 @@ class AiAssistantAgent:
                                                                  use_history=data.get(
                                                                      "use_history", True),
                                                                  )
-        # Checking if we need to switch models
-        if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
-            self.ai_assistant.set_assistant_model(
-                data["inference_model_name"])
-            self.current_inference_model_name = data["inference_model_name"]
 
         # Preparing the output for the user with all necessary information
         document_sources = [

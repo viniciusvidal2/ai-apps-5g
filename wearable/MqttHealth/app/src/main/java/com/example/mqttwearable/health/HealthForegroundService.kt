@@ -313,7 +313,7 @@ class HealthForegroundService : Service(), SensorEventListener {
         )
 
         val notification = NotificationCompat.Builder(this, FALL_ALERT_CHANNEL_ID)
-            .setContentTitle("🚨 QUEDA DETECTADA! 🚨")
+            .setContentTitle("Queda")
             .setContentText("Enviando alerta em $fallAlertCountdown segundos...")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -340,7 +340,7 @@ class HealthForegroundService : Service(), SensorEventListener {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, FALL_ALERT_CHANNEL_ID)
-            .setContentTitle("🚨 QUEDA DETECTADA! 🚨")
+            .setContentTitle("Queda")
             .setContentText("Enviando alerta em $fallAlertCountdown segundos...")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setPriority(NotificationCompat.PRIORITY_HIGH)

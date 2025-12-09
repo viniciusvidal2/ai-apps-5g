@@ -90,7 +90,7 @@ class EmergencyAlertActivity : ComponentActivity() {
     
     private fun updateCountdownDisplay() {
         txtCountdownBig.text = alertCountdown.toString()
-        txtEmergencyMessage.text = "QUEDA DETECTADA!\nEnviando alerta em:"
+        txtEmergencyMessage.text = "Enviando alerta em:"
     }
     
     private fun startVibrationAndCountdown() {

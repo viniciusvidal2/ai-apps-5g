@@ -39,7 +39,7 @@ object FallenConfig {
     /**
      * Countdown antes de enviar alerta de emergência após queda detectada
      */
-    const val FALL_ALERT_COUNTDOWN_SECONDS = 10  // 10 segundos
+    const val FALL_ALERT_COUNTDOWN_SECONDS = 20  // segundos
 
     /**
      * Intervalo de vibração durante alerta de queda

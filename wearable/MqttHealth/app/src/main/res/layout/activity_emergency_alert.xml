@@ -15,25 +15,40 @@
         android:gravity="center">
 
         <TextView
-            android:id="@+id/txtEmergencyMessage"
+            android:id="@+id/txtTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
             android:gravity="center"
-            android:text="QUEDA DETECTADA!\nEnviando alerta em:"
+            android:text="Queda"
             android:textAlignment="center"
             android:textColor="@android:color/white"
-            android:textSize="12sp"
+            android:textSize="16sp"
             android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
+            android:id="@+id/txtEmergencyMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="Enviando alerta em:"
+            android:textAlignment="center"
+            android:textColor="@android:color/white"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="@+id/txtTitle"
+            app:layout_constraintStart_toStartOf="@+id/txtTitle"
+            app:layout_constraintTop_toBottomOf="@+id/btnCancelEmergency" />
+
+        <TextView
             android:id="@+id/txtCountdownBig"
             android:layout_width="66dp"
             android:layout_height="41dp"
-            android:layout_marginTop="16dp"
+            android:layout_marginTop="8dp"
             android:gravity="center"
             android:text="10"
             android:textColor="@android:color/white"
@@ -41,7 +56,8 @@
             android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="@+id/txtEmergencyMessage"
             app:layout_constraintStart_toStartOf="@+id/txtEmergencyMessage"
-            app:layout_constraintTop_toBottomOf="@+id/txtEmergencyMessage" />
+            app:layout_constraintTop_toBottomOf="@+id/txtEmergencyMessage"
+            app:layout_constraintBottom_toBottomOf="parent" />
 
         <Button
             android:id="@+id/btnCancelEmergency"
@@ -53,9 +69,9 @@
             android:textColor="@android:color/black"
             android:textSize="12sp"
             android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/txtCountdownBig" />
+            app:layout_constraintEnd_toEndOf="@+id/txtTitle"
+            app:layout_constraintStart_toStartOf="@+id/txtTitle"
+            app:layout_constraintTop_toBottomOf="@+id/txtTitle" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

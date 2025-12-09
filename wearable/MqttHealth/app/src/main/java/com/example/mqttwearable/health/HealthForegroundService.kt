@@ -3,6 +3,7 @@ package com.sae5g.mqttwearable.health
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.bluetooth.BluetoothAdapter
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
@@ -35,6 +36,8 @@ import com.sae5g.mqttwearable.presentation.EmergencyAlertActivity
 import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import com.sae5g.mqttwearable.config.AppConfig
 import com.sae5g.mqttwearable.config.FallenConfig
+import com.sae5g.mqttwearable.config.BluetoothConfig
+import java.util.Calendar
 
 class HealthForegroundService : Service(), SensorEventListener {
     private lateinit var wakeLock: PowerManager.WakeLock
@@ -65,10 +68,16 @@ class HealthForegroundService : Service(), SensorEventListener {
     private var fallDetectionActive = false
     private lateinit var wifiConnectivityManager: WiFiConnectivityManager
 
+    // Verificação periódica de Bluetooth
+    private lateinit var bluetoothCheckHandler: Handler
+    private var bluetoothCheckRunnable: Runnable? = null
+
     // IDs para notificações
     private val FALL_ALERT_NOTIFICATION_ID = 2
     private val ACTION_CANCEL_FALL_ALERT = "CANCEL_FALL_ALERT"
     private val FALL_ALERT_CHANNEL_ID = "fall_alert_channel"
+    private val BLUETOOTH_ALERT_CHANNEL_ID = "bluetooth_alert_channel"
+    private val BLUETOOTH_ALERT_NOTIFICATION_ID = 3
 
     // Receptor para cancelar alerta de queda
     private val fallAlertCancelReceiver = object : BroadcastReceiver() {
@@ -114,6 +123,14 @@ class HealthForegroundService : Service(), SensorEventListener {
             )
             fallChannel.description = "Notificações de queda com ação de cancelamento"
             notificationManager.createNotificationChannel(fallChannel)
+
+            val bluetoothChannel = android.app.NotificationChannel(
+                BLUETOOTH_ALERT_CHANNEL_ID,
+                "Alertas de Bluetooth",
+                android.app.NotificationManager.IMPORTANCE_HIGH
+            )
+            bluetoothChannel.description = "Avisos quando Bluetooth está ligado no horário comercial"
+            notificationManager.createNotificationChannel(bluetoothChannel)
         }
 
         // Registrar receiver para cancelar alerta (API 33+: precisa especificar flag de exportação)
@@ -127,6 +144,9 @@ class HealthForegroundService : Service(), SensorEventListener {
         } else {
             registerReceiver(fallAlertCancelReceiver, filter)
         }
+
+        // Iniciar monitoramento periódico do Bluetooth
+        startBluetoothMonitoring()
     }
 
     private fun setupAccelerometer() {
@@ -508,6 +528,48 @@ class HealthForegroundService : Service(), SensorEventListener {
         notificationManager.cancel(FALL_ALERT_NOTIFICATION_ID)
     }
 
+    // MONITORAMENTO PERIÓDICO DO BLUETOOTH
+    private fun startBluetoothMonitoring() {
+        bluetoothCheckHandler = Handler(Looper.getMainLooper())
+        bluetoothCheckRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    val now = Calendar.getInstance()
+                    val withinWindow = BluetoothConfig.isWithinActiveWindow(now)
+                    val isBluetoothEnabled = BluetoothAdapter.getDefaultAdapter()?.isEnabled == true
+
+                    if (withinWindow && isBluetoothEnabled) {
+                        // Vibrar conforme configuração
+                        if (vibrator.hasVibrator()) {
+                            vibrator.vibrate(BluetoothConfig.VIBRATION_DURATION_MS)
+                        }
+                        // Notificar usuário
+                        val notification = NotificationCompat.Builder(this@HealthForegroundService, BLUETOOTH_ALERT_CHANNEL_ID)
+                            .setContentTitle(BluetoothConfig.NOTIFICATION_TITLE)
+                            .setContentText(BluetoothConfig.NOTIFICATION_TEXT)
+                            .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setCategory(NotificationCompat.CATEGORY_ALARM)
+                            .setAutoCancel(true)
+                            .build()
+                        notificationManager.notify(BLUETOOTH_ALERT_NOTIFICATION_ID, notification)
+                    }
+                } catch (e: Exception) {
+                    Log.e("HealthForegroundService", "Erro no monitoramento de Bluetooth", e)
+                } finally {
+                    // Reagendar próxima verificação
+                    bluetoothCheckHandler.postDelayed(this, BluetoothConfig.CHECK_INTERVAL_MS)
+                }
+            }
+        }
+        // Primeira execução imediata
+        bluetoothCheckHandler.post(bluetoothCheckRunnable!!)
+    }
+
+    private fun stopBluetoothMonitoring() {
+        bluetoothCheckRunnable?.let { bluetoothCheckHandler.removeCallbacks(it) }
+    }
+
     override fun onSensorChanged(event: SensorEvent?) {
         event?.let { sensorEvent ->
             if (sensorEvent.sensor.type == Sensor.TYPE_ACCELEROMETER) {
@@ -561,6 +623,7 @@ class HealthForegroundService : Service(), SensorEventListener {
         stopAccelerometerCollection()
         locationManager.stopLocationUpdates()
         accelerometerPublishHandler.removeCallbacksAndMessages(null)
+        stopBluetoothMonitoring()
         
         // Limpar alertas de queda
         if (isFallAlertActive) {

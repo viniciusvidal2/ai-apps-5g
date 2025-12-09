@@ -34,6 +34,7 @@ import androidx.core.app.NotificationManagerCompat
 import com.sae5g.mqttwearable.presentation.EmergencyAlertActivity
 import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import com.sae5g.mqttwearable.config.AppConfig
+import com.sae5g.mqttwearable.config.FallenConfig
 
 class HealthForegroundService : Service(), SensorEventListener {
     private lateinit var wakeLock: PowerManager.WakeLock
@@ -264,7 +265,7 @@ class HealthForegroundService : Service(), SensorEventListener {
         if (isFallAlertActive) return
         
         isFallAlertActive = true
-        fallAlertCountdown = AppConfig.FALL_ALERT_COUNTDOWN_SECONDS
+        fallAlertCountdown = FallenConfig.FALL_ALERT_COUNTDOWN_SECONDS
         
         Log.d("HealthForegroundService", "Starting fall alert in background")
         
@@ -361,7 +362,7 @@ class HealthForegroundService : Service(), SensorEventListener {
                 if (isFallAlertActive && fallAlertCountdown > 0) {
                     // Vibrar
                     if (vibrator.hasVibrator()) {
-                        vibrator.vibrate(AppConfig.FALL_ALERT_VIBRATION_DURATION_MS)
+                        vibrator.vibrate(FallenConfig.FALL_ALERT_VIBRATION_DURATION_MS)
                     }
                     
                     // Atualizar notificação
@@ -369,7 +370,7 @@ class HealthForegroundService : Service(), SensorEventListener {
                     fallAlertCountdown--
                     
                     // Agendar próxima vibração
-                    fallAlertHandler?.postDelayed(this, AppConfig.FALL_ALERT_VIBRATION_INTERVAL_MS)
+                    fallAlertHandler?.postDelayed(this, FallenConfig.FALL_ALERT_VIBRATION_INTERVAL_MS)
                 } else if (isFallAlertActive && fallAlertCountdown <= 0) {
                     // Tempo esgotado - enviar alerta
                     sendFallAlert()

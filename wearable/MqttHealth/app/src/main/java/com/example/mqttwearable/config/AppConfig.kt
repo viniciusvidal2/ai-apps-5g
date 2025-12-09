@@ -54,27 +54,7 @@ object AppConfig {
     const val SPO2_DATA_VALIDITY_MS = 2*3600000L   // 30 minutos
     
     
-    // ========== DETECÇÃO DE QUEDA ==========
-    
-    /**
-     * Janela de tempo para detecção de padrão de queda
-     */
-    const val FALL_DETECTION_WINDOW_MS = 10*3000L  // 3 segundos
-    
-    /**
-     * Countdown antes de enviar alerta de emergência após queda detectada
-     */
-    const val FALL_ALERT_COUNTDOWN_SECONDS = 10  // 10 segundos
-    
-    /**
-     * Intervalo de vibração durante alerta de queda
-     */
-    const val FALL_ALERT_VIBRATION_INTERVAL_MS = 1000L  // 1 segundo
-    
-    /**
-     * Duração de cada vibração durante alerta
-     */
-    const val FALL_ALERT_VIBRATION_DURATION_MS = 500L  // 0.5 segundo
+    // Parâmetros de detecção de queda movidos para FallenConfig
     
     
     // ========== GPS / LOCALIZAÇÃO ==========

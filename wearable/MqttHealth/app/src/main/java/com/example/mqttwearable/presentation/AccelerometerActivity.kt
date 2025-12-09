@@ -23,6 +23,7 @@ import com.sae5g.mqttwearable.mqtt.MqttHandler
 import com.sae5g.mqttwearable.location.LocationManager
 import com.sae5g.mqttwearable.data.DeviceIdManager
 import com.sae5g.mqttwearable.config.AppConfig
+import com.sae5g.mqttwearable.config.FallenConfig
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -349,7 +350,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
         if (isAlertActive) return
         
         isAlertActive = true
-        alertCountdown = AppConfig.FALL_ALERT_COUNTDOWN_SECONDS
+        alertCountdown = FallenConfig.FALL_ALERT_COUNTDOWN_SECONDS
         
         // Mostrar tela vermelha completa
         layoutFallAlertOverlay.visibility = View.VISIBLE
@@ -367,7 +368,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
                 if (isAlertActive && alertCountdown > 0) {
                     // Vibrar
                     if (vibrator.hasVibrator()) {
-                        vibrator.vibrate(AppConfig.FALL_ALERT_VIBRATION_DURATION_MS)
+                        vibrator.vibrate(FallenConfig.FALL_ALERT_VIBRATION_DURATION_MS)
                     }
                     
                     // Atualizar countdown na tela vermelha
@@ -375,7 +376,7 @@ class AccelerometerActivity : ComponentActivity(), SensorEventListener {
                     alertCountdown--
                     
                     // Agendar próxima vibração
-                    alertHandler?.postDelayed(this, AppConfig.FALL_ALERT_VIBRATION_INTERVAL_MS)
+                    alertHandler?.postDelayed(this, FallenConfig.FALL_ALERT_VIBRATION_INTERVAL_MS)
                 } else if (isAlertActive && alertCountdown <= 0) {
                     // Tempo esgotado - enviar alerta
                     sendFallAlert()

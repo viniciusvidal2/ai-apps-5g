@@ -8,9 +8,9 @@ import java.util.Calendar
 object BluetoothConfig {
     /**
      * Intervalo entre verificações do estado do Bluetooth (ms).
-     * Recomendado: 30000L (30s) para evitar consumo excessivo.
+     * Recomendado: 600000L (10 minutos) para evitar consumo excessivo.
      */
-    const val CHECK_INTERVAL_MS: Long = 30000L
+    const val CHECK_INTERVAL_MS: Long = 600000L
 
     /**
      * Duração da vibração (ms) quando o Bluetooth estiver ligado

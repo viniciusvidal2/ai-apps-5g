@@ -29,7 +29,7 @@ object FallenConfig {
      * - 80ms a 200ms
      * - 100ms (padrão) é adequado para testes de campo
      */
-    const val FREE_FALL_DURATION_MS: Long = 100L
+    const val FREE_FALL_DURATION_MS: Long = 200L
 
     /**
      * Janela de tempo para detecção de padrão de queda

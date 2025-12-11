@@ -1,7 +1,5 @@
 package com.sae5g.mqttwearable.config
 
-import java.util.Calendar
-
 /**
  * Configurações para alerta de Bluetooth ligado em horário comercial.
  */
@@ -10,7 +8,13 @@ object BluetoothConfig {
      * Intervalo entre verificações do estado do Bluetooth (ms).
      * Recomendado: 600000L (10 minutos) para evitar consumo excessivo.
      */
-    const val CHECK_INTERVAL_MS: Long = 600000L
+    //const val CHECK_INTERVAL_MS: Long = 600000L
+    const val CHECK_INTERVAL_MS: Long = 20000L
+
+    /**
+     * Intervalo mínimo entre atualizações de GPS, alinhado ao CHECK_INTERVAL_MS.
+     */
+    const val GPS_UPDATE_INTERVAL_MS: Long = CHECK_INTERVAL_MS
 
     /**
      * Duração da vibração (ms) quando o Bluetooth estiver ligado
@@ -19,22 +23,22 @@ object BluetoothConfig {
     const val VIBRATION_DURATION_MS: Long = 10000L
 
     /**
-     * Janela ativa diária (horário local).
-     * Início inclusivo (8:00), fim exclusivo (17:00).
+     * Limites geográficos (caixa) onde o alerta deve ser emitido.
+     * Coordenadas aproximam um quadrado de teste.
      */
-    const val ACTIVE_START_HOUR: Int = 8
-    const val ACTIVE_END_HOUR: Int = 17
+    // JF - Iago (coords anteriores)
+    const val ALERT_LATITUDE_MIN = -21.775658435620908
+    const val ALERT_LATITUDE_MAX = -21.773863394159424
+    const val ALERT_LONGITUDE_MIN = -43.381987607933404
+    const val ALERT_LONGITUDE_MAX = -43.380252410127234
 
+    // Novos limites (caixa de Porto Velho, RO)
     /**
-     * Dias ativos: Segunda a Sexta-feira.
-     */
-    val ACTIVE_DAYS: Set<Int> = setOf(
-        Calendar.MONDAY,
-        Calendar.TUESDAY,
-        Calendar.WEDNESDAY,
-        Calendar.THURSDAY,
-        Calendar.FRIDAY
-    )
+    const val ALERT_LATITUDE_MIN = -8.81410166425833
+    const val ALERT_LATITUDE_MAX = -8.787001612291837
+    const val ALERT_LONGITUDE_MIN = -63.96096884444608
+    const val ALERT_LONGITUDE_MAX = -63.937837475111564
+    */
 
     /**
      * Título e texto da notificação de alerta de Bluetooth.
@@ -43,14 +47,15 @@ object BluetoothConfig {
     const val NOTIFICATION_TEXT: String = "Bluetooth Ligado, favor desligar"
 
     /**
-     * Helper para verificar se o momento atual está dentro da janela ativa.
+     * Verifica se a posição atual está dentro da área configurada.
      */
-    fun isWithinActiveWindow(now: Calendar = Calendar.getInstance()): Boolean {
-        val day = now.get(Calendar.DAY_OF_WEEK)
-        if (!ACTIVE_DAYS.contains(day)) return false
+    fun isWithinAlertArea(latitude: Double?, longitude: Double?): Boolean {
+        if (latitude == null || longitude == null) return false
 
-        val hour = now.get(Calendar.HOUR_OF_DAY)
-        return hour in ACTIVE_START_HOUR until ACTIVE_END_HOUR
+        val insideLatitude = latitude in ALERT_LATITUDE_MIN..ALERT_LATITUDE_MAX
+        val insideLongitude = longitude in ALERT_LONGITUDE_MIN..ALERT_LONGITUDE_MAX
+
+        return insideLatitude && insideLongitude
     }
 }
 

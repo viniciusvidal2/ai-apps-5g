@@ -136,96 +136,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     // Variáveis removidas - publicação do acelerômetro agora é feita pelo HealthForegroundService
 
-    private val spO2MeasurementDuration = AppConfig.SPO2_MEASUREMENT_DURATION_MS
-    private val spO2MeasurementInterval = AppConfig.SPO2_MEASUREMENT_INTERVAL_MS
-    private val isSpO2MeasurementRunning = java.util.concurrent.atomic.AtomicBoolean(false)
-    private lateinit var measurementHandler: android.os.Handler
-    private var connectionManagerSpO2: com.sae5g.mqttwearable.sensors.ConnectionManager? = null
-    private var spO2Listener: com.sae5g.mqttwearable.sensors.SpO2Listener? = null
-    private var previousSpO2Status: Int = com.sae5g.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
-
-    private lateinit var txtSpO2Main: android.widget.TextView
-
-    // Listener para receber atualizações do SpO2DataManager
-    private val spO2DataListener = object : com.sae5g.mqttwearable.data.SpO2DataManager.SpO2DataListener {
-        override fun onSpO2ValueUpdated(spO2Value: Int, timestamp: Long) {
-            runOnUiThread {
-                txtSpO2Main.text = spO2Value.toString()
-            }
-        }
-    }
-
-    // Observer de conexão com o serviço de saúde
-    private val spO2ConnectionObserver = object : com.sae5g.mqttwearable.sensors.ConnectionObserver {
-        override fun onConnectionResult(message: String) {
-            // Se a mensagem indicar erro de suporte, ignoramos
-            if (message.contains("não suportado")) return
-
-            // Inicializar listeners quando conectado
-            spO2Listener = com.sae5g.mqttwearable.sensors.SpO2Listener { status, spO2Value ->
-                onSpO2TrackerDataChanged(status, spO2Value)
-            }
-            connectionManagerSpO2?.initSpO2(spO2Listener!!)
-            // Iniciar o loop de medição periódica
-            startPeriodicSpO2Measurement()
-        }
-
-        override fun onError(exception: com.samsung.android.service.health.tracking.HealthTrackerException) {
-            // Loga o erro, mas não interrompe a aplicação principal
-            android.util.Log.e("MainActivity", "Erro de conexão SpO2: ${exception.message}")
-        }
-    }
-
-    private fun onSpO2TrackerDataChanged(status: Int, spO2Value: Int) {
-        if (status == previousSpO2Status) return
-        previousSpO2Status = status
-
-        if (status == com.sae5g.mqttwearable.sensors.SpO2Status.MEASUREMENT_COMPLETED) {
-            isSpO2MeasurementRunning.set(false)
-            spO2Listener?.stopTracker()
-            com.sae5g.mqttwearable.data.SpO2DataManager.updateSpO2Value(spO2Value)
-            // Voltar fundo para padrão após medição bem-sucedida
-            txtSpO2Main.setBackgroundColor(resources.getColor(android.R.color.background_dark, theme))
-            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
-        } else if (status == com.sae5g.mqttwearable.sensors.SpO2Status.DEVICE_MOVING ||
-             status == com.sae5g.mqttwearable.sensors.SpO2Status.LOW_SIGNAL) {
-            // Erro durante medição
-            txtSpO2Main.setBackgroundColor(android.graphics.Color.RED)
-            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
-        }
-    }
-
-    private fun performSpO2Measurement() {
-        if (isSpO2MeasurementRunning.get()) return
-        spO2Listener?.let {
-            previousSpO2Status = com.sae5g.mqttwearable.sensors.SpO2Status.INITIAL_STATUS
-            it.startTracker()
-            isSpO2MeasurementRunning.set(true)
-            // Alterar fundo para AZUL enquanto mede
-            txtSpO2Main.setBackgroundColor(android.graphics.Color.BLUE)
-            txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
-            // Forçar parada de segurança após a duração prevista
-            measurementHandler.postDelayed({
-                if (isSpO2MeasurementRunning.get()) {
-                    it.stopTracker()
-                    isSpO2MeasurementRunning.set(false)
-                    // Medição não concluiu – marcar como erro
-                    txtSpO2Main.setBackgroundColor(android.graphics.Color.RED)
-                    txtSpO2Main.setTextColor(android.graphics.Color.WHITE)
-                }
-            }, spO2MeasurementDuration + 2000)
-        }
-    }
-
-    private fun startPeriodicSpO2Measurement() {
-        measurementHandler.post(object : Runnable {
-            override fun run() {
-                performSpO2Measurement()
-                measurementHandler.postDelayed(this, spO2MeasurementInterval)
-            }
-        })
-    }
-
 //    val activeTypes: Set<DeltaDataType<*, *>> = setOf(
 ////        DataType.STEPS,     // é um DeltaDataType<Int, SampleDataPoint<Int>>
 ////        DataType.CALORIES,  // é um DeltaDataType<Float, SampleDataPoint<Float>>
@@ -283,22 +193,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val btnConectar = findViewById<Button>(R.id.btnConectar)
         val btnAcc = findViewById<Button>(R.id.btnAcc)
         val btnSpO2 = findViewById<Button>(R.id.btnSpO2)
+        val btnGps = findViewById<Button>(R.id.btnGps)
         val txtStatus = findViewById<TextView?>(R.id.txtStatus)
-        txtSpO2Main = findViewById(R.id.txtSpO2Main)
         
         // Configurar timer MQTT
         setupMqttTimer()
 
-        // Inicializa o handler para medições periódicas
-        measurementHandler = android.os.Handler(android.os.Looper.getMainLooper())
-
-        // Registrar listener de dados de SpO2
-        com.sae5g.mqttwearable.data.SpO2DataManager.addListener(spO2DataListener)
-
-        // Criar ConnectionManager para SpO2
-        connectionManagerSpO2 = com.sae5g.mqttwearable.sensors.ConnectionManager(spO2ConnectionObserver)
-        connectionManagerSpO2?.connect(applicationContext)
-        
         // Obter e exibir o ANDROID_ID usando o DeviceIdManager
         txtAndroidId.text = DeviceIdManager.getDeviceId()
         
@@ -380,13 +280,23 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             startActivity(intent)
         }
 
+        btnGps.setOnClickListener {
+            val intent = Intent(this, GpsStatusActivity::class.java)
+            startActivity(intent)
+        }
+
         permissionsLauncher = registerForActivityResult(RequestMultiplePermissions()) { results ->
             if (results.values.all { it }) {
                 val ipText = edtIp.text.toString().trim()
+                // Sempre iniciar o serviço para monitorar Bluetooth/GPS mesmo sem MQTT
+                val fgIntent = Intent(this, HealthForegroundService::class.java)
+
                 if (ipText.isEmpty()) {
-                    txtStatus?.text = "Por favor, insira o IP do broker MQTT."
+                    ContextCompat.startForegroundService(this, fgIntent)
+                    txtStatus?.text = "Serviço iniciado (BT/GPS) sem MQTT"
                     return@registerForActivityResult
                 }
+
                 val brokerUrl = "tcp://$ipText:1883"
                 mqttHandler.connect(
                     brokerUrl = brokerUrl,
@@ -413,11 +323,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     if (success) {
                         Log.d("MainActivity", "MQTT conectado com sucesso")
                         // HealthPublisher removido da MainActivity - roda apenas no HealthForegroundService
-                        val intent = Intent(this, HealthForegroundService::class.java)
-                        intent.putExtra(HealthForegroundService.EXTRA_BROKER_IP, ipText)
-                        ContextCompat.startForegroundService(this, intent)
+                        fgIntent.putExtra(HealthForegroundService.EXTRA_BROKER_IP, ipText)
+                        ContextCompat.startForegroundService(this, fgIntent)
                     } else {
                         Log.e("MainActivity", "Falha ao conectar MQTT")
+                        // Mesmo sem MQTT, manter serviço rodando para BT/GPS
+                        ContextCompat.startForegroundService(this, fgIntent)
                     }
                 }
             } else {
@@ -774,11 +685,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         // Parar timer MQTT
         stopMqttSendTimer()
         
-        // Limpar medições de SpO2
-        measurementHandler.removeCallbacksAndMessages(null)
-        com.sae5g.mqttwearable.data.SpO2DataManager.removeListener(spO2DataListener)
-        spO2Listener?.stopTracker()
-        connectionManagerSpO2?.disconnect()
     }
 
     private fun setupGestureDetector() {

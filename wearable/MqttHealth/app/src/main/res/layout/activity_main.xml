@@ -72,15 +72,12 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/btnConectar" />
 
-        <TextView
-            android:id="@+id/txtSpO2Main"
-            android:layout_width="40dp"
+        <Button
+            android:id="@+id/btnGps"
+            android:layout_width="50dp"
             android:layout_height="32dp"
             android:layout_marginStart="4dp"
-            android:background="@android:color/background_dark"
-            android:gravity="center"
-            android:text="--"
-            android:textColor="@color/cardview_light_background"
+            android:text="GPS"
             android:textSize="10sp"
             app:layout_constraintStart_toEndOf="@id/btnSpO2"
             app:layout_constraintTop_toTopOf="@id/btnSpO2"

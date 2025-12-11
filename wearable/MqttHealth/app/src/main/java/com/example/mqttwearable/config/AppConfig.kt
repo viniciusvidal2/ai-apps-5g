@@ -60,11 +60,6 @@ object AppConfig {
     // ========== GPS / LOCALIZAÇÃO ==========
     
     /**
-     * Intervalo mínimo entre atualizações de GPS
-     */
-    const val GPS_UPDATE_INTERVAL_MS = 2*600000L  // 10 segundos
-    
-    /**
      * Distância mínima para atualização de GPS (em metros)
      */
     const val GPS_MIN_DISTANCE_METERS = 10f  // 10 metros

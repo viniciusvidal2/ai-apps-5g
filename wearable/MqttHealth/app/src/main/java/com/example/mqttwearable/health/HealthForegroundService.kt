@@ -37,7 +37,6 @@ import com.sae5g.mqttwearable.connectivity.WiFiConnectivityManager
 import com.sae5g.mqttwearable.config.AppConfig
 import com.sae5g.mqttwearable.config.FallenConfig
 import com.sae5g.mqttwearable.config.BluetoothConfig
-import java.util.Calendar
 
 class HealthForegroundService : Service(), SensorEventListener {
     private lateinit var wakeLock: PowerManager.WakeLock
@@ -129,7 +128,7 @@ class HealthForegroundService : Service(), SensorEventListener {
                 "Alertas de Bluetooth",
                 android.app.NotificationManager.IMPORTANCE_HIGH
             )
-            bluetoothChannel.description = "Avisos quando Bluetooth está ligado no horário comercial"
+            bluetoothChannel.description = "Avisos quando Bluetooth está ligado na área configurada"
             notificationManager.createNotificationChannel(bluetoothChannel)
         }
 
@@ -534,11 +533,10 @@ class HealthForegroundService : Service(), SensorEventListener {
         bluetoothCheckRunnable = object : Runnable {
             override fun run() {
                 try {
-                    val now = Calendar.getInstance()
-                    val withinWindow = BluetoothConfig.isWithinActiveWindow(now)
+                    val withinArea = BluetoothConfig.isWithinAlertArea(currentLatitude, currentLongitude)
                     val isBluetoothEnabled = BluetoothAdapter.getDefaultAdapter()?.isEnabled == true
 
-                    if (withinWindow && isBluetoothEnabled) {
+                    if (withinArea && isBluetoothEnabled) {
                         // Vibrar conforme configuração
                         if (vibrator.hasVibrator()) {
                             vibrator.vibrate(BluetoothConfig.VIBRATION_DURATION_MS)

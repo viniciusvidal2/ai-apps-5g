@@ -546,7 +546,7 @@ def start_docker_container(user_id: str = "1") -> bool:
         docker_image = os.getenv("DOCKER_IMAGE_NAME", "ai_assistant_image")
         mqtt_broker = os.getenv("MQTT_BROKER", "0.0.0.0")
         mqtt_port = int(os.getenv("MQTT_PORT", "1883"))
-        inference_model = os.getenv("INFERENCE_MODEL", "gemma3:27b")
+        inference_model = os.getenv("INFERENCE_MODEL", "gemma3:12b")
         
         print(f"   - DOCKER_IMAGE_NAME: {docker_image}")
         print(f"   - MQTT_BROKER: {mqtt_broker}")

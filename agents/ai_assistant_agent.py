@@ -211,7 +211,7 @@ def main() -> None:
     parser.add_argument(
         "--inference_model_name", "-m",
         type=str,
-        default="gemma3:4b",
+        default="gemma3:12b",
         help="Name of the inference model to use"
     )
     args = parser.parse_args()

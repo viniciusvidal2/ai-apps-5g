@@ -797,6 +797,7 @@ class InferenceRequest(BaseModel):
     use_history: bool = True
     search_urls: bool = False
     n_chunks: int = 3
+    inference_model_name: str = "gemma3:12b"
 
 class InferenceResponse(BaseModel):
     """Model for inference responses"""
@@ -1159,6 +1160,7 @@ async def run_inference(request: InferenceRequest):
         print("\n" + "="*60)
         print("🚀 NEW INFERENCE REQUEST RECEIVED")
         print("="*60)
+        print(f"🤖 AI Assistant Model: gemma3:12b")
         print(f"📝 Query: {request.query}")
         print(f"🔍 Search DB: {request.search_db}")
         print(f"💬 Use History: {request.use_history}")
@@ -1296,7 +1298,8 @@ async def run_inference(request: InferenceRequest):
                 "search_db": request.search_db,
                 "search_urls": request.search_urls,
                 "use_history": request.use_history,
-                "n_chunks": request.n_chunks
+                "n_chunks": request.n_chunks,
+                "inference_model_name": "gemma3:12b"
             }
             
             print(f"📋 Publishing message: {mqtt_message}")

@@ -23,12 +23,12 @@ class DatabaseManager():
             model_name="BAAI/bge-m3",
             device="cuda"
         )
-        self.pipeline_options = PdfPipelineOptions()
-        self.pipeline_options.do_table_structure = True
+        pipeline_options = PdfPipelineOptions()
+        pipeline_options.do_table_structure = True
         self.converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
-                    pipeline_options=self.pipeline_options,
+                    pipeline_options=pipeline_options,
                 )
             }
         )
@@ -163,6 +163,7 @@ def create_database() -> None:
         help="Path to the database description YAML file (default: ./database_description.yaml)"
     )
     args = parser.parse_args()
+    
     # Initialize DatabaseManager
     db_manager = DatabaseManager(
         db_path=args.db_path)

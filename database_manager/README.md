@@ -7,6 +7,23 @@ This is the database manager folder, where we can:
 
 ## Creating a database
 
+The first step you should perform to create the database is installing the script dependencies in your system (which you can do in root, but conda or virtual environment are recommended):
+
+```bash
+cd database_manager
+pip install -r requirements.txt
+```
+
+You database should be described in a yaml file similar to the default one, __database_description.yaml__ (or just change the values in this one). The file should be passed as an argument to the script alongside the database output path, which you will pass as a shared volume to the chromadb server docer container in the following sections. 
+
+The command to create the database:
+
+```bash
+cd database_manager
+python database_manager.py --db_path /your/chromadb/local/path --yaml_path /your/yaml/local/path
+```
+
+You should have the database fully vectorized in your system after a while o processing (which can take minutes depending on your documents).
 
 ## Building and running the image
 

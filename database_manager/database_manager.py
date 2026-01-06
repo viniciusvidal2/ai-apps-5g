@@ -8,7 +8,13 @@ from docling.chunking import HybridChunker
 
 
 class DatabaseManager():
-    def __init__(self, db_path: str = "./chroma_db"):
+    def __init__(self, db_path: str = "./chroma_db") -> None:
+        """
+        Database manager class constructor
+
+        Args:
+            db_path (str, optional): Database path. Defaults to "./chroma_db".
+        """
         self.client = chromadb.PersistentClient(path=db_path)
         self.bge_m3_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="BAAI/bge-m3",
@@ -26,6 +32,13 @@ class DatabaseManager():
         self.chunker = HybridChunker(max_tokens=1024)
 
     def add_document(self, collection_name: str, document_path: str) -> None:
+        """
+        Adds a document to the specified collection in the database.
+
+        Args:
+            collection_name (str): The name of the collection to add the document to.
+            document_path (str): The file path of the document to be added.
+        """
         # Get the collection we are interested in
         collection = self.client.get_or_create_collection(name=collection_name)
         # Check if document already exists in collection
@@ -49,7 +62,8 @@ class DatabaseManager():
             # Create metadata and id for this specific chunk
             metadatas.append({
                 "document_name": document_name,
-                "page_number": str(page_numbers)  # Chroma prefers strings or simple types
+                # Chroma prefers strings or simple types
+                "page_number": str(page_numbers)
             })
             ids.append(f"{document_name}_chunk_{i}")
         # Add to collection
@@ -61,13 +75,30 @@ class DatabaseManager():
         print(
             f"Added {len(final_texts)} chunks to collection '{collection_name}'.")
 
-    def inspect_collection(self, collection_name: str):
+    def inspect_collection(self, collection_name: str) -> None:
+        """
+        Inspects the specified collection in the database.
+
+        Args:
+            collection_name (str): The name of the collection to inspect.
+        """
         collection = self.client.get_or_create_collection(name=collection_name)
         print(
             f"Collection '{collection_name}' has {collection.count()} documents.")
         print(f"First 10 documents: {collection.peek()}")
 
-    def query_collection(self, collection_name: str, query_text: str, n_results: int = 5):
+    def query_collection(self, collection_name: str, query_text: str, n_results: int = 5) -> dict:
+        """
+        Queries the specified collection in the database.
+
+        Args:
+            collection_name (str): The name of the collection to query.
+            query_text (str): The text to query against the collection.
+            n_results (int, optional): Number of results to return. Defaults to 5.
+
+        Returns:
+            dict: The query results.
+        """
         collection = self.client.get_or_create_collection(name=collection_name)
         results = collection.query(
             query_texts=[query_text],
@@ -76,6 +107,16 @@ class DatabaseManager():
         return results
 
     def _check_if_document_exists(self, collection: Collection, document: str) -> bool:
+        """
+        Checks if a document already exists in the specified collection.
+
+        Args:
+            collection (Collection): The ChromaDB collection to check.
+            document (str): The file path of the document to check.
+
+        Returns:
+            bool: True if the document exists, False otherwise.
+        """
         # We only need to find 1 record to know the doc exists
         results = collection.get(
             where={"document_name": self._get_document_name(document)},
@@ -85,6 +126,15 @@ class DatabaseManager():
         return len(results['ids']) > 0
 
     def _get_document_name(self, document_path: str) -> str:
+        """
+        Extracts the document name from the full file path.
+
+        Args:
+            document_path (str): The full file path of the document.
+
+        Returns:
+            str: The extracted document name.
+        """
         if "/" not in document_path:
             return document_path
         return document_path.split("/")[-1]

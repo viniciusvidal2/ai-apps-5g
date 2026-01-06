@@ -5,10 +5,23 @@ from httpx import ConnectError, ConnectTimeout
 
 class DatabaseTestClient():
     def __init__(self, ip: str = "localhost", port: int = 8000):
+        """
+        Database test client class constructor
+
+        Args:
+            ip (str, optional): ChromaDB server IP address. Defaults to "localhost".
+            port (int, optional): ChromaDB server port. Defaults to 8000.
+        """
         self.ip_address = ip
         self.port = port
 
-    def create_client(self) -> bool:
+    def init_remote_client(self) -> bool:
+        """
+        Creates a ChromaDB HTTP client and tests the connection.
+
+        Returns:
+            bool: True if the connection is successful, False otherwise.
+        """
         try:
             self.client = chromadb.HttpClient(
                 host=self.ip_address,
@@ -32,12 +45,24 @@ class DatabaseTestClient():
             self.client = None
         return False
 
-    def list_collections(self):
+    def list_collections(self) -> None:
+        """Lists all collections in the ChromaDB client."""
         collections = self.client.list_collections()
         for collection in collections:
             print(f"Collection Name: {collection.name}, ID: {collection.id}")
 
-    def query_collection(self, collection_name: str, query_text: str, n_results: int = 5):
+    def query_collection(self, collection_name: str, query_text: str, n_results: int = 5) -> dict:
+        """
+        Queries the specified collection in the database.
+
+        Args:
+            collection_name (str): The name of the collection to query.
+            query_text (str): The text to query against the collection.
+            n_results (int, optional): Number of results to return. Defaults to 5.
+
+        Returns:
+            dict: The query results.
+        """
         collection = self.client.get_or_create_collection(name=collection_name)
         results = collection.query(
             query_texts=[query_text],
@@ -47,8 +72,9 @@ class DatabaseTestClient():
 
 
 def main() -> None:
+    """Sample usage of the DatabaseTestClient to connect to ChromaDB."""
     db_test_client = DatabaseTestClient(ip="localhost", port=8000)
-    if not db_test_client.create_client():
+    if not db_test_client.init_remote_client():
         return
     db_test_client.list_collections()
 

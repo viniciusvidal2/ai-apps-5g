@@ -1,3 +1,4 @@
+import argparse
 import chromadb
 from chromadb.config import Settings
 from httpx import ConnectError, ConnectTimeout
@@ -73,15 +74,42 @@ class DatabaseTestClient():
 
 def main() -> None:
     """Sample usage of the DatabaseTestClient to connect to ChromaDB."""
-    db_test_client = DatabaseTestClient(ip="localhost", port=8000)
+    parser = argparse.ArgumentParser(
+        description="Test ChromaDB connection and query collections.")
+    parser.add_argument(
+        "--ip", "-i",
+        type=str,
+        default="localhost",
+        help="ChromaDB server IP address (default: localhost)"
+    )
+    parser.add_argument(
+        "--port", "-p",
+        type=int,
+        default=8000,
+        help="ChromaDB server port (default: 8000)"
+    )
+    parser.add_argument(
+        "--collection", "-c",
+        type=str,
+        default="my_collection",
+        help="Name of the collection to query (default: my_collection)"
+    )
+    parser.add_argument(
+        "--query", "-q",
+        type=str,
+        default="Sample query text",
+        help="Text to query against the collection (default: 'Sample query text')"
+    )
+    args = parser.parse_args()
+
+    db_test_client = DatabaseTestClient(ip=args.ip, port=args.port)
     if not db_test_client.init_remote_client():
         return
     db_test_client.list_collections()
 
     # Sample query
-    query = "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"
     results = db_test_client.query_collection(
-        collection_name="my_collection", query_text=query, n_results=3)
+        collection_name=args.collection, query_text=args.query, n_results=3)
     for doc, score in zip(results['documents'][0], results['distances'][0]):
         print(f"Score: {score:.4f}, Document: {doc}")
 

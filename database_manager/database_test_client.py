@@ -1,0 +1,64 @@
+import chromadb
+from chromadb.config import Settings
+from httpx import ConnectError, ConnectTimeout
+
+
+class DatabaseTestClient():
+    def __init__(self, ip: str = "localhost", port: int = 8000):
+        self.ip_address = ip
+        self.port = port
+
+    def create_client(self) -> bool:
+        try:
+            self.client = chromadb.HttpClient(
+                host=self.ip_address,
+                port=self.port,
+                settings=Settings(
+                    chroma_server_ssl_verify=False
+                )
+            )
+            self.client.heartbeat()
+            print(
+                f"✅ Successfully connected to ChromaDB at {self.ip_address}:{self.port}")
+            return True
+        except (ConnectError, ConnectTimeout) as e:
+            print(
+                f"❌ Connection Failed: Could not reach ChromaDB at {self.ip_address}:{self.port}.")
+            print(f"Internal Error: {e}")
+            self.client = None
+        except Exception as e:
+            print(
+                f"⚠️ An unexpected error occurred during initialization: {e}")
+            self.client = None
+        return False
+
+    def list_collections(self):
+        collections = self.client.list_collections()
+        for collection in collections:
+            print(f"Collection Name: {collection.name}, ID: {collection.id}")
+
+    def query_collection(self, collection_name: str, query_text: str, n_results: int = 5):
+        collection = self.client.get_or_create_collection(name=collection_name)
+        results = collection.query(
+            query_texts=[query_text],
+            n_results=n_results
+        )
+        return results
+
+
+def main() -> None:
+    db_test_client = DatabaseTestClient(ip="localhost", port=8000)
+    if not db_test_client.create_client():
+        return
+    db_test_client.list_collections()
+
+    # Sample query
+    query = "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"
+    results = db_test_client.query_collection(
+        collection_name="my_collection", query_text=query, n_results=3)
+    for doc, score in zip(results['documents'][0], results['distances'][0]):
+        print(f"Score: {score:.4f}, Document: {doc}")
+
+
+if __name__ == "__main__":
+    main()

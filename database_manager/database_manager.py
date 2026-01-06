@@ -5,6 +5,9 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import PdfPipelineOptions
 from docling.chunking import HybridChunker
+import yaml
+import os
+import argparse
 
 
 class DatabaseManager():
@@ -140,25 +143,40 @@ class DatabaseManager():
         return document_path.split("/")[-1]
 
 
-if __name__ == "__main__":
+def create_database() -> None:
+    """Creates and populates the database with given data from the description in the proper output folder."""
+    # Get the current script path
+    current_script_path = os.path.dirname(os.path.abspath(__file__))
+    # Parse arguments
+    parser = argparse.ArgumentParser(
+        description="Database Manager for ChromaDB")
+    parser.add_argument(
+        "--db_path", "-d",
+        type=str,
+        default=os.path.join(current_script_path, 'chroma_db'),
+        help="Path to the ChromaDB database (default: ./chroma_db)"
+    )
+    parser.add_argument(
+        "--yaml_path", "-y",
+        type=str,
+        default=os.path.join(current_script_path, 'database_description.yaml'),
+        help="Path to the database description YAML file (default: ./database_description.yaml)"
+    )
+    args = parser.parse_args()
+    # Initialize DatabaseManager
     db_manager = DatabaseManager(
-        db_path="./database_manager/chroma_db_testing")
-    pdf_paths = [
-        "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
-    ]
-    for pdf_path in pdf_paths:
-        db_manager.add_document(
-            collection_name="my_collection", document_path=pdf_path)
+        db_path=args.db_path)
+    # Load database description from YAML file
+    with open(args.yaml_path, "r") as file:
+        database_description = yaml.safe_load(file)
+    # Add documents to collections as per the description
+    for collection_name, collection_data in database_description.get("collections", {}).items():
+        for document_path in collection_data.get("documents", []):
+            db_manager.add_document(
+                collection_name=collection_name, document_path=document_path)
+    # Inspect one of the collections
     db_manager.inspect_collection(collection_name="my_collection")
 
-    # Sample query
-    query = "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"
-    results = db_manager.query_collection(
-        collection_name="my_collection", query_text=query, n_results=3)
-    for doc, score in zip(results['documents'][0], results['distances'][0]):
-        print(f"Score: {score}\nDocument Chunk: {doc}\n")
+
+if __name__ == "__main__":
+    create_database()

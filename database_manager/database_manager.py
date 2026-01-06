@@ -20,7 +20,7 @@ class DatabaseManager():
         """
         self.client = chromadb.PersistentClient(path=db_path)
         self.bge_m3_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="BAAI/bge-m3",
+            model_name="Qwen/Qwen3-Embedding-0.6B",
             device="cuda"
         )
         pipeline_options = PdfPipelineOptions()
@@ -163,7 +163,7 @@ def create_database() -> None:
         help="Path to the database description YAML file (default: ./database_description.yaml)"
     )
     args = parser.parse_args()
-    
+
     # Initialize DatabaseManager
     db_manager = DatabaseManager(
         db_path=args.db_path)

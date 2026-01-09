@@ -7,6 +7,7 @@ from langchain_core.prompts.chat import ChatPromptValue
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
+import tiktoken
 from typing import Dict, Any, List
 import os
 import subprocess
@@ -63,8 +64,13 @@ class AiAssistant:
         self.message_history = []
         self.accessed_database_in_history = []
         # Chunk parameters
-        self.chunk_size = 10000
-        self.chunk_overlap = 200
+        self.model_tokenizer = tiktoken.get_encoding("cl100k_base")
+        self.max_token_count_per_model = {
+            "gemma3:4b": 128000, "gemma3:27b": 128000}
+        self.max_token_count = self.max_token_count_per_model.get(
+            self.inference_model_name, 128000)
+        self.chunk_size = 10000  # tokens
+        self.chunk_overlap = 200  # tokens
         self.n_chunks = 5
         # Minimum similarity score to consider a match
         self.similarity_score_threshold = 0.1
@@ -532,14 +538,29 @@ class AiAssistant:
             chat_messages (list): List of SystemMessage and HumanMessage objects.
             assistant_response (str): The assistant's response message.
         """
+        # Count the tokens in the history messages
+        tokens_in_history = sum(len(self.model_tokenizer.encode(
+            message.content)) for message in self.message_history)
+        tokens_in_new_messages = 0
         for message in chat_messages:
+            # Add token count
+            tokens_in_new_messages += len(
+                self.model_tokenizer.encode(message.content))
             if isinstance(message, SystemMessage):
                 self.message_history.append(
                     SystemMessage(content=message.content))
             elif isinstance(message, HumanMessage):
                 self.message_history.append(
                     HumanMessage(content=message.content))
-            self.message_history.append(AIMessage(content=assistant_response))
+        tokens_in_new_messages += len(
+            self.model_tokenizer.encode(assistant_response))
+        self.message_history.append(AIMessage(content=assistant_response))
+        # Pop old messages if we exceed a certain token limit
+        if tokens_in_history + tokens_in_new_messages > self.max_token_count - 2000:
+            while self.message_history and (tokens_in_history + tokens_in_new_messages) > self.max_token_count - 2000:
+                removed_message = self.message_history.pop(0)
+                tokens_in_history -= len(
+                    self.model_tokenizer.encode(removed_message.content))
 
     def clear_history(self) -> None:
         """

@@ -1,12 +1,14 @@
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
+from langchain.memory import ConversationSummaryMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.prompts.chat import ChatPromptValue
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain.schema import SystemMessage, HumanMessage, AIMessage
+import chromadb
 import tiktoken
 from typing import Dict, Any, List
 import os
@@ -42,8 +44,17 @@ class AiAssistant:
                                                                  collection_name=self.collection_name)
         self.urls_vectorstore = self._load_or_initialize_db(path=self.url_db_path,
                                                             collection_name=self.collection_name)
+
         # This assumes you have the model pulled and Ollama is running
         self.llm = ChatOllama(model=self.inference_model_name)
+        # Dealing with history of conversation
+        history_client = chromadb.Client()
+        self.history_vectorstore = Chroma(
+            client=history_client, embedding_function=self.embedding_function)
+        self.history_summary = ConversationSummaryMemory(
+            llm=self.llm,
+            return_messages=False
+        )
         # Initialize the prompt templates
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---

@@ -51,9 +51,21 @@ class AiAssistant:
         history_client = chromadb.Client()
         self.history_vectorstore = Chroma(
             client=history_client, embedding_function=self.embedding_function)
+        HISTORY_SUMMARY_PROMPT = PromptTemplate(
+            input_variables=["summary", "new_lines"],
+            template=(
+                "Você é um assistente que resume a conversas até agora.\n\n"
+                "Resumo atual:\n{summary}\n\n"
+                "Novas interações:\n{new_lines}\n\n"
+                "Atualize o resumo em **português**, mantendo apenas as informações relevantes."
+            ),
+        )
         self.history_summary = ConversationSummaryMemory(
             llm=self.llm,
-            return_messages=False
+            return_messages=False,
+            prompt=HISTORY_SUMMARY_PROMPT,
+            memory_key="history",
+
         )
         # Initialize the prompt templates
         DOCUMENT_PROMPT_TEMPLATE = """
@@ -71,8 +83,8 @@ class AiAssistant:
              "mas tambem pode usar seu conhecimento geral. Cada CHUNK DE CONTEXTO e um trecho de um CONTEUDO de documento que pode conter informaçoes relevantes. "
              "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta. \n"
              "Este e o SUMARIO do que foi falado no HISTORICO DE CONVERSA ate agora:\n{history_summary}\n"
-             "Este e o trecho do HISTORICO DE CONVERSA mais relevate que voce deve considerar, que tambem pode conter CHUNK DE CONTEXTO que te ajude na resposta:\n{history_context}\n"
-             "CONTEXTO:\n{context}"),
+             "CONTEXTO:\n{history_context}\n"
+             "\n{context}"),
             ("human", "{input}"),
         ])
         self.message_history = []

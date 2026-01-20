@@ -46,9 +46,6 @@ class AiAssistantAgentTest:
         # Creates data for testing
         message = {
             "query": "O que acontece quando um fornecedor obtém um IDF inferior a 70? Cite o documento na base de dados em que isso se encontra.",
-            "search_db": True,
-            "search_urls": False,
-            "use_history": True,
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
         }

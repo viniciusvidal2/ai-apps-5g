@@ -15,9 +15,6 @@ class AiAssistantTopicData(BaseModel):
         BaseModel: _BaseModel_ from pydantic library.
     """
     query: str
-    search_db: bool
-    search_urls: bool
-    use_history: bool
     n_chunks: int
     inference_model_name: str
 
@@ -97,8 +94,6 @@ class AiAssistantAgent:
             print("Error parsing message payload:", str(e))
             output_dict = {
                 "answer": f"Error: Invalid input data - {str(e)}",
-                "document_sources": [],
-                "url_sources": []
             }
             # Publish the response to the MQTT broker
             self.client.publish(
@@ -119,26 +114,21 @@ class AiAssistantAgent:
         # Set the chunking parameters
         self.ai_assistant.set_chunks_to_retrieve(
             n_chunks=data.get("n_chunks", 3))
-        
+
         # Checking if we need to switch models
         if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
             self.ai_assistant.switch_assistant_model(
                 data["inference_model_name"])
             self.current_inference_model_name = self.ai_assistant.inference_model_name
+
         # Sending the query to the agent for testing
         response = self.ai_assistant.run_inference_pipeline(
             user_query=data.get("query", "Any"))
 
-        # Preparing the output for the user with all necessary information
-        output_dict = {
-            "answer": response,
-            "document_sources": [],
-            "url_sources": []
-        }
         # Publish the response to the MQTT broker
         self.client.publish(
             self.output_topic,
-            payload=json.dumps(output_dict),
+            payload=json.dumps({"answer": response}),
             qos=2
         )
 

@@ -46,9 +46,9 @@ class AiAssistant:
         HISTORY_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você resume conversas em português de forma objetiva."),
             ("human",
-            "Resumo atual:\n{summary}\n\n"
-            "Novas mensagens:\n{new_lines}\n\n"
-            "Atualize o resumo em português."),
+             "Resumo atual:\n{summary}\n\n"
+             "Novas mensagens:\n{new_lines}\n\n"
+             "Atualize o resumo em português."),
         ])
         self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
         self.history_summary = ""

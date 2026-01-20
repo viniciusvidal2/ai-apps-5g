@@ -4,7 +4,6 @@ from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
 from langchain.memory import ConversationSummaryMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-from langchain_core.prompts.chat import ChatPromptValue
 import chromadb
 from typing import Dict, Any, List
 import os
@@ -270,7 +269,7 @@ class AiAssistant:
         # Convert text chunks to LangChain Document objects and add metadata
         document_chunks = text_splitter.split_documents(pages)
 
-        # Enhance Metadata for easier tracking (Optional but helpful)
+        # Enhance Metadata for easier tracking
         # The chunking process already created LangChain Document objects,
         # but we can iterate to add a 'full_source' and 'chunk_index' field.
         for i, chunk in enumerate(document_chunks):
@@ -324,18 +323,16 @@ class AiAssistant:
         # Retrieve relevant documents from the vectorstore
         context_string = "Nenhum CONTEXTO relevante encontrado nos documentos."
         if vectorstore:
-            retriever = vectorstore.as_retriever(
-                search_kwargs={"k": self.n_chunks})
-            retrieved_docs = retriever.invoke(query)
-
+            document_chunks = vectorstore.similarity_search(
+                query, k=self.n_chunks)
             # Format retrieved docs into context
             formatted_context_chunks = [
                 self.document_prompt.format(
-                    page_content=doc.page_content,
-                    source=doc.metadata.get("source", "Unknown"),
-                    page=doc.metadata.get("page", "N/A"),
+                    page_content=dc.page_content,
+                    source=dc.metadata.get("source", "Unknown"),
+                    page=dc.metadata.get("page", "N/A"),
                 )
-                for doc in retrieved_docs
+                for dc in document_chunks
             ]
             context_string = "\n".join(formatted_context_chunks)
 
@@ -347,16 +344,15 @@ class AiAssistant:
             input=query,
         )
 
-        final_prompt_string = final_prompt_value.to_string()
-        # Debug print
-        print("\n" + "=" * 50)
-        print("🌟 FINAL PROMPT BUILT 🌟")
-        print(final_prompt_string)
-        print("=" * 50 + "\n")
+        # final_prompt_string = final_prompt_value.to_string()
+        # # Debug print
+        # print("\n" + "=" * 50)
+        # print("🌟 FINAL PROMPT BUILT 🌟")
+        # print(final_prompt_string)
+        # print("=" * 50 + "\n")
 
         return {
             "prompt": final_prompt_value,
-            "context_documents": retrieved_docs,
             "context_string": context_string,
         }
 
@@ -376,13 +372,12 @@ class AiAssistant:
         Returns:
             Dict[str, Any]: The final response from the inference pipeline, plus sources to it.
         """
-        prompt = ChatPromptValue(messages=[])
+        # Step 1: Build the prompt
         prompt_data = self.build_rag_prompt(
             query=user_query, vectorstore_name="documents")
-        prompt.messages.extend(prompt_data["prompt"].messages)
 
         # Step 2: Run inference
-        response = self.llm.invoke(prompt.messages).content
+        response = self.llm.invoke(prompt_data["prompt"].messages).content
 
         # Step 2: Adding to history
         self.history_summary.save_context(

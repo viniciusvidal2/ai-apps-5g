@@ -455,40 +455,24 @@ if __name__ == "__main__":
     ]
     # Example queries to test
     querys = [
-        {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
-            "search_db": True, "use_history": True, "search_urls": False},
-        {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.",
-            "search_db": False, "use_history": True, "search_urls": False},
-        {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?",
-            "search_db": False, "use_history": True, "search_urls": False},
-        #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
-        #         "search_db": False, "use_history": False, "search_urls": True}
+        {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?"},
+        {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao."},
+        {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?"},
+        #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados"}
     ]
     # querys = [
-    #     {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais despesas não são reembolsáveis segundo o procedimento?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
-    #         "search_db": True, "use_history": False, "search_urls": False},
-    #     {"question": "Quais práticas são proibidas nas relações com agentes públicos?",
-    #         "search_db": True, "use_history": False, "search_urls": False}
+    #     {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"}
+    #     {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?"}
+    #     {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?"}
+    #     {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?"}
+    #     {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?"}
+    #     {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?"},
+    #     {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?"},
+    #     {"question": "Quais despesas não são reembolsáveis segundo o procedimento?"},
+    #     {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?"},
+    #     {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?"},
+    #     {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?"},
+    #     {"question": "Quais práticas são proibidas nas relações com agentes públicos?"}
     # ]
 
     ############ Adding documents to the database ############

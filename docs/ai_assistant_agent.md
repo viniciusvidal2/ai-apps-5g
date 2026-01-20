@@ -4,16 +4,14 @@ We will cover the basic working principles for the AI assistant agent, and how t
 
 ## Working concept
 
-The agent uses ollama and laggraph to return answers to the user queries. It can also perform RAG in a database, created and copied to the docker, that the user needs the context to have some search done.
+The agent uses ollama and langchain to return answers to the user queries. It can also perform RAG in a database, created and copied to the docker, that the user needs the context to have some search done.
 
 The communication between user and agent is performed through MQTT, so a broker must be active, and its information (IP and PORT) must be passed when running the agent container.
 
 Finally, some arguments can be passed in the MQTT topic pyload to improve the agent performance:
 
-- __search_db__: whether to use the given PDF documents database or not
-- __search_urls__: whether to use the given fetched URLs database or not
-- __use_history__: if we should use the conversation history in the current query or not; can give faster performance and reduce tokens, which avoids allucinations
 - __n_chunks__: the ammount of database matches we will use to perform RAG; balance between fast and accurate versus slow, but broader knowledge in the answer. Ranges from 1 to 10.
+- __inference_model_name__: name of the model we are going to try to use for inference. If the model is not present, we will use gemma3:4b.
 
 ## Installing the environment
 
@@ -47,31 +45,27 @@ The __dbs__ folder should be now filled in your root directory, and your can now
 
 ## Setting ollama models
 
-Read the instructions in the __ollama_models__ folder on how to properly place the models, as of the ollama standard.
+The LLM models will reside inside the docker image for now, and are pulled when building the image itself. The command should include the desired models that one must pull. In the current version, __gemma3:4b__ and __qwen3-embedding:0.6b__ are mandatory. These are the models we can use in our application (tested so far):
 
-You should install ollama and pull models according to the [official website](https://ollama.com/). They are stored in you local ollama directory. Copy them to __ollama_models__ so we can insert them in the docker image.
-
-The mandatory model to deal with embedding is __qwen3-embedding__. You should pull it from ollama website.
-
-The currently supported models for inference are:
-
-- gemma3:27b
-- gemma3:12b
 - gemma3:4b
+- gemma3:12b
+- gemma3:27b
+- qwen3-embedding:0.6b
 
-For a quick and dirty test, use [this google drive link](https://drive.google.com/file/d/1MO-R0tJ2aTWDEf4gy12njLsZlOtIKbJD/view?usp=sharing) to download the zipped __gemma3:4b__ plus __qwen3-embedding__, and unzip it inside the __ollama_models__ folder.
+You can find more models in [ollama library website link](https://ollama.com/library).
 
 ## Building the docker image
 
 We must have the dependencies set to build the image:
 
-- A generated database inside the __dbs__ folder
-- Ollama models properly placed inside the __ollama_models__ folder (all models will go inside the docker image so we can select them in runtime)
+- A generated database inside the __dbs__ folder.
+- The models we want to pull, with names annotated
 
-Use the following command to build the image:
+Use the following command to build the image (this example pulls all the proposed models from above section):
 
 ```bash
-docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent .
+docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent --build-arg OLLAMA_MODELS_TO_PULL="gemma3:4b gemma3:12b gemma3:27b qwen3-
+embedding:0.6b" .
 ```
 
 ## Running the docker container
@@ -81,12 +75,6 @@ Use the following command to run the docker container from the built image. __Th
 ```bash
 docker run --rm -d --network=host --name ai_assistant_agent ai_assistant_image --broker=0.0.0.0 --port=1883 --user_id=1 --input_topic=input --output_topic=output --inference_model_name "[YOUR_MODEL_NAME]"
 ```
-
-The currently supported models for inference are:
-
-- gemma3:27b
-- gemma3:12b
-- gemma3:4b
 
 The docker runs in detached mode and is ready to exchange information.
 

@@ -49,7 +49,7 @@ FastAPI server for AI Assistant integration, providing a REST API for frontend c
 
 The server is configured through environment variables:
 
-- `EMBEDDING_MODEL`: Embedding model (default: qwen3-embedding:latest)
+- `EMBEDDING_MODEL`: Embedding model (default: qwen3-embedding:0.6b)
 - `INFERENCE_MODEL`: Inference model (default: gpt-oss:120b)
 - `PERSIST_PATH`: Path to persist ChromaDB data
 - `COLLECTION_NAME`: Collection name in ChromaDB

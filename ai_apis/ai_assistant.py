@@ -37,7 +37,9 @@ class AiAssistant:
                                                             collection_name=self.collection_name)
 
         # This assumes you have the model pulled and Ollama is running
-        self.llm = ChatOllama(model=self.inference_model_name)
+        self.expected_llm_models = ["gemma3:4b", "gemma3:12b", "gemma3:27b"]
+        self.set_assistant_model(
+            inference_model_name=self.inference_model_name)
         # Dealing with history of conversation
         history_client = chromadb.Client()
         self.history_vectorstore = Chroma(
@@ -112,11 +114,24 @@ class AiAssistant:
         Args:
             inference_model_name (str): The name of the Ollama inference model to use.
         """
+        self.inference_model_name = inference_model_name
+        if inference_model_name not in self.expected_llm_models:
+            self.inference_model_name = self.expected_llm_models[0]
+            print(
+                f"Required model not found. Using inference model: {self.inference_model_name}")
+        self.llm = ChatOllama(model=self.inference_model_name)
+
+    def switch_assistant_model(self, inference_model_name: str) -> None:
+        """
+        Sets the inference model for the assistant.
+
+        Args:
+            inference_model_name (str): The name of the Ollama inference model to use.
+        """
         # Stop the current model before switching
         subprocess.run(["ollama", "stop", self.inference_model_name])
         sleep(5)
-        self.inference_model_name = inference_model_name
-        self.llm = ChatOllama(model=self.inference_model_name)
+        self.set_assistant_model(inference_model_name=inference_model_name)
 
     def close_assistant(self) -> None:
         """

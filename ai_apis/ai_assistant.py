@@ -1,7 +1,6 @@
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
-from langchain.memory import ConversationSummaryMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 import chromadb
@@ -376,9 +375,6 @@ class AiAssistant:
 
         Args:
             user_query (str): The user's input query.
-            search_db (bool): Whether to use RAG (search the database) or just general prompt.
-            use_history (bool): Whether to include message history in the LLM call.
-            search_urls (bool): Whether to include web content URLs in the LLM call.
 
         Returns:
             str: The final response from the inference pipeline.

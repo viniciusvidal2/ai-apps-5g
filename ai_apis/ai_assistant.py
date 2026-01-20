@@ -5,11 +5,7 @@ from langchain.memory import ConversationSummaryMemory
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from langchain_core.prompts.chat import ChatPromptValue
-from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain.chains import create_retrieval_chain
-from langchain.schema import SystemMessage, HumanMessage, AIMessage
 import chromadb
-import tiktoken
 from typing import Dict, Any, List
 import os
 import subprocess
@@ -18,13 +14,9 @@ from time import sleep
 
 class AiAssistant:
     # region Initialization and Setup
-    """
-    Manages a RAG (Retrieval-Augmented Generation) database using Chroma and Ollama models.
-    """
-
     def __init__(self, embedding_model_name: str, inference_model_name: str, documents_db_path: str, url_db_path: str, collection_name: str) -> None:
         """
-        Initializes the RAG Database Manager with the specified models and database path.
+        Initializes the AI Assistant with the specified models and database path.
 
         Args:
             embedding_model_name (str): The name of the Ollama embedding model to use.
@@ -67,7 +59,7 @@ class AiAssistant:
             memory_key="history",
 
         )
-        # Initialize the prompt templates
+        # Initialize the prompt templates for rag
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---
         Fonte: {source} (Pagina {page})
@@ -87,19 +79,10 @@ class AiAssistant:
              "\n{context}"),
             ("human", "{input}"),
         ])
-        self.message_history = []
-        self.accessed_database_in_history = []
         # Chunk parameters
-        self.model_tokenizer = tiktoken.get_encoding("cl100k_base")
-        self.max_token_count_per_model = {
-            "gemma3:4b": 128000, "gemma3:12b": 128000, "gemma3:27b": 128000}
-        self.max_token_count = self.max_token_count_per_model.get(
-            self.inference_model_name, 128000)
         self.chunk_size = 10000  # tokens
         self.chunk_overlap = 200  # tokens
         self.n_chunks = 5
-        # Minimum similarity score to consider a match
-        self.similarity_score_threshold = 0.1
         # Web based search variables
         self.urls_to_search = []
 
@@ -135,8 +118,6 @@ class AiAssistant:
         sleep(5)
         self.inference_model_name = inference_model_name
         self.llm = ChatOllama(model=self.inference_model_name)
-        self.max_token_count = self.max_token_count_per_model.get(
-            self.inference_model_name, 128000)
 
     def close_assistant(self) -> None:
         """
@@ -366,12 +347,12 @@ class AiAssistant:
             input=query,
         )
 
-        # final_prompt_string = final_prompt_value.to_string()
-        # # Debug print
-        # print("\n" + "=" * 50)
-        # print("🌟 FINAL PROMPT BUILT 🌟")
-        # print(final_prompt_string)
-        # print("=" * 50 + "\n")
+        final_prompt_string = final_prompt_value.to_string()
+        # Debug print
+        print("\n" + "=" * 50)
+        print("🌟 FINAL PROMPT BUILT 🌟")
+        print(final_prompt_string)
+        print("=" * 50 + "\n")
 
         return {
             "prompt": final_prompt_value,

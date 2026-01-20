@@ -8,7 +8,7 @@ def main() -> None:
     ############ Object creation and setup ############
     print("Initializing AI Assistant...")
     ai_assistant = AiAssistant(
-        embedding_model_name="qwen3-embedding:latest",
+        embedding_model_name="qwen3-embedding:0.6b",
         inference_model_name="gemma3:27b",
         documents_db_path="./dbs/chroma_documents_db",
         url_db_path="./dbs/chroma_url_db",

@@ -374,7 +374,7 @@ class AiAssistant:
 # endregion
 # region Inference related methods
 
-    def run_inference_pipeline(self, user_query: str, search_db: bool, use_history: bool, search_urls: bool) -> Dict[str, Any]:
+    def run_inference_pipeline(self, user_query: str) -> str:
         """
         Runs the full inference pipeline: builds the prompt (with or without RAG), runs inference, and returns the answer.
 
@@ -385,7 +385,7 @@ class AiAssistant:
             search_urls (bool): Whether to include web content URLs in the LLM call.
 
         Returns:
-            Dict[str, Any]: The final response from the inference pipeline, plus sources to it.
+            str: The final response from the inference pipeline.
         """
         # Step 1: Build the prompt
         prompt_data = self.build_rag_prompt(
@@ -394,7 +394,7 @@ class AiAssistant:
         # Step 2: Run inference
         response = self.llm.invoke(prompt_data["prompt"].messages).content
 
-        # Step 2: Adding to history
+        # Step 3: Adding to history
         self.history_summary.save_context(
             {"input": user_query},
             {"output": response}
@@ -403,9 +403,7 @@ class AiAssistant:
             [f"USUARIO: {user_query}\nCONTEXTO: {prompt_data['context_string']}\nASSISTENTE: {response}"]
         )
 
-        return {
-            "answer": response,
-        }
+        return response
 
 # endregion
 # region Example usage
@@ -512,17 +510,14 @@ if __name__ == "__main__":
     for query in querys:
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
-        response_data = ai_assistant.run_inference_pipeline(user_query=query["question"],
-                                                            search_db=query["search_db"],
-                                                            search_urls=query["search_urls"],
-                                                            use_history=query["use_history"])
+        response = ai_assistant.run_inference_pipeline(
+            user_query=query["question"])
 
         # Print the response and sources if applicable
         print(f"USUARIO: {query['question']}")
-        print(f"ASSISTENTE: {response_data['answer']}")
-
+        print(f"ASSISTENTE: {response}")
         q_a.append({"question": query['question'],
-                   "answer": response_data['answer']})
+                   "answer": response})
     ############ Cleanup ############
     # Close the assistant and clean up resources
     ai_assistant.close_assistant()

@@ -37,7 +37,7 @@ class AiAssistantAgent:
         # Initialize the AI Assistant
         print("Initializing AI Assistant...")
         self.ai_assistant = AiAssistant(
-            embedding_model_name="qwen3-embedding:latest",
+            embedding_model_name="qwen3-embedding:0.6b",
             inference_model_name=inference_model_name,
             documents_db_path="./dbs/chroma_documents_db",
             url_db_path="./dbs/chroma_url_db",
@@ -81,9 +81,7 @@ class AiAssistantAgent:
         """Callback function for when a message is received on the subscribed topic.
         What we can expect in the message:
             n_chunks (int): top n most likely chunks of data to retrieve from each requested database
-            use_db (bool): use the documents db or not in the query
-            use_history (bool): use the history or not in the query
-            use_url (bool): use the urls db or not in the query
+            inference_model_name (str): name of the inference model to use
             query (str): actual query from the user
 
         Args:
@@ -121,30 +119,19 @@ class AiAssistantAgent:
         # Set the chunking parameters
         self.ai_assistant.set_chunks_to_retrieve(
             n_chunks=data.get("n_chunks", 3))
+        
         # Checking if we need to switch models
         if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
-            self.ai_assistant.set_assistant_model(
+            self.ai_assistant.switch_assistant_model(
                 data["inference_model_name"])
-            self.current_inference_model_name = data["inference_model_name"]
+            self.current_inference_model_name = self.ai_assistant.inference_model_name
         # Sending the query to the agent for testing
-        response_data = self.ai_assistant.run_inference_pipeline(user_query=data.get("query", "Any"),
-                                                                 search_db=data.get(
-                                                                     "search_db", True),
-                                                                 search_urls=data.get(
-                                                                     "search_urls", False),
-                                                                 use_history=data.get(
-                                                                     "use_history", True),
-                                                                 )
+        response = self.ai_assistant.run_inference_pipeline(
+            user_query=data.get("query", "Any"))
 
         # Preparing the output for the user with all necessary information
-        document_sources = [
-            {"document": doc.get('source', 'Unknown'), "page": {doc.get('page', 'N/A')}} for doc in response_data["history_sources"]
-        ]
-        url_sources = [
-            {"title": doc.metadata.get('title', 'Unknown'), "url": doc.metadata.get('source', 'Unknown')} for doc in response_data["urls_used"]
-        ]
         output_dict = {
-            "answer": response_data["answer"],
+            "answer": response,
             "document_sources": [],
             "url_sources": []
         }

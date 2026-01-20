@@ -17,12 +17,6 @@ until curl -s http://127.0.0.1:${OLLAMA_PORT}/api/tags >/dev/null 2>&1; do
 done
 echo "Ollama is ready."
 
-# (Optional) preload the local model if provided as argument or env
-if [ -n "$MODEL_NAME" ]; then
-    echo "Preloading model: $MODEL_NAME"
-    ollama pull "$MODEL_NAME" || true
-fi
-
 # Launch your AI assistant agent
 cd /app
 echo "Starting AI assistant agent..."

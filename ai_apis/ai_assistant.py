@@ -67,9 +67,11 @@ class AiAssistant:
             DOCUMENT_PROMPT_TEMPLATE)
         self.rag_prompt = ChatPromptTemplate.from_messages([
             ("system",
-             "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO fornecido, "
+             "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO e HISTORICO DE CONVERSA fornecidos, "
              "mas tambem pode usar seu conhecimento geral. Cada CHUNK DE CONTEXTO e um trecho de um CONTEUDO de documento que pode conter informaçoes relevantes. "
              "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta. \n"
+             "Este e o SUMARIO do que foi falado no HISTORICO DE CONVERSA ate agora:\n{history_summary}\n"
+             "Este e o trecho do HISTORICO DE CONVERSA mais relevate que voce deve considerar, que tambem pode conter CHUNK DE CONTEXTO que te ajude na resposta:\n{history_context}\n"
              "CONTEXTO:\n{context}"),
             ("human", "{input}"),
         ])
@@ -109,15 +111,6 @@ class AiAssistant:
         """
         self.n_chunks = n_chunks
 
-    def set_similarity_score_threshold(self, threshold: float) -> None:
-        """
-        Sets the similarity score threshold for document retrieval.
-
-        Args:
-            threshold (float): The minimum similarity score to consider a match.
-        """
-        self.similarity_score_threshold = threshold
-
     def set_assistant_model(self, inference_model_name: str) -> None:
         """
         Sets the inference model for the assistant.
@@ -132,15 +125,6 @@ class AiAssistant:
         self.llm = ChatOllama(model=self.inference_model_name)
         self.max_token_count = self.max_token_count_per_model.get(
             self.inference_model_name, 128000)
-
-    def get_chunk_size(self) -> int:
-        """
-        Returns the current chunk size.
-
-        Returns:
-            int: The current chunk size.
-        """
-        return self.chunk_size
 
     def close_assistant(self) -> None:
         """
@@ -329,6 +313,7 @@ class AiAssistant:
         Returns:
             Dict[str, Any]: Contains the final prompt string, retrieved docs, and context string.
         """
+        vectorstore = None
         if vectorstore_name == "documents":
             vectorstore = self.documents_vectorstore
         elif vectorstore_name == "urls":
@@ -336,26 +321,35 @@ class AiAssistant:
         else:
             raise ValueError(f"Unknown vectorstore name: {vectorstore_name}")
 
-        if not vectorstore:
-            return {"prompt": None, "context_documents": [], "context_string": ""}
+        # Obtain the history summary and interesting history context
+        history_summary = self.history_summary.load_memory_variables(
+            {}).get("history", "") or ""
+        history_chunks = self.history_vectorstore.similarity_search(query, k=2)
+        # Check if the history chunks are already in the current context as well
+        history_context = "\n".join([hc.page_content for hc in history_chunks])
 
-        retriever = vectorstore.as_retriever(
-            search_kwargs={"k": self.n_chunks})
-        retrieved_docs = retriever.invoke(query)
+        # Retrieve relevant documents from the vectorstore
+        context_string = "Nenhum CONTEXTO relevante encontrado nos documentos."
+        if vectorstore:
+            retriever = vectorstore.as_retriever(
+                search_kwargs={"k": self.n_chunks})
+            retrieved_docs = retriever.invoke(query)
 
-        # Format retrieved docs into context
-        formatted_context_chunks = [
-            self.document_prompt.format(
-                page_content=doc.page_content,
-                source=doc.metadata.get("source", "Unknown"),
-                page=doc.metadata.get("page", "N/A"),
-            )
-            for doc in retrieved_docs
-        ]
-        context_string = "\n".join(formatted_context_chunks)
+            # Format retrieved docs into context
+            formatted_context_chunks = [
+                self.document_prompt.format(
+                    page_content=doc.page_content,
+                    source=doc.metadata.get("source", "Unknown"),
+                    page=doc.metadata.get("page", "N/A"),
+                )
+                for doc in retrieved_docs
+            ]
+            context_string = "\n".join(formatted_context_chunks)
 
         # Fill the RAG prompt
         final_prompt_value = self.rag_prompt.format_prompt(
+            history_summary=history_summary,
+            history_context=history_context,
             context=context_string,
             input=query,
         )
@@ -373,124 +367,8 @@ class AiAssistant:
             "context_string": context_string,
         }
 
-    def generate_rag_answer(self, query: str) -> Dict[str, Any]:
-        """
-        Runs the RAG chain: retrieves context and generates an answer using an LLM.
-
-        Args:
-            query (str): The user's question.
-
-        Returns:
-            Dict[str, Any]: A dictionary containing the final answer and the source documents.
-        """
-        if not self.documents_vectorstore:
-            print("Error: Vector database is not initialized. Cannot run RAG chain.")
-            return {"answer": "Database not available.", "context": []}
-
-        # Create the Document Chain (combines retrieved docs and prompt into a single message for the LLM)
-        document_chain = create_stuff_documents_chain(
-            self.llm,
-            self.rag_prompt,
-            # This applies the DOCUMENT_PROMPT to each document
-            document_prompt=self.document_prompt
-        )
-
-        # Create the Retrieval Chain (combines the retriever and the document chain)
-        retriever = self.documents_vectorstore.as_retriever(
-            search_kwargs={"k": 5})
-        # -----------------------------------------------------------------------
-        retrieved_docs = retriever.invoke(query)
-        # Create the context string using the document_prompt for each retrieved doc
-        formatted_context_chunks = [
-            self.document_prompt.format(
-                page_content=doc.page_content,
-                source=doc.metadata.get('source', 'Unknown'),
-                page=doc.metadata.get('page', 'N/A')
-            )
-            for doc in retrieved_docs
-        ]
-        context_string = "\n".join(formatted_context_chunks)
-        # Now, fill the RAG prompt with the context and the query
-        final_prompt_value = self.rag_prompt.format_prompt(
-            context=context_string,
-            input=query
-        )
-        # 🌟 PRINT THE FINAL PROMPT HERE 🌟
-        print("\n" + "="*50)
-        print("🌟 FINAL PROMPT SENT TO LLM 🌟")
-        # This prints the prompt in the format the LLM expects (System/User messages)
-        print(final_prompt_value.to_string())
-        print("="*50 + "\n")
-        # -----------------------------------------------------------------------
-        retrieval_chain = create_retrieval_chain(retriever, document_chain)
-
-        # Invoke the Chain
-        print(f"\n--- Running RAG Chain with {self.inference_model_name} ---")
-        response = retrieval_chain.invoke({"input": query})
-
-        # Format the context for better display
-        context_sources = [
-            f"Source: {doc.metadata.get('full_source', doc.metadata.get('source', 'Unknown'))}\nContent: {doc.page_content[:150]}..." for doc in response["context"]]
-
-        print("✅ RAG Answer Generated.")
-        return {
-            "answer": response["answer"],
-            "context_documents": response["context"],
-            "sources_summary": "\n".join(context_sources)
-        }
-
 # endregion
 # region Inference related methods
-
-    def format_general_user_prompt(self, user_input: str) -> ChatPromptValue:
-        """
-        Formats a general user input into the RAG prompt structure without retrieval.
-
-        Args:
-            user_input (str): The user's input query.
-
-        Returns:
-            ChatPromptValue: The formatted prompt.
-        """
-        # Fill the prompt with a default context message
-        final_prompt_value = self.rag_prompt.format_prompt(
-            context="Nenhum CONTEXTO fornecido. Utilize seu conhecimento ou o CONTEXTO fornecido nas mensagens de 'system' anteriores.",
-            input=user_input,
-        )
-
-        # # Debug print
-        # final_prompt_string = final_prompt_value.to_string()
-        # print("\n" + "=" * 50)
-        # print("🌟 FORMATTED USER PROMPT 🌟")
-        # print(final_prompt_string)
-        # print("=" * 50 + "\n")
-
-        return final_prompt_value
-
-    def run_inference(self, prompt: ChatPromptValue, use_history: bool) -> str:
-        """
-        Runs inference on a given prompt using the LLM.
-        Can take either a string or a LangChain ChatPromptValue.
-
-        Args:
-            prompt (ChatPromptValue): The prepared prompt.
-            use_history (bool): Whether to include message history in the LLM call.
-
-        Returns:
-            str: The model's answer.
-        """
-        # Find the messages to send wether from history or just the prompt
-        messages = []
-        if use_history and self.message_history:
-            # If using history, we need to construct a full message list
-            messages = self.message_history.copy()
-            messages.extend(prompt.messages)
-        else:
-            messages = prompt.messages
-        # Invoke the LLM with the messages
-        response = self.llm.invoke(messages)
-
-        return response.content
 
     def run_inference_pipeline(self, user_query: str, search_db: bool, use_history: bool, search_urls: bool) -> Dict[str, Any]:
         """
@@ -506,104 +384,25 @@ class AiAssistant:
             Dict[str, Any]: The final response from the inference pipeline, plus sources to it.
         """
         prompt = ChatPromptValue(messages=[])
-        urls_info_used = []
-        if search_urls and self.urls_to_search:
-            # Fetch and include web content in the prompt
-            prompt_data = self.build_rag_prompt(
-                query=user_query, vectorstore_name="urls")
-            if prompt_data["prompt"].messages:
-                prompt.messages.extend(prompt_data["prompt"].messages)
-                urls_info_used = prompt_data["context_documents"]
-        # Step 1: Build the prompt
-        if search_db:
-            prompt_data = self.build_rag_prompt(
-                query=user_query, vectorstore_name="documents")
-            prompt.messages.extend(prompt_data["prompt"].messages)
-            # Add the sources to the history tracking if we used the DB
-            if use_history:
-                self.accessed_database_in_history.extend([
-                    {"source": doc.metadata.get("source", "Unknown"),
-                     "page": doc.metadata.get("page", "N/A")} for doc in prompt_data["context_documents"]
-                ])
-        if not search_db and not search_urls:
-            prompt.messages.extend(self.format_general_user_prompt(
-                user_input=user_query).messages)
+        prompt_data = self.build_rag_prompt(
+            query=user_query, vectorstore_name="documents")
+        prompt.messages.extend(prompt_data["prompt"].messages)
 
         # Step 2: Run inference
-        response = self.run_inference(prompt, use_history=use_history)
+        response = self.llm.invoke(prompt.messages).content
 
-        # Step 3: Add to history if needed
-        if use_history:
-            self.increment_history(
-                chat_messages=prompt.messages,
-                assistant_response=response
-            )
+        # Step 2: Adding to history
+        self.history_summary.save_context(
+            {"input": user_query},
+            {"output": response}
+        )
+        self.history_vectorstore.add_texts(
+            [f"USUARIO: {user_query}\nCONTEXTO: {prompt_data['context_string']}\nASSISTENTE: {response}"]
+        )
 
         return {
             "answer": response,
-            "history_sources": self.accessed_database_in_history,
-            "urls_used": urls_info_used
         }
-
-# endregion
-# region Message History methods
-
-    def increment_history(self, chat_messages: list, assistant_response: str) -> None:
-        """
-        Updates the message history with a new user input and assistant response.
-
-        Args:
-            chat_messages (list): List of SystemMessage and HumanMessage objects.
-            assistant_response (str): The assistant's response message.
-        """
-        # Count the tokens in the history messages
-        tokens_in_history = sum(len(self.model_tokenizer.encode(
-            message.content)) for message in self.message_history)
-        tokens_in_new_messages = 0
-        for message in chat_messages:
-            # Add token count
-            tokens_in_new_messages += len(
-                self.model_tokenizer.encode(message.content))
-            if isinstance(message, SystemMessage):
-                self.message_history.append(
-                    SystemMessage(content=message.content))
-            elif isinstance(message, HumanMessage):
-                self.message_history.append(
-                    HumanMessage(content=message.content))
-        tokens_in_new_messages += len(
-            self.model_tokenizer.encode(assistant_response))
-        self.message_history.append(AIMessage(content=assistant_response))
-        # Pop old messages if we exceed a certain token limit
-        if tokens_in_history + tokens_in_new_messages > self.max_token_count - 2000:
-            while self.message_history and (tokens_in_history + tokens_in_new_messages) > self.max_token_count - 2000:
-                removed_message = self.message_history.pop(0)
-                tokens_in_history -= len(
-                    self.model_tokenizer.encode(removed_message.content))
-
-    def clear_history(self) -> None:
-        """
-        Clears the message history.
-        """
-        self.message_history = []
-        self.accessed_database_in_history = []
-
-    def get_history(self) -> list:
-        """
-        Returns the current message history.
-
-        Returns:
-            list: The message history with system, user, and assistant messages types.
-        """
-        return self.message_history
-
-    def get_accessed_sources(self) -> list:
-        """
-        Returns the list of accessed sources in the current session.
-
-        Returns:
-            list: The list of accessed sources with their page numbers.
-        """
-        return self.accessed_database_in_history
 
 # endregion
 # region Example usage
@@ -627,66 +426,69 @@ if __name__ == "__main__":
 
     # Setting pdf chunking parameters
     ai_assistant.set_chunking_parameters(
-        chunk_size=5000, chunk_overlap=200)
+        chunk_size=3000, chunk_overlap=200)
     ai_assistant.set_chunks_to_retrieve(n_chunks=3)
 
     ############ Database formation ############
     # Example PDF files to add to the database
-    # pdf_files = [
-    #     "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-    #     "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-    #     "/home/vini/Downloads/box 31 servicos.pdf",
-    #     "/home/vini/Downloads/contrato natal.pdf",
-    #     "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
-    #     "/home/vini/Downloads/APEX and SOLIX G3 Operations Manual.pdf"
-    # ]
     pdf_files = [
-        "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
-        "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
-        "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
+        "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
+        "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
+        "/home/vini/Downloads/box 31 servicos.pdf",
+        "/home/vini/Downloads/contrato natal.pdf",
+        "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
+        "/home/vini/Downloads/apex_manual.pdf"
     ]
+    # pdf_files = [
+    #     "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
+    #     "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
+    #     "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
+    #     "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
+    # ]
     # Example URLs to add to the web-based search
     urls = [
         "https://www.in.gov.br/en/web/dou/-/resolucao-normativa-aneel-n-1.125-de-27-de-maio-de-2025-634339148",
         # "https://www.gov.br/aneel/pt-br/assuntos/noticias/2025/aneel-publica-resolucao-sobre-tratamento-especifico-a-empreendimentos-de-geracao",
     ]
     # Example queries to test
-    # querys = [
-    #     # {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
-    #     #     "search_db": True, "use_history": True, "search_urls": False},
-    #     # {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.", "search_db": False, "use_history": True, "search_urls": False},
-    #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
-    #         "search_db": False, "use_history": False, "search_urls": True}
-    # ]
     querys = [
-        {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais despesas não são reembolsáveis segundo o procedimento?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
-            "search_db": True, "use_history": False, "search_urls": False},
-        {"question": "Quais práticas são proibidas nas relações com agentes públicos?",
-            "search_db": True, "use_history": False, "search_urls": False}
+        {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?",
+            "search_db": True, "use_history": True, "search_urls": False},
+        {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao.",
+            "search_db": False, "use_history": True, "search_urls": False},
+        {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?",
+            "search_db": False, "use_history": True, "search_urls": False},
+        #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados",
+        #         "search_db": False, "use_history": False, "search_urls": True}
     ]
+    # querys = [
+    #     {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais despesas não são reembolsáveis segundo o procedimento?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?",
+    #         "search_db": True, "use_history": False, "search_urls": False},
+    #     {"question": "Quais práticas são proibidas nas relações com agentes públicos?",
+    #         "search_db": True, "use_history": False, "search_urls": False}
+    # ]
 
     ############ Adding documents to the database ############
     for pdf_file in pdf_files:
@@ -713,16 +515,8 @@ if __name__ == "__main__":
                                                             use_history=query["use_history"])
 
         # Print the response and sources if applicable
-        print(f"QUESTION: {query['question']}")
-        print(f"ANSWER: {response_data['answer']}")
-        print("SOURCES:")
-        for doc in response_data["history_sources"]:
-            print(
-                f"- Document: {doc.get('source', 'Unknown')}, (Page {doc.get('page', 'N/A')})")
-        for doc in response_data["urls_used"]:
-            print(
-                f"- TITLE: {doc.metadata.get('title', 'Unknown')}, URL: {doc.metadata.get('source', 'Unknown')}")
-        print("-" * 80)
+        print(f"USUARIO: {query['question']}")
+        print(f"ASSISTENTE: {response_data['answer']}")
 
         q_a.append({"question": query['question'],
                    "answer": response_data['answer']})
@@ -731,7 +525,7 @@ if __name__ == "__main__":
     ai_assistant.close_assistant()
 
     # Save answers to a file or database
-    with open("q_and_a_ai_assistant.md", "w") as f:
+    with open("q_and_a_ai_assistant_history_change.md", "w") as f:
         for item in q_a:
             f.write("-" * 80 + "\n")
             f.write("-" * 80 + "\n")

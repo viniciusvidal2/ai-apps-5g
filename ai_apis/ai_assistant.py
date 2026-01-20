@@ -44,22 +44,15 @@ class AiAssistant:
         history_client = chromadb.Client()
         self.history_vectorstore = Chroma(
             client=history_client, embedding_function=self.embedding_function)
-        HISTORY_SUMMARY_PROMPT = PromptTemplate(
-            input_variables=["summary", "new_lines"],
-            template=(
-                "Você é um assistente que resume a conversas até agora.\n\n"
-                "Resumo atual:\n{summary}\n\n"
-                "Novas interações:\n{new_lines}\n\n"
-                "Atualize o resumo em **português**, mantendo apenas as informações relevantes."
-            ),
-        )
-        self.history_summary = ConversationSummaryMemory(
-            llm=self.llm,
-            return_messages=False,
-            prompt=HISTORY_SUMMARY_PROMPT,
-            memory_key="history",
-
-        )
+        HISTORY_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", "Você resume conversas em português de forma objetiva."),
+            ("human",
+            "Resumo atual:\n{summary}\n\n"
+            "Novas mensagens:\n{new_lines}\n\n"
+            "Atualize o resumo em português."),
+        ])
+        self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
+        self.history_summary = ""
         # Initialize the prompt templates for rag
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---
@@ -328,12 +321,15 @@ class AiAssistant:
         else:
             raise ValueError(f"Unknown vectorstore name: {vectorstore_name}")
 
-        # Obtain the history summary and interesting history context
-        history_summary = self.history_summary.load_memory_variables(
-            {}).get("history", "") or ""
         history_chunks = self.history_vectorstore.similarity_search(query, k=2)
         # Check if the history chunks are already in the current context as well
         history_context = "\n".join([hc.page_content for hc in history_chunks])
+        # Obtain the history summary and interesting history context
+        summmary_result = self.history_summarizer.invoke({
+            "summary": self.history_summary,
+            "new_lines": history_context,
+        })
+        self.history_summary = summmary_result.content
 
         # Retrieve relevant documents from the vectorstore
         context_string = "Nenhum CONTEXTO relevante encontrado nos documentos."
@@ -353,7 +349,7 @@ class AiAssistant:
 
         # Fill the RAG prompt
         final_prompt_value = self.rag_prompt.format_prompt(
-            history_summary=history_summary,
+            history_summary=self.history_summary,
             history_context=history_context,
             context=context_string,
             input=query,
@@ -395,10 +391,6 @@ class AiAssistant:
         response = self.llm.invoke(prompt_data["prompt"].messages).content
 
         # Step 3: Adding to history
-        self.history_summary.save_context(
-            {"input": user_query},
-            {"output": response}
-        )
         self.history_vectorstore.add_texts(
             [f"USUARIO: {user_query}\nCONTEXTO: {prompt_data['context_string']}\nASSISTENTE: {response}"]
         )

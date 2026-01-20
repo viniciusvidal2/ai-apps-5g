@@ -75,24 +75,13 @@ class AiAssistantAgentTest:
         data = json.loads(payload)
         # Obtain the agent response from the message payload
         assistant_response = data.get("answer", "")
-        document_sources = data.get("document_sources", [])
-        url_sources = data.get("url_sources", [])
         if assistant_response:
             print(f"Received response from agent: {assistant_response}")
-            print("\nDocument sources:\n")
-            for source in document_sources:
-                print("")
-            print("\nURL sources:\n")
-            for source in url_sources:
-                print("")
         else:
             print("No response received from agent.")
         # Sends a new message to the agent for testing
         message = {
             "query": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
-            "search_db": True,
-            "search_urls": False,
-            "use_history": True,
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
         }

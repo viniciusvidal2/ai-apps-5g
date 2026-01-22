@@ -12,6 +12,7 @@ from langchain.text_splitter import TokenTextSplitter
 
 
 class WebContentExtractor:
+    # region Constructor
     def __init__(self):
         """The WebContentExtractor constructor"""
         # The efemeral chromadb client can be used to cache embeddings
@@ -25,10 +26,12 @@ class WebContentExtractor:
             chunk_size=2048,
             chunk_overlap=200
         )
-
+# endregion
 # region Public Methods
+
     def query_content_from_url(self, url: str, query: str) -> str:
-        """Extracts content from a URL, stores it in chromadb, and performs a similarity search with the given query.
+        """
+        Extracts content from a URL, stores it in chromadb, and performs a similarity search with the given query.
 
         Args:
             url (str): The URL to extract content from.
@@ -47,7 +50,8 @@ class WebContentExtractor:
         return self._similarity_search(collection_name, query, top_k=2)
 
     def extract_content(self, url: str) -> Dict:
-        """Extracts content from a URL based on its content type.
+        """
+        Extracts content from a URL based on its content type.
 
         Args:
             url (str): The URL to extract content from.
@@ -144,7 +148,7 @@ class WebContentExtractor:
     def _extract_html(self, url: str) -> Dict:
         """
         Extracts and cleans HTML content from the given URL.
-        
+
         Args:
             url (str): The URL to extract HTML content from.
 

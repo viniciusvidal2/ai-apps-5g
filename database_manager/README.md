@@ -14,13 +14,13 @@ cd database_manager
 pip install -r requirements.txt
 ```
 
-You database should be described in a yaml file similar to the default one, __database_description.yaml__ (or just change the values in this one). The file should be passed as an argument to the script alongside the database output path, which you will pass as a shared volume to the chromadb server docer container in the following sections. 
+You database should be described in a yaml file similar to the default one, __database_description.yaml__ (or just change the values in this one). The file should be passed as an argument to the script alongside the database output path, which you will pass as a shared volume to the chromadb server docker container in the following sections.
 
-The command to create the database:
+The command to create the database (set the device according to your machine to 'cpu' or 'cuda', where 'cpu' is the default):
 
 ```bash
 cd database_manager
-python database_manager.py --db_path /your/chromadb/local/path --yaml_path /your/yaml/local/path
+python database_manager.py --db_path /your/chromadb/local/path --yaml_path /your/yaml/local/path --device 'cpu'
 ```
 
 You should have the database fully vectorized in your system after a while o processing (which can take minutes depending on your documents).

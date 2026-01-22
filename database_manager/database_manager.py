@@ -11,17 +11,18 @@ import argparse
 
 
 class DatabaseManager():
-    def __init__(self, db_path: str = "./chroma_db") -> None:
+    def __init__(self, db_path: str = "./chroma_db", device: str = "cpu") -> None:
         """
         Database manager class constructor
 
         Args:
             db_path (str, optional): Database path. Defaults to "./chroma_db".
+            device (str, optional): Device to use for embedding (cpu or cuda). Defaults to "cpu".
         """
         self.client = chromadb.PersistentClient(path=db_path)
-        self.bge_m3_ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+        self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="Qwen/Qwen3-Embedding-0.6B",
-            device="cuda"
+            device=device
         )
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_table_structure = True
@@ -43,7 +44,8 @@ class DatabaseManager():
             document_path (str): The file path of the document to be added.
         """
         # Get the collection we are interested in
-        collection = self.client.get_or_create_collection(name=collection_name)
+        collection = self.client.get_or_create_collection(
+            name=collection_name, embedding_function=self.ef)
         # Check if document already exists in collection
         if self._check_if_document_exists(collection, document_path):
             print(
@@ -162,11 +164,19 @@ def create_database() -> None:
         default=os.path.join(current_script_path, 'database_description.yaml'),
         help="Path to the database description YAML file (default: ./database_description.yaml)"
     )
+    parser.add_argument(
+        "--device", "-dev",
+        type=str,
+        default="cpu",
+        help="Device to use for embedding (cpu or cuda) (default: cpu)"
+    )
     args = parser.parse_args()
 
     # Initialize DatabaseManager
     db_manager = DatabaseManager(
-        db_path=args.db_path)
+        db_path=args.db_path,
+        device=args.device
+    )
     # Load database description from YAML file
     with open(args.yaml_path, "r") as file:
         database_description = yaml.safe_load(file)

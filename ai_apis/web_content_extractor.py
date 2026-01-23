@@ -277,7 +277,9 @@ if __name__ == "__main__":
 
     prompts = [
         "Qual a introdução no artigo sob o link https://arxiv.org/pdf/2601.00169?",
-        "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?"
+        "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?",
+        "Nao ha url aqui, mas vou testar mesmo assim.",
+        "Aqui vai uma URL falsa, que nao deve ser validada: http://thisurldoesnotexist.tld/test.pdf",
     ]
 
     for prompt in prompts:

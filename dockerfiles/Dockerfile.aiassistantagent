@@ -70,11 +70,13 @@ COPY dbs /app/dbs
 
 RUN mkdir -p /app/ai_apis /app/agents
 COPY ai_apis/ai_assistant.py /app/ai_apis/ai_assistant.py
+COPY ai_apis/web_content_extractor.py /app/ai_apis/web_content_extractor.py
 COPY agents/ai_assistant_agent.py /app/agents/ai_assistant_agent.py
 COPY agents/start_ai_assistant_docker.sh /app/agents/start_ai_assistant_docker.sh
 
 RUN chmod +x \
     /app/ai_apis/ai_assistant.py \
+    /app/ai_apis/web_content_extractor.py \
     /app/agents/ai_assistant_agent.py \
     /app/agents/start_ai_assistant_docker.sh
 

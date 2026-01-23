@@ -37,7 +37,6 @@ class AiAssistantAgent:
             embedding_model_name="qwen3-embedding:0.6b",
             inference_model_name=inference_model_name,
             documents_db_path="./dbs/chroma_documents_db",
-            url_db_path="./dbs/chroma_url_db",
             collection_name="dev_collection"
         )
         # Storing model name so we can check later if we need to switch models

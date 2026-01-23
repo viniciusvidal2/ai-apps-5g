@@ -1,18 +1,19 @@
 from langchain_ollama import OllamaEmbeddings, ChatOllama
 from langchain_chroma import Chroma
-from langchain_community.document_loaders import PyPDFLoader, WebBaseLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 import chromadb
-from typing import Dict, Any, List
+from typing import Dict, Any
 import os
 import subprocess
 from time import sleep
+from ai_apis.web_content_extractor import WebContentExtractor
 
 
 class AiAssistant:
     # region Initialization and Setup
-    def __init__(self, embedding_model_name: str, inference_model_name: str, documents_db_path: str, url_db_path: str, collection_name: str) -> None:
+    def __init__(self, embedding_model_name: str, inference_model_name: str, documents_db_path: str, collection_name: str) -> None:
         """
         Initializes the AI Assistant with the specified models and database path.
 
@@ -20,20 +21,16 @@ class AiAssistant:
             embedding_model_name (str): The name of the Ollama embedding model to use.
             inference_model_name (str): The name of the Ollama inference model to use.
             documents_db_path (str): The directory path where the Chroma database will be stored.
-            url_db_path (str): The directory path where the URLs Chroma database will be stored.
             collection_name (str): The name of the collection within the Chroma database.
         """
         self.embedding_model_name = embedding_model_name
         self.inference_model_name = inference_model_name
         self.documents_db_path = documents_db_path
-        self.url_db_path = url_db_path
         self.collection_name = collection_name
         self.embedding_function = OllamaEmbeddings(
             model=self.embedding_model_name)
         self.documents_vectorstore = self._load_or_initialize_db(path=self.documents_db_path,
                                                                  collection_name=self.collection_name)
-        self.urls_vectorstore = self._load_or_initialize_db(path=self.url_db_path,
-                                                            collection_name=self.collection_name)
 
         # This assumes you have the model pulled and Ollama is running
         self.expected_llm_models = ["gemma3:4b", "gemma3:12b", "gemma3:27b"]
@@ -76,8 +73,8 @@ class AiAssistant:
         self.chunk_size = 10000  # tokens
         self.chunk_overlap = 200  # tokens
         self.n_chunks = 5
-        # Web based search variables
-        self.urls_to_search = []
+        # URL and Web content extractor
+        self.web_extractor = WebContentExtractor(device="cpu")
 
     def set_chunking_parameters(self, chunk_size: int, chunk_overlap: int) -> None:
         """
@@ -132,9 +129,6 @@ class AiAssistant:
         subprocess.run(["ollama", "stop", self.inference_model_name])
         subprocess.run(["ollama", "stop", self.embedding_model_name])
 
-# endregion
-# region Private internal methods
-
     def _load_or_initialize_db(self, path: str, collection_name: str) -> Chroma:
         """
         Loads an existing DB or initializes an empty one if the path is empty/new.
@@ -165,83 +159,33 @@ class AiAssistant:
 # endregion
 # region webbased methods
 
-    def add_urls_to_search(self, urls: List[str]) -> None:
+    def find_context_from_urls(self, urls: list, query: str, top_k: int = 5) -> str:
         """
-        Adds the list of URLs to search during web-based retrieval.
+        Uses the web content extractor to find relevant context from predefined URLs.
 
         Args:
-            urls (List[str]): A list of URLs to include in the search.
-        """
-        self.urls_to_search.extend(urls)
-
-    def get_urls_to_search(self) -> List[str]:
-        """
-        Returns the current list of URLs to search.
+            urls (list): A list of URLs to extract content from.
+            query (str): The user's input query.
+            top_k (int): The number of top relevant sections to retrieve. Default is 5.
 
         Returns:
-            List[str]: The current list of URLs to search.
+            str: The combined text of the most similar chunks from all URLs.
         """
-        return self.urls_to_search
-
-    def reset_urls_to_search(self) -> None:
-        """Clears the list of URLs to search."""
-        self.urls_to_search = []
-
-    def create_database_from_urls(self) -> None:
-        """
-        Creates a RAG database from the content of the URLs in the urls_to_search list.
-        """
-        for url in self.urls_to_search:
-            print(f"\n--- Adding URL Content: {url} ---")
-            # Check if the document was already added to the database
-            if self.urls_vectorstore:
-                existing_docs = self.urls_vectorstore.similarity_search(
-                    query=url, k=10)
-                for doc in existing_docs:
-                    if doc.metadata.get("source") == url:
-                        print(
-                            f"Content from '{url}' already exists in the database. Skipping addition.")
-                        return
-
-            # Loading from web and adding the chunks to the DB
-            try:
-                loader = WebBaseLoader(url)
-                documents = loader.load()
-                for doc in documents:
-                    doc.page_content = doc.page_content.replace(
-                        "\n", " ").strip()
-                if not documents:
-                    print(f"No content found at URL: {url}")
-                    continue
-                # Initialize Text Splitter
-                text_splitter = RecursiveCharacterTextSplitter(
-                    separators=["\n\n", "\n", " ", ""],
-                    chunk_size=self.chunk_size,
-                    chunk_overlap=self.chunk_overlap,
-                )
-                # Convert text chunks to LangChain Document objects and add metadata
-                document_chunks = text_splitter.split_documents(documents)
-
-                # Enhance Metadata for easier tracking
-                for i, chunk in enumerate(document_chunks):
-                    chunk.metadata.update({
-                        "source": url,
-                        "chunk_index": i,
-                        "full_source": f"URL: {url}, Chunk: {i}"
-                    })
-
-                # Add documents to the Vector Store and Persist
-                if document_chunks:
-                    print(
-                        f"Generated {len(document_chunks)} chunks of size up to {self.chunk_size}.")
-                    self.urls_vectorstore.add_documents(
-                        documents=document_chunks)
-                    print(
-                        f"Successfully added {len(document_chunks)} chunks from URL to the database.")
-                else:
-                    print(f"No content found at URL: {url}")
-            except Exception as e:
-                print(f"Error loading URL {url}: {e}")
+        results = []
+        for url in urls:
+            content = self.web_extractor.query_content_from_url(
+                url=url, query=query, top_k=top_k)
+            self.document_prompt.format(
+                page_content=content,
+                source=url,
+                page="N/A",
+            )
+            results.append({
+                "url": url,
+                "content": content
+            })
+        combined_text = "\n\n".join([item["content"] for item in results])
+        return combined_text
 
 # endregion
 # region Database RAG methods
@@ -315,8 +259,6 @@ class AiAssistant:
         vectorstore = None
         if vectorstore_name == "documents":
             vectorstore = self.documents_vectorstore
-        elif vectorstore_name == "urls":
-            vectorstore = self.urls_vectorstore
         else:
             raise ValueError(f"Unknown vectorstore name: {vectorstore_name}")
 
@@ -331,7 +273,7 @@ class AiAssistant:
         self.history_summary = summmary_result.content
 
         # Retrieve relevant documents from the vectorstore
-        context_string = "Nenhum CONTEXTO relevante encontrado nos documentos."
+        context_string = ""
         if vectorstore:
             document_chunks = vectorstore.similarity_search(
                 query, k=self.n_chunks)
@@ -345,6 +287,12 @@ class AiAssistant:
                 for dc in document_chunks
             ]
             context_string = "\n".join(formatted_context_chunks)
+
+        # Check if we have URLs to extract context from and add to context
+        urls = self.web_extractor.extract_and_validate_urls(text=query)
+        if urls:
+            url_context = self.find_context_from_urls(urls, query, top_k=3)
+            context_string = "\n".join([context_string, url_context])
 
         # Fill the RAG prompt
         final_prompt_value = self.rag_prompt.format_prompt(
@@ -401,7 +349,7 @@ if __name__ == "__main__":
     ############ Object creation and setup ############
     # Model to be used
     embedding_model_name = "qwen3-embedding:0.6b"
-    inference_model_name = "gemma3:12b"
+    inference_model_name = "gemma3:4b"
 
     # Initialize the AI Assistant
     print("Initializing AI Assistant...")
@@ -409,7 +357,6 @@ if __name__ == "__main__":
         embedding_model_name=embedding_model_name,
         inference_model_name=inference_model_name,
         documents_db_path="./dbs/chroma_documents_db",
-        url_db_path="./dbs/chroma_url_db",
         collection_name="dev_collection"
     )
 
@@ -436,17 +383,12 @@ if __name__ == "__main__":
     #     "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
     #     "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
     # ]
-    # Example URLs to add to the web-based search
-    urls = [
-        "https://www.in.gov.br/en/web/dou/-/resolucao-normativa-aneel-n-1.125-de-27-de-maio-de-2025-634339148",
-        # "https://www.gov.br/aneel/pt-br/assuntos/noticias/2025/aneel-publica-resolucao-sobre-tratamento-especifico-a-empreendimentos-de-geracao",
-    ]
     # Example queries to test
     querys = [
         {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?"},
         {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao."},
         {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?"},
-        #     {"question": "Qual o objetivo desta resolução da aneel numero 1.125, faça um resumo e apresente os principais dados"}
+        {"question": "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?"}
     ]
     # querys = [
     #     {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"}
@@ -470,12 +412,6 @@ if __name__ == "__main__":
             document_path=pdf_file,
             source_name=os.path.basename(pdf_file)
         )
-
-    ############ Adding URLs to search ############
-    ai_assistant.reset_urls_to_search()
-    ai_assistant.add_urls_to_search(urls=urls)
-    print(f"Added {len(urls)} URLs to the web-based search list.")
-    ai_assistant.create_database_from_urls()
 
     ############ Running Inference ############
     q_a = []

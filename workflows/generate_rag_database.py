@@ -11,7 +11,6 @@ def main() -> None:
         embedding_model_name="qwen3-embedding:0.6b",
         inference_model_name="gemma3:27b",
         documents_db_path="./dbs/chroma_documents_db",
-        url_db_path="./dbs/chroma_url_db",
         collection_name="dev_collection"
     )
     ai_assistant.set_chunking_parameters(
@@ -22,7 +21,6 @@ def main() -> None:
     with open("workflows/config/database_inputs.yaml", "r") as config_file:
         config = yaml.safe_load(config_file)
     pdf_files = config.get("pdfs", [])
-    urls = config.get("urls", [])
 
     ############ Adding documents to the database ############
     for pdf_file in pdf_files:
@@ -32,12 +30,6 @@ def main() -> None:
             document_path=pdf_file,
             source_name=os.path.basename(pdf_file)
         )
-
-    ############ Adding URLs to search ############
-    ai_assistant.reset_urls_to_search()
-    ai_assistant.add_urls_to_search(urls=urls)
-    print(f"Added {len(urls)} URLs to the web-based search list.")
-    ai_assistant.create_database_from_urls()
 
     print("\n-- RAG database generation completed. --")
 

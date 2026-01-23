@@ -1,7 +1,8 @@
 import requests
 import trafilatura
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import traceback
+import re
 import chromadb
 from chromadb.utils import embedding_functions
 from chromadb.api.models import Collection
@@ -13,29 +14,47 @@ from langchain.text_splitter import TokenTextSplitter
 
 class WebContentExtractor:
     # region Constructor
-    def __init__(self):
-        """The WebContentExtractor constructor"""
+    def __init__(self, device: str = "cpu") -> None:
+        """
+        The WebContentExtractor constructor
+
+        Args:
+            device (str): The device to use for embedding computation. Defaults to "cpu".
+        """
         # The efemeral chromadb client can be used to cache embeddings
         self.client = chromadb.Client()
         self.ebf = embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name="Qwen/Qwen3-Embedding-0.6B",
-            device="cuda"
+            device=device,
         )
         # Text splitter to create chunks from the extracted text
         self.splitter = TokenTextSplitter(
-            chunk_size=2048,
+            chunk_size=8000,
             chunk_overlap=200
+        )
+        # URL identification regex variables
+        self.url_regex = re.compile(
+            r"""
+            (?:
+                https?://
+                |
+                www\.
+            )
+            [^\s<>"']+
+            """,
+            re.VERBOSE | re.IGNORECASE
         )
 # endregion
 # region Public Methods
 
-    def query_content_from_url(self, url: str, query: str) -> str:
+    def query_content_from_url(self, url: str, query: str, top_k: int = 5) -> str:
         """
         Extracts content from a URL, stores it in chromadb, and performs a similarity search with the given query.
 
         Args:
             url (str): The URL to extract content from.
             query (str): The query string to perform similarity search.
+            top_k (int): The number of top similar results to retrieve.
 
         Returns:
             str: The combined text of the most similar chunks.
@@ -47,7 +66,7 @@ class WebContentExtractor:
         collection_name = f"{url.replace('/', '_').replace(':', '_')}"
         self._add_to_collection(collection_name, text, {"source": url})
         # Then perform a similarity search with the query to get relevant chunks
-        return self._similarity_search(collection_name, query, top_k=2)
+        return self._similarity_search(collection_name, query, top_k)
 
     def extract_content(self, url: str) -> Dict:
         """
@@ -74,6 +93,43 @@ class WebContentExtractor:
             f"Unsupported Content-Type: {content_type}"
         )
 
+    def extract_and_validate_urls(self, text: str, timeout: int = 5, allow_redirects: bool = True) -> List[str]:
+        """
+        Extract URLs from text and validate them via HTTP HEAD request.
+        Returns only reachable URLs.
+
+        Args:
+            text (str): The input text to extract URLs from.
+            timeout (int): Timeout for the HEAD request in seconds.
+            allow_redirects (bool): Whether to allow redirects in the HEAD request.
+
+        Returns:
+            List[str]: A list of validated URLs.
+        """
+        TRAILING_PUNCTUATION = {".", ",", ";", ":", ")", "]", "}", "?", "!"}
+        candidates = self.url_regex.findall(text)
+        urls = []
+        for url in candidates:
+            # strip trailing punctuation
+            while url and url[-1] in TRAILING_PUNCTUATION:
+                url = url[:-1]
+            # normalize
+            if url.startswith("www."):
+                url = "https://" + url
+            # validate via HEAD
+            try:
+                response = requests.head(
+                    url,
+                    timeout=timeout,
+                    allow_redirects=allow_redirects,
+                    headers={"User-Agent": "URLValidator/1.0"}
+                )
+                if response.status_code < 400:
+                    urls.append(url)
+            except requests.RequestException:
+                continue
+        # deduplicate, preserve order
+        return list(dict.fromkeys(urls))
 # endregion
 # region Private Methods
 
@@ -219,16 +275,27 @@ if __name__ == "__main__":
     # Example usage
     extractor = WebContentExtractor()
 
-    url = "https://arxiv.org/pdf/2601.00169"
+    prompts = [
+        "Qual a introdução no artigo sob o link https://arxiv.org/pdf/2601.00169?",
+        "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?"
+    ]
 
-    try:
-        result = extractor.extract_content(url)
-        print(f"Source: {result['source']}")
-        print(f"Type: {result['type']}")
-        query = "what is the introduction of this paper?"
-        similar_section = extractor.query_content_from_url(url, query)
-        # print("----- Similar Section -----")
-        # print(f"\nQuery: {query}")
-        # print(f"\n\nSimilar Section:\n{similar_section}")
-    except Exception as e:
-        print(f"Error: {e}")
+    for prompt in prompts:
+        print("----- Prompt -----")
+        print(prompt)
+        print("\n\n")
+
+        try:
+            # Get the URLs from the prompt text
+            urls = extractor.extract_and_validate_urls(prompt)
+            for url in urls:
+                result = extractor.extract_content(url)
+                print(f"Source: {result['source']}")
+                print(f"Type: {result['type']}")
+                similar_section = extractor.query_content_from_url(
+                    url=url, query=prompt, top_k=4)
+                print("----- Similar Section -----")
+                print(f"\nQuery: {prompt}")
+                print(f"\n\nSimilar Section:\n{similar_section}...")
+        except Exception as e:
+            print(f"Error: {e}")

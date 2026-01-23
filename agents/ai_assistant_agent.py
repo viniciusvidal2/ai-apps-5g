@@ -17,6 +17,7 @@ class AiAssistantTopicData(BaseModel):
     query: str
     n_chunks: int
     inference_model_name: str
+    vectorstore_name: str
 
 
 class AiAssistantAgent:
@@ -122,7 +123,9 @@ class AiAssistantAgent:
 
         # Sending the query to the agent for testing
         response = self.ai_assistant.run_inference_pipeline(
-            user_query=data.get("query", "Any"))
+            user_query=data.get("query", "Any"),
+            vectorstore_name=data.get("vectorstore_name", "None")
+        )
 
         # Publish the response to the MQTT broker
         self.client.publish(

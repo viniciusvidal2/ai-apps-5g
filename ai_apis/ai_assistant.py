@@ -259,11 +259,9 @@ class AiAssistant:
         vectorstore = None
         if vectorstore_name == "documents":
             vectorstore = self.documents_vectorstore
-        else:
-            raise ValueError(f"Unknown vectorstore name: {vectorstore_name}")
 
+        # Retrieve relevant history from the history vectorstore
         history_chunks = self.history_vectorstore.similarity_search(query, k=2)
-        # Check if the history chunks are already in the current context as well
         history_context = "\n".join([hc.page_content for hc in history_chunks])
         # Obtain the history summary and interesting history context
         summmary_result = self.history_summarizer.invoke({
@@ -317,19 +315,20 @@ class AiAssistant:
 # endregion
 # region Inference related methods
 
-    def run_inference_pipeline(self, user_query: str) -> str:
+    def run_inference_pipeline(self, user_query: str, vectorstore_name: str = "documents") -> str:
         """
         Runs the full inference pipeline: builds the prompt (with or without RAG), runs inference, and returns the answer.
 
         Args:
             user_query (str): The user's input query.
+            vectorstore_name (str): The name of the vectorstore to use ('documents' or 'None').
 
         Returns:
             str: The final response from the inference pipeline.
         """
         # Step 1: Build the prompt
         prompt_data = self.build_rag_prompt(
-            query=user_query, vectorstore_name="documents")
+            query=user_query, vectorstore_name=vectorstore_name)
 
         # Step 2: Run inference
         response = self.llm.invoke(prompt_data["prompt"].messages).content
@@ -419,7 +418,7 @@ if __name__ == "__main__":
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
         response = ai_assistant.run_inference_pipeline(
-            user_query=query["question"])
+            user_query=query["question"], vectorstore_name="documents")
 
         # Print the response and sources if applicable
         print(f"USUARIO: {query['question']}")

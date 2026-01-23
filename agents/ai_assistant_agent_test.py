@@ -48,6 +48,7 @@ class AiAssistantAgentTest:
             "query": "O que acontece quando um fornecedor obtém um IDF inferior a 70? Cite o documento na base de dados em que isso se encontra.",
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
+            "vectorstore_name": "documents"
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
@@ -81,6 +82,7 @@ class AiAssistantAgentTest:
             "query": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
+            "vectorstore_name": "documents"
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)

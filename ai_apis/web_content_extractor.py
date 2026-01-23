@@ -273,7 +273,7 @@ class WebContentExtractor:
 
 if __name__ == "__main__":
     # Example usage
-    extractor = WebContentExtractor()
+    extractor = WebContentExtractor(device="cpu")
 
     prompts = [
         "Qual a introdução no artigo sob o link https://arxiv.org/pdf/2601.00169?",

@@ -72,7 +72,7 @@ class AiAssistant:
         # Chunk parameters
         self.chunk_size = 10000  # tokens
         self.chunk_overlap = 200  # tokens
-        self.n_chunks = 5
+        self.n_chunks = 3
         # URL and Web content extractor
         self.web_extractor = WebContentExtractor(device="cpu")
 
@@ -289,7 +289,7 @@ class AiAssistant:
         # Check if we have URLs to extract context from and add to context
         urls = self.web_extractor.extract_and_validate_urls(text=query)
         if urls:
-            url_context = self.find_context_from_urls(urls, query, top_k=3)
+            url_context = self.find_context_from_urls(urls, query, top_k=self.n_chunks)
             context_string = "\n".join([context_string, url_context])
 
         # Fill the RAG prompt

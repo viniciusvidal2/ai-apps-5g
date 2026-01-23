@@ -29,7 +29,7 @@ class WebContentExtractor:
         )
         # Text splitter to create chunks from the extracted text
         self.splitter = TokenTextSplitter(
-            chunk_size=8000,
+            chunk_size=4000,
             chunk_overlap=200
         )
         # URL identification regex variables

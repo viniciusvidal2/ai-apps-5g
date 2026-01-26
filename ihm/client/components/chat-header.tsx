@@ -50,9 +50,6 @@ function PureChatHeader({
         />
       )}
 
-      <h1 className="absolute left-1/2 -translate-x-1/2 text-base font-bold text-foreground underline">
-        Assistente de IA
-      </h1>
     </header>
   );
 }

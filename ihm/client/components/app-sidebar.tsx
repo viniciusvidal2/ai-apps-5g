@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "next-auth";
@@ -28,20 +27,15 @@ export function AppSidebar({ user }: { user: User | undefined }) {
         <SidebarMenu>
           <div className="flex flex-row items-center justify-between">
             <Link
-              className="flex flex-row items-center justify-center gap-3 py-6"
+              className="flex flex-row items-center gap-3"
               href="/"
               onClick={() => {
                 setOpenMobile(false);
               }}
             >
-              <Image 
-                src="/images/Axia_Energia.svg.png" 
-                alt="Axia Energia" 
-                width={240} 
-                height={120} 
-                className="h-28 w-auto cursor-pointer hover:opacity-80 transition-opacity"
-                priority
-              />
+              <span className="cursor-pointer rounded-md px-2 font-semibold text-lg hover:bg-muted">
+                Chatbot
+              </span>
             </Link>
             <Tooltip>
               <TooltipTrigger asChild>

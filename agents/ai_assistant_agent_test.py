@@ -45,10 +45,10 @@ class AiAssistantAgentTest:
             f"Connected to MQTT broker at {self.mqtt_address}:{self.mqtt_port} for user id {self.user_id}")
         # Creates data for testing
         message = {
-            "query": "O que acontece quando um fornecedor obtém um IDF inferior a 70? Cite o documento na base de dados em que isso se encontra.",
+            "query": "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?",
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
-            "vectorstore_name": "documents"
+            "vectorstore_name": "none"
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)
@@ -79,10 +79,10 @@ class AiAssistantAgentTest:
             print("No response received from agent.")
         # Sends a new message to the agent for testing
         message = {
-            "query": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?",
+            "query": "Quais sao as porcentagens das multas segundo grupos predefinidos, e quais as razoes para estar no grupo com maior porcentagem? https://www2.aneel.gov.br/cedoc/ren2019846.html",
             "n_chunks": 10,
             "inference_model_name": self.choose_random_model(),
-            "vectorstore_name": "documents"
+            "vectorstore_name": "none"
         }
         # Publish the message to the assistant input topic
         self.client.publish(self.input_topic, json.dumps(message), qos=2)

@@ -4,10 +4,11 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 import chromadb
-from typing import Dict, Any
+from typing import Dict, Any, List
 import os
 import subprocess
 from time import sleep
+import requests
 from ai_apis.web_content_extractor import WebContentExtractor
 
 
@@ -33,7 +34,7 @@ class AiAssistant:
                                                                  collection_name=self.collection_name)
 
         # This assumes you have the model pulled and Ollama is running
-        self.expected_llm_models = ["gemma3:4b", "gemma3:12b", "gemma3:27b"]
+        self.expected_llm_models = self._get_available_ollama_models()
         self.set_assistant_model(
             inference_model_name=self.inference_model_name)
         # Dealing with history of conversation
@@ -158,6 +159,29 @@ class AiAssistant:
                 embedding_function=self.embedding_function,
                 collection_name=collection_name,
             )
+
+    def _get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
+        """
+        Returns a list of available Ollama model names (e.g. gemma3:4b).
+
+        Args:
+            base_url (str): The base URL of the Ollama API.
+            timeout (int): The request timeout in seconds.
+
+        Returns:
+            List[str]: A list of available model names.
+        """
+        try:
+            r = requests.get(
+                f"{base_url}/api/tags",
+                timeout=timeout
+            )
+            r.raise_for_status()
+            data = r.json()
+            return [m["name"] for m in data.get("models", [])]
+        except requests.RequestException as e:
+            print(f"Failed to query Ollama models: {e}")
+            return []
 
 # endregion
 # region webbased methods
@@ -292,7 +316,8 @@ class AiAssistant:
         # Check if we have URLs to extract context from and add to context
         urls = self.web_extractor.extract_and_validate_urls(text=query)
         if urls:
-            url_context = self.find_context_from_urls(urls, query, top_k=self.n_chunks)
+            url_context = self.find_context_from_urls(
+                urls, query, top_k=self.n_chunks)
             context_string = "\n".join([context_string, url_context])
 
         # Fill the RAG prompt

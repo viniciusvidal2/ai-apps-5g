@@ -166,13 +166,20 @@ class WebContentExtractor:
             text (str): The text to be chunked and added.
             metadata (Dict): Metadata to associate with each chunk.
         """
-        collection: Collection = self.client.get_or_create_collection(
+        # Check if collection already exists
+        existing_collections = [
+            col.name for col in self.client.list_collections()
+        ]
+        if collection_name in existing_collections:
+            print(f"\n\n\nCollection {collection_name} already exists. Skipping addition.\n\n\n")
+            return
+        # Create new collection with respect to the URL (collection name)
+        collection: Collection = self.client.create_collection(
             name=collection_name,
             embedding_function=self.ebf
         )
         # Create chunks to add to the collection
         chunks = self.splitter.split_text(text)
-
         for i, chunk in enumerate(chunks):
             collection.add(
                 documents=[chunk],

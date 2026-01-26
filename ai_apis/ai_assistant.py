@@ -103,11 +103,14 @@ class AiAssistant:
         Args:
             inference_model_name (str): The name of the Ollama inference model to use.
         """
-        self.inference_model_name = inference_model_name
         if inference_model_name not in self.expected_llm_models:
             self.inference_model_name = self.expected_llm_models[0]
             print(
                 f"Required model not found. Using inference model: {self.inference_model_name}")
+        else:
+            self.inference_model_name = inference_model_name
+            print(
+                f"Using inference model: {self.inference_model_name}")
         self.llm = ChatOllama(model=self.inference_model_name)
 
     def switch_assistant_model(self, inference_model_name: str) -> None:

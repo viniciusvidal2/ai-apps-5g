@@ -3,8 +3,21 @@ from paho.mqtt.client import CallbackAPIVersion
 from typing import Any
 import argparse
 import json
+from pydantic import BaseModel, ValidationError
 from concurrent.futures import ThreadPoolExecutor
 from ai_apis.ai_assistant import AiAssistant
+
+
+class AiAssistantTopicData(BaseModel):
+    """A class to validate the input data that comes in the ai assistant topic.
+
+    Args:
+        BaseModel: _BaseModel_ from pydantic library.
+    """
+    query: str
+    n_chunks: int
+    inference_model_name: str
+    vectorstore_name: str
 
 
 class AiAssistantAgent:
@@ -22,12 +35,13 @@ class AiAssistantAgent:
         # Initialize the AI Assistant
         print("Initializing AI Assistant...")
         self.ai_assistant = AiAssistant(
-            embedding_model_name="qwen3-embedding:latest",
+            embedding_model_name="qwen3-embedding:0.6b",
             inference_model_name=inference_model_name,
             documents_db_path="./dbs/chroma_documents_db",
-            url_db_path="./dbs/chroma_url_db",
             collection_name="dev_collection"
         )
+        # Storing model name so we can check later if we need to switch models
+        self.current_inference_model_name = inference_model_name
         # Start the MQTT client and connect to the broker
         self.mqtt_address = mqtt_address
         self.mqtt_port = mqtt_port
@@ -64,9 +78,7 @@ class AiAssistantAgent:
         """Callback function for when a message is received on the subscribed topic.
         What we can expect in the message:
             n_chunks (int): top n most likely chunks of data to retrieve from each requested database
-            use_db (bool): use the documents db or not in the query
-            use_history (bool): use the history or not in the query
-            use_url (bool): use the urls db or not in the query
+            inference_model_name (str): name of the inference model to use
             query (str): actual query from the user
 
         Args:
@@ -77,11 +89,21 @@ class AiAssistantAgent:
         # Parse the incoming message payload as JSON
         try:
             data = json.loads(msg.payload.decode('utf-8'))
-        except json.JSONDecodeError:
-            print("Received message is not valid JSON.")
+            validated_data = AiAssistantTopicData(**data).model_dump()
+        except (json.JSONDecodeError, ValidationError) as e:
+            print("Error parsing message payload:", str(e))
+            output_dict = {
+                "answer": f"Error: Invalid input data - {str(e)}",
+            }
+            # Publish the response to the MQTT broker
+            self.client.publish(
+                self.output_topic,
+                payload=json.dumps(output_dict),
+                qos=2
+            )
             return
         # Handle the incoming message in a separate thread
-        self.executor.submit(self.handle_incoming_message, data)
+        self.executor.submit(self.handle_incoming_message, validated_data)
 
     def handle_incoming_message(self, data: dict) -> None:
         """Handles an incoming message by sending it to the AI Assistant and publishing the response.
@@ -92,31 +114,23 @@ class AiAssistantAgent:
         # Set the chunking parameters
         self.ai_assistant.set_chunks_to_retrieve(
             n_chunks=data.get("n_chunks", 3))
+
+        # Checking if we need to switch models
+        if data.get("inference_model_name", self.current_inference_model_name) != self.current_inference_model_name:
+            self.ai_assistant.switch_assistant_model(
+                data["inference_model_name"])
+            self.current_inference_model_name = self.ai_assistant.inference_model_name
+
         # Sending the query to the agent for testing
-        response_data = self.ai_assistant.run_inference_pipeline(user_query=data.get("query", "Any"),
-                                                                 search_db=data.get(
-                                                                     "search_db", True),
-                                                                 search_urls=data.get(
-                                                                     "search_urls", False),
-                                                                 use_history=data.get(
-                                                                     "use_history", True),
-                                                                 )
-        # # Preparing the output for the user with all necessary information
-        document_sources = [
-            {"document": doc.get('source', 'Unknown'), "page": {doc.get('page', 'N/A')}} for doc in response_data["history_sources"]
-        ]
-        url_sources = [
-            {"title": doc.metadata.get('title', 'Unknown'), "url": doc.metadata.get('source', 'Unknown')} for doc in response_data["urls_used"]
-        ]
-        output_dict = {
-            "answer": response_data["answer"],
-            "document_sources": [],
-            "url_sources": []
-        }
+        response = self.ai_assistant.run_inference_pipeline(
+            user_query=data.get("query", "Any"),
+            vectorstore_name=data.get("vectorstore_name", "None")
+        )
+
         # Publish the response to the MQTT broker
         self.client.publish(
             self.output_topic,
-            payload=json.dumps(output_dict),
+            payload=json.dumps({"answer": response}),
             qos=2
         )
 
@@ -176,7 +190,7 @@ def main() -> None:
     parser.add_argument(
         "--inference_model_name", "-m",
         type=str,
-        default="gemma3:4b",
+        default="gemma3:12b",
         help="Name of the inference model to use"
     )
     args = parser.parse_args()

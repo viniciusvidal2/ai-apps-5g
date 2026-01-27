@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from flask import Flask, request, jsonify
-from pydantic import ValidationError, Extra
+from pydantic import ValidationError
 import subprocess
 from common import AiAssistantInputData, generate_docker_name
 

@@ -76,6 +76,7 @@ class AiAssistant:
         self.n_chunks = 3
         # URL and Web content extractor
         self.web_extractor = WebContentExtractor(device="cpu")
+        print("AI Assistant initialized successfully.")
 
     def set_chunking_parameters(self, chunk_size: int, chunk_overlap: int) -> None:
         """
@@ -355,17 +356,21 @@ class AiAssistant:
             str: The final response from the inference pipeline.
         """
         # Step 1: Build the prompt
+        print("Building RAG prompt...")
         prompt_data = self.build_rag_prompt(
             query=user_query, vectorstore_name=vectorstore_name)
 
         # Step 2: Run inference
+        print("Running inference...")
         response = self.llm.invoke(prompt_data["prompt"].messages).content
 
         # Step 3: Adding to history
+        print("Updating conversation history...")
         self.history_vectorstore.add_texts(
             [f"USUARIO: {user_query}\nCONTEXTO: {prompt_data['context_string']}\nASSISTENTE: {response}"]
         )
 
+        print("Inference pipeline completed.")
         return response
 
 # endregion

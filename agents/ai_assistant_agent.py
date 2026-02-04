@@ -53,6 +53,7 @@ class AiAssistantAgent:
         self.input_topic = input_topic
         self.output_topic = output_topic
         # Executor to handle incoming messages concurrently
+        print("Starting ThreadPoolExecutor for handling incoming messages...")
         self.executor = ThreadPoolExecutor()
         # Start the subscriber to listen for incoming messages
         self.client.subscribe(self.input_topic, qos=1)
@@ -60,6 +61,7 @@ class AiAssistantAgent:
         self.client.on_connect = self.on_connect
         # Start the publisher to send messages to the MQTT broker
         self.client.loop_start()
+        print("AI Assistant Agent initialized and connected to MQTT broker.")
 
     def on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int, properties=None) -> None:
         """Callback function for when the client connects to the MQTT broker.

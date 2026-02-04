@@ -70,13 +70,13 @@ embedding:0.6b" .
 
 ## Running the docker container
 
-Use the following command to run the docker container from the built image. __This command assumes you have a MQTT brocker running in your host machine, so it can connect to it and start exchanging messages.__
+Use the following command to run the docker container from the built image. __This command assumes you have a MQTT brocker running in your host machine, with a proper config file to allow for connections in 0.0.0.0 host, so it can connect to it and start exchanging messages.__
 
 ```bash
-docker run --rm -d --network=host --name ai_assistant_agent ai_assistant_image --broker=0.0.0.0 --port=1883 --user_id=1 --input_topic=input --output_topic=output --inference_model_name "[YOUR_MODEL_NAME]"
+docker run --rm -d --add-host=host.docker.internal:host-gateway --name ai_assistant_agent ai_assistant_image --broker=host.docker.internal --port=1883 --user_id=1 --input_topic=input --output_topic=output --inference_model_name "[YOUR_MODEL_NAME]"
 ```
 
-The docker runs in detached mode and is ready to exchange information.
+The docker runs in detached mode and is ready to exchange information. Remove the "-d" option flag if you want to see the debug prints.
 
 ## Verifying
 

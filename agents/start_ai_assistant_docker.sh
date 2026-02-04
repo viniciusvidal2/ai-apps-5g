@@ -20,4 +20,4 @@ echo "Ollama is ready."
 # Launch your AI assistant agent
 cd /app
 echo "Starting AI assistant agent..."
-exec python3 -m agents.ai_assistant_agent "$@"
+exec python3 -u -m agents.ai_assistant_agent "$@"

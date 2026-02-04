@@ -30,7 +30,7 @@ RUN pip install --upgrade pip
 RUN curl -fsSL https://ollama.com/install.sh | sh
 
 ENV OLLAMA_MODELS="/app/ollama_models"
-ENV OLLAMA_HOST=127.0.0.1
+ENV OLLAMA_HOST=http://127.0.0.1:11434
 ENV OLLAMA_PORT=11434
 
 RUN mkdir -p /app/ollama_models
@@ -90,4 +90,6 @@ RUN chmod +x \
 # Runtime
 # ------------------------
 EXPOSE 1883
+EXPOSE 11434
+ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["/app/agents/start_ai_assistant_docker.sh"]

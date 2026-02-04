@@ -21,6 +21,7 @@ class WebContentExtractor:
         Args:
             device (str): The device to use for embedding computation. Defaults to "cpu".
         """
+        print("Initializing WebContentExtractor...")
         # The efemeral chromadb client can be used to cache embeddings
         self.client = chromadb.Client()
         self.ebf = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -44,6 +45,7 @@ class WebContentExtractor:
             """,
             re.VERBOSE | re.IGNORECASE
         )
+        print("WebContentExtractor initialized successfully.")
 # endregion
 # region Public Methods
 

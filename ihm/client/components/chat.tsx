@@ -76,10 +76,9 @@ export function Chat({
   // RAG parameters with localStorage persistence
   const [ragParams, setRAGParams] = useState<RAGParams>(() => {
     const defaultParams = {
-      use_history: true,
-      search_db: true,
-      search_urls: false,
       n_chunks: getNChunksFromModel(initialChatModel),
+      inference_model_name: "gemma3:4b",
+      vectorstore_name: "none",
     };
     
     if (typeof window === "undefined") {
@@ -89,8 +88,12 @@ export function Chat({
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Ensure n_chunks is set based on current model
-        return { ...parsed, n_chunks: getNChunksFromModel(initialChatModel) };
+        // Ensure n_chunks is set based on current model, keep other params
+        return {
+          n_chunks: getNChunksFromModel(initialChatModel),
+          inference_model_name: parsed.inference_model_name ?? defaultParams.inference_model_name,
+          vectorstore_name: parsed.vectorstore_name ?? defaultParams.vectorstore_name,
+        };
       } catch {
         return defaultParams;
       }

@@ -157,10 +157,9 @@ async def run_inference(request: InferenceRequest):
         await ensure_services_ready(user_id=request.user_id, session_id=request.session_id)
         mqtt_message = {
             "query": request.query,
-            "search_db": request.search_db,
-            "search_urls": request.search_urls,
-            "use_history": request.use_history,
             "n_chunks": request.n_chunks,
+            "inference_model_name": request.inference_model_name,
+            "vectorstore_name": request.vectorstore_name,
         }
         # Get the MQTT client for this specific session
         mqtt_client = state.session_mqtt_clients.get(request.session_id)

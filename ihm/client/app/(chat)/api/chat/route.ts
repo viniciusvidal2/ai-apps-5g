@@ -171,16 +171,15 @@ export async function POST(request: Request) {
 
     // Extract RAG parameters from request body (with defaults)
     const ragParams = requestBody.ragParams || {};
-    const search_db = ragParams.search_db ?? true;
-    const use_history = ragParams.use_history ?? true;
-    const search_urls = ragParams.search_urls ?? false;
     const n_chunks = ragParams.n_chunks ?? 3;
+    const inference_model_name = ragParams.inference_model_name ?? "gemma3:4b";
+    const vectorstore_name = ragParams.vectorstore_name ?? "none";
 
     // Call FastAPI backend
     const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
     console.log(`[API Route] Calling FastAPI backend at ${backendUrl}/inference`);
     console.log(`[API Route] Query: ${query}`);
-    console.log(`[API Route] RAG Params: search_db=${search_db}, use_history=${use_history}, search_urls=${search_urls}, n_chunks=${n_chunks}`);
+    console.log(`[API Route] RAG Params: n_chunks=${n_chunks}, inference_model_name=${inference_model_name}, vectorstore_name=${vectorstore_name}`);
 
     // Create AbortController with 10 minute timeout
     const controller = new AbortController();
@@ -208,10 +207,9 @@ export async function POST(request: Request) {
           query: query,
           user_id: userId,
           session_id: sessionId || `fallback-session-${userId}`,
-          search_db: search_db,
-          use_history: use_history,
-          search_urls: search_urls,
           n_chunks: n_chunks,
+          inference_model_name: inference_model_name,
+          vectorstore_name: vectorstore_name,
         }),
         signal: controller.signal,
       });

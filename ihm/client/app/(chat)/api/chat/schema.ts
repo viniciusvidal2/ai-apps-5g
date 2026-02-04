@@ -15,10 +15,9 @@ const filePartSchema = z.object({
 const partSchema = z.union([textPartSchema, filePartSchema]);
 
 const ragParamsSchema = z.object({
-  use_history: z.boolean().optional(),
-  search_db: z.boolean().optional(),
-  search_urls: z.boolean().optional(),
   n_chunks: z.number().optional(),
+  inference_model_name: z.string().optional(),
+  vectorstore_name: z.enum(["documents", "none"]).optional(),
 }).optional();
 
 export const postRequestBodySchema = z.object({

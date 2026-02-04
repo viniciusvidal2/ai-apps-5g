@@ -42,6 +42,7 @@ RUN pip install --no-cache-dir setuptools==75.1.0
 COPY requirements/requirements_ai_assistant.txt /app/requirements_ai_assistant.txt
 RUN pip install --no-cache-dir --timeout=100 --retries=100 \
     -r requirements_ai_assistant.txt
+ENV PYTHONUNBUFFERED=1
 
 # ------------------------
 # Build-time model selection
@@ -68,6 +69,12 @@ RUN if [ -n "$OLLAMA_MODELS_TO_PULL" ]; then \
       echo "No Ollama models requested at build time" ; \
     fi
 
+# Huggingface embedding model cache
+ENV HF_HOME=/opt/hf
+RUN mkdir -p /opt/hf
+COPY agents/config/download_models.py /app/agents/config/download_models.py
+RUN python3 /app/agents/config/download_models.py
+
 # ------------------------
 # App files
 # ------------------------
@@ -91,5 +98,4 @@ RUN chmod +x \
 # ------------------------
 EXPOSE 1883
 EXPOSE 11434
-ENV PYTHONUNBUFFERED=1
 ENTRYPOINT ["/app/agents/start_ai_assistant_docker.sh"]

@@ -30,11 +30,16 @@ def _coerce_user_id(user_id: str) -> int:
 
 async def start_ai_assistant_agent(user_id: str, session_id: str) -> None:
     """Request the REST API to start the AI Assistant container for a specific session."""
+    # Generate container name with user_id and session_id for isolation
+    coerced_user_id = _coerce_user_id(user_id)
+    container_name = f"ai_assistant_{coerced_user_id}_{session_id}"
+    
     payload: Dict[str, Any] = {
         "broker": MQTT_BROKER,
         "port": MQTT_PORT,
-        "user_id": _coerce_user_id(user_id),
+        "user_id": coerced_user_id,
         "session_id": session_id,
+        "container_name": container_name,
         "input_topic": MQTT_INPUT_TOPIC,
         "output_topic": MQTT_OUTPUT_TOPIC,
         "inference_model_name": INFERENCE_MODEL_NAME,
@@ -44,14 +49,16 @@ async def start_ai_assistant_agent(user_id: str, session_id: str) -> None:
         f"🚀 CALLING REST API - START DOCKER\n"
         f"  URL: {AI_ASSISTANT_START_API_URL}\n"
         f"  Session ID: {session_id}\n"
-        f"  User ID: {user_id} (coerced to {_coerce_user_id(user_id)})\n"
+        f"  User ID: {user_id} (coerced to {coerced_user_id})\n"
+        f"  Container Name: {container_name}\n"
         f"  Payload: {payload}"
     )
     print(
         f"🚀 CALLING REST API - START DOCKER\n"
         f"  URL: {AI_ASSISTANT_START_API_URL}\n"
         f"  Session ID: {session_id}\n"
-        f"  User ID: {user_id} (coerced to {_coerce_user_id(user_id)})\n"
+        f"  User ID: {user_id} (coerced to {coerced_user_id})\n"
+        f"  Container Name: {container_name}\n"
         f"  Payload: {payload}"
     )
 
@@ -72,23 +79,30 @@ async def start_ai_assistant_agent(user_id: str, session_id: str) -> None:
 
 async def kill_ai_assistant_agent(user_id: str, session_id: str) -> None:
     """Request the REST API to stop the AI Assistant container for a specific session."""
+    # Generate container name with user_id and session_id for isolation
+    coerced_user_id = _coerce_user_id(user_id)
+    container_name = f"ai_assistant_{coerced_user_id}_{session_id}"
+    
     payload = {
-        "user_id": _coerce_user_id(user_id),
+        "user_id": coerced_user_id,
         "session_id": session_id,
+        "container_name": container_name,
     }
 
     logger.info(
         f"🛑 CALLING REST API - KILL DOCKER\n"
         f"  URL: {AI_ASSISTANT_KILL_API_URL}\n"
         f"  Session ID: {session_id}\n"
-        f"  User ID: {user_id} (coerced to {_coerce_user_id(user_id)})\n"
+        f"  User ID: {user_id} (coerced to {coerced_user_id})\n"
+        f"  Container Name: {container_name}\n"
         f"  Payload: {payload}"
     )
     print(
         f"🛑 CALLING REST API - KILL DOCKER\n"
         f"  URL: {AI_ASSISTANT_KILL_API_URL}\n"
         f"  Session ID: {session_id}\n"
-        f"  User ID: {user_id} (coerced to {_coerce_user_id(user_id)})\n"
+        f"  User ID: {user_id} (coerced to {coerced_user_id})\n"
+        f"  Container Name: {container_name}\n"
         f"  Payload: {payload}"
     )
 

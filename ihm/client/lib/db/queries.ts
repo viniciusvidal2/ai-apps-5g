@@ -69,10 +69,32 @@ export async function createGuestUser() {
   const guestEmail = `guest-${guestId}@temp.com`;
   console.log(`[createGuestUser] Creating new guest user: ${guestId}`);
   
-  return [{
-    id: guestId,
-    email: guestEmail
-  }];
+  try {
+    // Insert the guest user into the database
+    await db.insert(user).values({
+      id: guestId,
+      email: guestEmail,
+      password: null, // Guest users don't have passwords
+    });
+    
+    console.log(`[createGuestUser] Successfully created guest user in database: ${guestId}`);
+    
+    return [{
+      id: guestId,
+      email: guestEmail
+    }];
+  } catch (error: any) {
+    console.error("[createGuestUser] Error creating guest user in database:", error);
+    
+    // Check if it's a duplicate key error (unlikely with UUID, but safety check)
+    if (error?.code === '23505') { // PostgreSQL duplicate key error
+      console.warn(`[createGuestUser] Duplicate guest user ID: ${guestId}, retrying...`);
+      // Recursively retry with a new UUID
+      return createGuestUser();
+    }
+    
+    throw new ChatSDKError("bad_request:database", "Failed to create guest user");
+  }
 }
 
 export async function saveChat({

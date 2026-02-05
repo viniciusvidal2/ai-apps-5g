@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from pydantic import ValidationError
 import subprocess
-from common import AiAssistantKillData, generate_docker_name
+from common import AiAssistantKillData
 
 
 app = Flask(__name__)
@@ -21,13 +21,10 @@ def kill_ai_assistant_agent_docker():
     except ValidationError as e:
         return jsonify({"error": "Invalid input data", "details": e.errors()}), 400
 
-    # Create a name for the Docker container with the user id
-    container_name = generate_docker_name(input_data.user_id)
-
     # Call the docker with the provided parameters
     try:
         command = [
-            "docker", "stop", container_name
+            "docker", "stop", input_data.container_name
         ]
         result_stop = subprocess.run(
             command,
@@ -36,7 +33,7 @@ def kill_ai_assistant_agent_docker():
             check=True
         )
         command = [
-            "docker", "rm", container_name
+            "docker", "rm", input_data.container_name
         ]
         result_rm = subprocess.run(
             command,
@@ -50,7 +47,6 @@ def kill_ai_assistant_agent_docker():
     return jsonify({"message": "Docker container killed successfully",
                     "output_stop": result_stop.stdout,
                     "output_rm": result_rm.stdout}), 200
-
 
 
 if __name__ == "__main__":

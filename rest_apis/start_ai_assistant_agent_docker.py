@@ -2,7 +2,7 @@
 from flask import Flask, request, jsonify
 from pydantic import ValidationError
 import subprocess
-from common import AiAssistantInputData, generate_docker_name
+from common import AiAssistantInputData
 
 
 app = Flask(__name__)
@@ -21,14 +21,11 @@ def start_ai_assistant_agent_docker():
     except ValidationError as e:
         return jsonify({"error": "Invalid input data", "details": e.errors()}), 400
 
-    # Create a name for the Docker container with the user id
-    container_name = generate_docker_name(input_data.user_id)
-
     # Call the docker with the provided parameters
     try:
         command = [
             "docker", "run", "-d", "--network=host",
-            "--name", container_name,
+            "--name", input_data.container_name,
             "ai_assistant_image",
             f"--broker={input_data.broker}",
             f"--port={input_data.port}",

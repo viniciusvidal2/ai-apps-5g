@@ -51,6 +51,8 @@ The LLM models will reside inside the docker image for now, and are pulled when 
 - gemma3:12b
 - gemma3:27b
 - qwen3-embedding:0.6b
+- nemotron-3-nano:30b
+- glm-4.7-flash:q8_0
 
 You can find more models in [ollama library website link](https://ollama.com/library).
 
@@ -61,11 +63,11 @@ We must have the dependencies set to build the image:
 - A generated database inside the __dbs__ folder.
 - The models we want to pull, with names annotated
 
-Use the following command to build the image (this example pulls all the proposed models from above section):
+Use the following command to build the image (this example pulls only the mandatory ones, but fell free to add all the ones listed above):
 
 ```bash
 docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent --build-arg OLLAMA_MODELS_TO_PULL="gemma3:4b gemma3:12b gemma3:27b qwen3-
-embedding:0.6b" .
+embedding:0.6b nemotron-3-nano:30b glm-4.7-flash:q8_0" .
 ```
 
 ## Running the docker container

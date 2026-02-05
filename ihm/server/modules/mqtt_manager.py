@@ -131,21 +131,22 @@ class MQTTClientManager:
                 self.responses.pop(request_id, None)
 
 
-def initialize_mqtt_client() -> bool:
-    """Create and connect the MQTT client if it is not ready."""
-    if state.mqtt_client_manager and state.mqtt_client_manager.connected:
-        return True
-
+def initialize_mqtt_client() -> "MQTTClientManager | None":
+    """Create and connect a new MQTT client for a session.
+    
+    Returns:
+        MQTTClientManager: The connected MQTT client, or None if connection failed.
+    """
     try:
-        state.mqtt_client_manager = MQTTClientManager(
+        mqtt_client = MQTTClientManager(
             broker=MQTT_BROKER,
             port=MQTT_PORT,
             input_topic=MQTT_INPUT_TOPIC,
             output_topic=MQTT_OUTPUT_TOPIC,
         )
-        state.mqtt_client_manager.connect()
-        return True
+        mqtt_client.connect()
+        logger.info(f"✅ MQTT client initialized and connected to {MQTT_BROKER}:{MQTT_PORT}")
+        return mqtt_client
     except Exception as exc:  # pragma: no cover - connection errors
         logger.exception("Error initializing MQTT client: %s", exc)
-        state.mqtt_client_manager = None
-        return False
+        return None

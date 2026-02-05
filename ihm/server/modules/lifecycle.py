@@ -14,19 +14,31 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
-        # Clean up MQTT clients for all users
-        for user_id, mqtt_client in list(state.user_mqtt_clients.items()):
-            mqtt_client.disconnect()
-        state.user_mqtt_clients.clear()
+        # Clean up MQTT clients for all sessions
+        for session_id, mqtt_client in list(state.session_mqtt_clients.items()):
+            try:
+                mqtt_client.disconnect()
+            except Exception:
+                pass  # Ignore errors during shutdown
+        state.session_mqtt_clients.clear()
         
-        # Stop Docker containers for all users
+        # Stop Docker containers for all sessions
         if USE_AI_ASSISTANT:
-            for user_id in list(state.user_docker_containers.keys()):
-                await kill_ai_assistant_agent(user_id=user_id)
-            state.user_docker_containers.clear()
+            for session_id in list(state.session_docker_containers.keys()):
+                session_data = state.active_sessions.get(session_id, {})
+                user_id = session_data.get("user_id", state.last_user_id or "1")
+                try:
+                    await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
+                except Exception:
+                    pass  # Ignore errors during shutdown
+            state.session_docker_containers.clear()
         
-        # Clean up deprecated global variables
+        # Clean up deprecated global variables (backward compatibility)
         if state.mqtt_client_manager:
-            state.mqtt_client_manager.disconnect()
+            try:
+                state.mqtt_client_manager.disconnect()
+            except Exception:
+                pass
             state.mqtt_client_manager = None
         state.docker_container_running = False
+        state.active_sessions.clear()

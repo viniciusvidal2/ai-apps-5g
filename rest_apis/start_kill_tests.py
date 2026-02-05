@@ -23,7 +23,8 @@ def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: 
         "user_id": user_id,
         "input_topic": input_topic,
         "output_topic": output_topic,
-        "inference_model_name": inference_model_name
+        "inference_model_name": inference_model_name,
+        "container_name": f"ai_assistant_{user_id}"
     }
     response = requests.post(url, json=payload)
     return response
@@ -37,7 +38,8 @@ def kill_ai_assistant_agent(user_id: int) -> requests.Response:
     """
     url = "http://localhost:8001/ai_assistant/kill_docker"
     payload = {
-        "user_id": user_id
+        "user_id": user_id,
+        "container_name": f"ai_assistant_{user_id}"
     }
     response = requests.post(url, json=payload)
     return response

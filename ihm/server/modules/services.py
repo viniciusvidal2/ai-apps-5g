@@ -66,15 +66,25 @@ async def shutdown_services_if_idle(session_id: str, user_id: str) -> bool:
     if session_id in state.session_mqtt_clients:
         logger.info(f"📡 DISCONNECTING MQTT CLIENT for session {session_id}")
         print(f"📡 DISCONNECTING MQTT CLIENT for session {session_id}")
-        state.session_mqtt_clients[session_id].disconnect()
-        del state.session_mqtt_clients[session_id]
+        try:
+            state.session_mqtt_clients[session_id].disconnect()
+        except Exception as e:
+            logger.warning(f"⚠️  Error disconnecting MQTT client: {e}")
+            print(f"⚠️  Error disconnecting MQTT client: {e}")
+        finally:
+            del state.session_mqtt_clients[session_id]
     
     # Stop Docker container for this session
     if session_id in state.session_docker_containers and state.session_docker_containers[session_id]:
         logger.info(f"🔄 STOPPING DOCKER - Calling kill_ai_assistant_agent")
         print(f"🔄 STOPPING DOCKER - Calling kill_ai_assistant_agent")
-        await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
-        del state.session_docker_containers[session_id]
+        try:
+            await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
+        except Exception as e:
+            logger.warning(f"⚠️  Error stopping Docker: {e}")
+            print(f"⚠️  Error stopping Docker: {e}")
+        finally:
+            del state.session_docker_containers[session_id]
         logger.info(f"✅ SERVICES STOPPED for session {session_id}")
         print(f"✅ SERVICES STOPPED for session {session_id}")
         return True

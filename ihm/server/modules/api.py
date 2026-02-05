@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Dict
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from ihm.server import state
@@ -94,60 +94,65 @@ async def turn_on_services(request: ServiceRequest) -> ServiceResponse:
 
 
 @router.post("/turn_off_services")
-async def turn_off_services(request: Request) -> Dict[str, str]:
+async def turn_off_services(request: Request, background_tasks: BackgroundTasks) -> Dict[str, str]:
     """Remove a session and immediately stop services (Docker + MQTT) for this session."""
-    data: Dict[str, str] = {}
-    body = await request.body()
-    if body:
-        try:
-            data = json.loads(body.decode("utf-8"))
-        except json.JSONDecodeError as exc:
-            raise HTTPException(status_code=400, detail=f"Invalid request body: {exc}")
+    try:
+        data: Dict[str, str] = {}
+        body = await request.body()
+        if body:
+            try:
+                data = json.loads(body.decode("utf-8"))
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid request body: {exc}")
 
-    session_id = data.get("session_id", "")
-    if not session_id:
-        raise HTTPException(status_code=400, detail="No session_id provided")
+        session_id = data.get("session_id", "")
+        if not session_id:
+            raise HTTPException(status_code=400, detail="No session_id provided")
 
-    session_data = state.active_sessions.pop(session_id, None)
-    user_id = session_data.get("user_id") if session_data else state.last_user_id or "1"
-    active_count = len(state.active_sessions)
-    
-    # Count remaining sessions for this specific user
-    user_session_count = sum(
-        1 for session_data in state.active_sessions.values() 
-        if session_data.get("user_id") == user_id
-    )
-    
-    # Log when someone closes the app (tab/guide)
-    logger.info(
-        f"🔴 SESSION ENDED - User ID: {user_id}, "
-        f"Session ID: {session_id}, "
-        f"Total Remaining Sessions: {active_count}, "
-        f"User Remaining Sessions: {user_session_count}"
-    )
-    print(
-        f"🔴 SESSION ENDED - User ID: {user_id}, "
-        f"Session ID: {session_id}, "
-        f"Total Remaining Sessions: {active_count}, "
-        f"User Remaining Sessions: {user_session_count}"
-    )
-    
-    services_shutdown = await shutdown_services_if_idle(session_id=session_id, user_id=user_id)
-    
-    if services_shutdown:
+        session_data = state.active_sessions.pop(session_id, None)
+        user_id = session_data.get("user_id") if session_data else state.last_user_id or "1"
+        active_count = len(state.active_sessions)
+        
+        # Count remaining sessions for this specific user
+        user_session_count = sum(
+            1 for session_data in state.active_sessions.values() 
+            if session_data.get("user_id") == user_id
+        )
+        
+        # Log when someone closes the app (tab/guide)
+        logger.info(
+            f"🔴 SESSION ENDED - User ID: {user_id}, "
+            f"Session ID: {session_id}, "
+            f"Total Remaining Sessions: {active_count}, "
+            f"User Remaining Sessions: {user_session_count}"
+        )
+        print(
+            f"🔴 SESSION ENDED - User ID: {user_id}, "
+            f"Session ID: {session_id}, "
+            f"Total Remaining Sessions: {active_count}, "
+            f"User Remaining Sessions: {user_session_count}"
+        )
+        
+        # Use background task to ensure cleanup happens even if client disconnects
+        background_tasks.add_task(shutdown_services_if_idle, session_id=session_id, user_id=user_id)
+        
         return {
             "status": "ok",
-            "message": f"Services stopped for session {session_id}",
+            "message": f"Services shutdown initiated for session {session_id}",
             "active_sessions_count": str(active_count),
             "user_sessions_count": str(user_session_count),
         }
-
-    return {
-        "status": "ok",
-        "message": f"Session {session_id} removed (services were not running)",
-        "active_sessions_count": str(active_count),
-        "user_sessions_count": str(user_session_count),
-    }
+    except Exception as e:
+        # If the client disconnected before we could respond, log it but don't raise
+        logger.warning(f"⚠️  Error in turn_off_services (client may have disconnected): {e}")
+        print(f"⚠️  Error in turn_off_services (client may have disconnected): {e}")
+        # Still try to clean up the session in the background if we have the session_id
+        if 'session_id' in locals() and session_id:
+            try:
+                background_tasks.add_task(shutdown_services_if_idle, session_id=session_id, user_id=user_id)
+            except Exception as cleanup_error:
+                logger.error(f"❌ Error adding cleanup background task: {cleanup_error}")
+        raise
 
 
 @router.post("/inference")

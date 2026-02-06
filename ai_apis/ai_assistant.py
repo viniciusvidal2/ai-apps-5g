@@ -125,6 +125,15 @@ class AiAssistant:
         """
         self.n_chunks = n_chunks
 
+    def set_assistant_conversation_summary(self, summary: str) -> None:
+        """
+        Manually sets the conversation summary for the assistant.
+
+        Args:
+            summary (str): The conversation summary string to set.
+        """
+        self.history_summary = summary
+
     def set_assistant_model(self, inference_model_name: str) -> None:
         """
         Sets the inference model for the assistant.
@@ -219,6 +228,15 @@ class AiAssistant:
             str: The current status string of the assistant.
         """
         return self.status
+    
+    def get_assistant_conversation_summary(self) -> str:
+        """
+        Returns the current conversation summary of the assistant.
+
+        Returns:
+            str: The current conversation summary.
+        """
+        return self.history_summary
 
 # endregion
 # region webbased methods
@@ -327,8 +345,6 @@ class AiAssistant:
         # Improve query formulation before retrieval to maximize relevance of retrieved chunks
         self.status = "Melhorando a formulação da consulta para recuperação."
         improved_query = self.query_improver.invoke({"input": query}).content
-        print(f"Original Query: {query}")
-        print(f"\nImproved Query for Retrieval: {improved_query}")
 
         # Retrieve relevant documents from the vectorstore
         self.status = "Recuperando documentos relevantes da base de dados."

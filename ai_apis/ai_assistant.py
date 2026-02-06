@@ -102,6 +102,8 @@ class AiAssistant:
         # URL and Web content extractor
         self.web_extractor = WebContentExtractor(device="cpu")
         print("AI Assistant initialized successfully.")
+        # Assistant status string for agent analysis
+        self.status = "Assistente inicializado e pronto para processar mensagens."
 
     def set_chunking_parameters(self, chunk_size: int, chunk_overlap: int) -> None:
         """
@@ -209,6 +211,15 @@ class AiAssistant:
             print(f"Failed to query Ollama models: {e}")
             return []
 
+    def get_assistant_status(self) -> str:
+        """
+        Returns the current status of the assistant for agent analysis.
+
+        Returns:
+            str: The current status string of the assistant.
+        """
+        return self.status
+
 # endregion
 # region webbased methods
 
@@ -314,11 +325,13 @@ class AiAssistant:
             vectorstore = self.documents_vectorstore
 
         # Improve query formulation before retrieval to maximize relevance of retrieved chunks
+        self.status = "Melhorando a formulação da consulta para recuperação."
         improved_query = self.query_improver.invoke({"input": query}).content
         print(f"Original Query: {query}")
         print(f"\nImproved Query for Retrieval: {improved_query}")
 
         # Retrieve relevant documents from the vectorstore
+        self.status = "Recuperando documentos relevantes da base de dados."
         context_string = ""
         if vectorstore:
             document_chunks = vectorstore.similarity_search(
@@ -337,11 +350,13 @@ class AiAssistant:
         # Check if we have URLs to extract context from and add to context
         urls = self.web_extractor.extract_and_validate_urls(text=query)
         if urls:
+            self.status = "Extraindo contexto relevante das URLs fornecidas."
             url_context = self.find_context_from_urls(
                 urls, query, top_k=self.n_chunks)
             context_string = "\n".join([context_string, url_context])
 
         # Fill the RAG prompt
+        self.status = "Preenchendo o prompt RAG final."
         final_prompt_value = self.rag_prompt.format_prompt(
             history_summary=self.history_summary if self.history_summary else "Nenhuma conversa anterior.",
             context=context_string,
@@ -376,20 +391,24 @@ class AiAssistant:
         """
         # Step 1: Build the prompt
         print("Building RAG prompt...")
+        self.status = "Construindo o prompt para a consulta do usuário."
         prompt_data = self.build_rag_prompt(
             query=user_query, vectorstore_name=vectorstore_name)
 
         # Step 2: Run inference
         print("Running inference...")
+        self.status = "Executando inferência com a IA."
         response = self.llm.invoke(prompt_data["prompt"].messages).content
 
         # Step 3: Obtain the history summary from the conversation so far
+        self.status = "Atualizando o resumo do histórico da conversa."
         summmary_result = self.history_summarizer.invoke({
             "summary": self.history_summary,
             "new_lines": f"USUARIO: {user_query} \n CHUNKS DE CONTEXTO DA BASE DE DADOS: {prompt_data['context_string']} \n ASSISTENTE: {response}",
         })
         self.history_summary = summmary_result.content
 
+        self.status = "Inferência concluída com sucesso. Assistente está pronto para processar mensagens."
         print("Inference pipeline completed.")
         return response
 

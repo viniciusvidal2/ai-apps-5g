@@ -38,9 +38,6 @@ class AiAssistant:
         self.set_assistant_model(
             inference_model_name=self.inference_model_name)
         # Dealing with history of conversation
-        history_client = chromadb.Client()
-        self.history_vectorstore = Chroma(
-            client=history_client, embedding_function=self.embedding_function)
         HISTORY_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você resume conversas em português de forma objetiva."),
             ("human",
@@ -64,9 +61,9 @@ class AiAssistant:
             ("system",
              "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO e HISTORICO DE CONVERSA fornecidos, "
              "mas tambem pode usar seu conhecimento geral. Cada CHUNK DE CONTEXTO e um trecho de um CONTEUDO de documento que pode conter informaçoes relevantes. "
-             "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta. \n"
+             "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta.\n"
              "Este e o SUMARIO do que foi falado no HISTORICO DE CONVERSA ate agora:\n{history_summary}\n"
-             "CONTEXTO:\n{history_context}\n"
+             "CONTEXTO:\n"
              "\n{context}"),
             ("human", "{input}"),
         ])
@@ -288,16 +285,6 @@ class AiAssistant:
         if vectorstore_name == "documents":
             vectorstore = self.documents_vectorstore
 
-        # Retrieve relevant history from the history vectorstore
-        history_chunks = self.history_vectorstore.similarity_search(query, k=2)
-        history_context = "\n".join([hc.page_content for hc in history_chunks])
-        # Obtain the history summary and interesting history context
-        summmary_result = self.history_summarizer.invoke({
-            "summary": self.history_summary,
-            "new_lines": history_context,
-        })
-        self.history_summary = summmary_result.content
-
         # Retrieve relevant documents from the vectorstore
         context_string = ""
         if vectorstore:
@@ -323,8 +310,7 @@ class AiAssistant:
 
         # Fill the RAG prompt
         final_prompt_value = self.rag_prompt.format_prompt(
-            history_summary=self.history_summary,
-            history_context=history_context,
+            history_summary=self.history_summary if self.history_summary else "Nenhuma conversa anterior.",
             context=context_string,
             input=query,
         )
@@ -364,11 +350,12 @@ class AiAssistant:
         print("Running inference...")
         response = self.llm.invoke(prompt_data["prompt"].messages).content
 
-        # Step 3: Adding to history
-        print("Updating conversation history...")
-        self.history_vectorstore.add_texts(
-            [f"USUARIO: {user_query}\nCONTEXTO: {prompt_data['context_string']}\nASSISTENTE: {response}"]
-        )
+        # Step 3: Obtain the history summary from the conversation so far
+        summmary_result = self.history_summarizer.invoke({
+            "summary": self.history_summary,
+            "new_lines": f"USUARIO: {user_query} \n CHUNKS DE CONTEXTO DA BASE DE DADOS: {prompt_data['context_string']} \n ASSISTENTE: {response}",
+        })
+        self.history_summary = summmary_result.content
 
         print("Inference pipeline completed.")
         return response
@@ -381,7 +368,7 @@ if __name__ == "__main__":
     ############ Object creation and setup ############
     # Model to be used
     embedding_model_name = "qwen3-embedding:0.6b"
-    inference_model_name = "gemma3:4b"
+    inference_model_name = "nemotron-3-nano:30b"
 
     # Initialize the AI Assistant
     print("Initializing AI Assistant...")

@@ -57,6 +57,25 @@ class AiAssistant:
         ])
         self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
         self.history_summary = ""
+        # Query improvement stage
+        QUERY_IMPROVEMENT_PROMPT = ChatPromptTemplate.from_messages([
+            (
+                "system",
+                """Voce e um assistente de IA especializado em reformular perguntas para maximizar a relevância dos resultados recuperados de uma base de dados e da web. 
+                Sua tarefa é pegar a pergunta original do usuário e reescrevê-la de forma mais clara, 
+                objetiva e detalhada, mantendo o significado original, 
+                mas melhorando a formulação para obter melhores respostas do assistente de IA.
+                """,
+            ),
+            (
+                "human",
+                """Dada a pergunta do usuário abaixo, reescreva-a para ser mais clara, objetiva e detalhada, 
+                de forma a maximizar a relevância dos resultados recuperados da base de dados e da web. 
+                Mantenha o significado original, mas melhore a formulação para obter melhores respostas do assistente de IA.\n
+                "Pergunta original: {input}""",
+            ),
+        ])
+        self.query_improver = QUERY_IMPROVEMENT_PROMPT | self.llm
         # Initialize the prompt templates for rag
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---
@@ -294,11 +313,16 @@ class AiAssistant:
         if vectorstore_name == "documents":
             vectorstore = self.documents_vectorstore
 
+        # Improve query formulation before retrieval to maximize relevance of retrieved chunks
+        improved_query = self.query_improver.invoke({"input": query}).content
+        print(f"Original Query: {query}")
+        print(f"\nImproved Query for Retrieval: {improved_query}")
+
         # Retrieve relevant documents from the vectorstore
         context_string = ""
         if vectorstore:
             document_chunks = vectorstore.similarity_search(
-                query, k=self.n_chunks)
+                improved_query, k=self.n_chunks)
             # Format retrieved docs into context
             formatted_context_chunks = [
                 self.document_prompt.format(

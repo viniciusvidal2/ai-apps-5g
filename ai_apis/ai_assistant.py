@@ -1,10 +1,9 @@
-from langchain_ollama import OllamaEmbeddings, ChatOllama
-from langchain_chroma import Chroma
-from langchain_community.document_loaders import PyPDFLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from httpx import ConnectError, ConnectTimeout
+import chromadb
+from chromadb.config import Settings
 from typing import Dict, Any, List
-import os
 import subprocess
 from time import sleep
 import requests
@@ -13,24 +12,20 @@ from ai_apis.web_content_extractor import WebContentExtractor
 
 class AiAssistant:
     # region Initialization and Setup
-    def __init__(self, embedding_model_name: str, inference_model_name: str, documents_db_path: str, collection_name: str) -> None:
+    def __init__(self, inference_model_name: str, db_ip_address: str = "localhost") -> None:
         """
         Initializes the AI Assistant with the specified models and database path.
 
         Args:
-            embedding_model_name (str): The name of the Ollama embedding model to use.
             inference_model_name (str): The name of the Ollama inference model to use.
-            documents_db_path (str): The directory path where the Chroma database will be stored.
-            collection_name (str): The name of the collection within the Chroma database.
+            db_ip_address (str): The IP address of the ChromaDB server. Defaults to "localhost".
         """
-        self.embedding_model_name = embedding_model_name
         self.inference_model_name = inference_model_name
-        self.documents_db_path = documents_db_path
-        self.collection_name = collection_name
-        self.embedding_function = OllamaEmbeddings(
-            model=self.embedding_model_name)
-        self.documents_vectorstore = self._load_or_initialize_db(path=self.documents_db_path,
-                                                                 collection_name=self.collection_name)
+        self.db_ip_address = db_ip_address
+
+        # Connect to the ChromaDB server
+        print("Connecting to ChromaDB server...")
+        self.db_client = self._connect_to_chromadb()
 
         # This assumes you have the model pulled and Ollama is running
         self.expected_llm_models = self._get_available_ollama_models()
@@ -96,25 +91,41 @@ class AiAssistant:
             ("human", "PERGUNTA ATUAL: {input}"),
         ])
         # Chunk parameters
-        self.chunk_size = 10000  # tokens
-        self.chunk_overlap = 200  # tokens
         self.n_chunks = 3
         # URL and Web content extractor
         self.web_extractor = WebContentExtractor(device="cpu")
-        print("AI Assistant initialized successfully.")
         # Assistant status string for agent analysis
         self.status = "Assistente inicializado e pronto para processar mensagens."
+        print("AI Assistant initialized successfully.")
 
-    def set_chunking_parameters(self, chunk_size: int, chunk_overlap: int) -> None:
+    def _connect_to_chromadb(self) -> chromadb.api.client.Client:
         """
-        Sets the chunking parameters for document processing.
+        Connects to the ChromaDB server and returns the client instance.
 
-        Args:
-            chunk_size (int): The maximum number of characters in each chunk.
-            chunk_overlap (int): The number of characters to overlap between chunks.
+        Returns:
+            chromadb.api.Client: The connected ChromaDB client instance.
         """
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
+        try:
+            client = chromadb.HttpClient(
+                host=self.db_ip_address,
+                port=8000,
+                settings=Settings(
+                    chroma_server_ssl_verify=False
+                )
+            )
+            client.heartbeat()
+            print(
+                f"✅ Successfully connected to ChromaDB at {self.ip_address}:{self.port}")
+            return client
+        except (ConnectError, ConnectTimeout) as e:
+            print(
+                f"❌ Connection Failed: Could not reach ChromaDB at {self.ip_address}:{self.port}.")
+            print(f"Internal Error: {e}")
+            return None
+        except Exception as e:
+            print(
+                f"⚠️ An unexpected error occurred during initialization: {e}")
+            return None
 
     def set_chunks_to_retrieve(self, n_chunks: int) -> None:
         """
@@ -164,38 +175,8 @@ class AiAssistant:
         self.set_assistant_model(inference_model_name=inference_model_name)
 
     def close_assistant(self) -> None:
-        """
-        Closes the assistant and performs any necessary cleanup, especially in the models.
-        """
+        """Closes the assistant and performs any necessary cleanup, especially in the models."""
         subprocess.run(["ollama", "stop", self.inference_model_name])
-        subprocess.run(["ollama", "stop", self.embedding_model_name])
-
-    def _load_or_initialize_db(self, path: str, collection_name: str) -> Chroma:
-        """
-        Loads an existing DB or initializes an empty one if the path is empty/new.
-
-        Args:
-            path (str): The directory path where the Chroma database is stored.
-            collection_name (str): The name of the collection within the Chroma database.
-
-        Returns:
-            Chroma: The loaded or newly created Chroma vector store.
-        """
-        try:
-            # Try to load existing database
-            db = Chroma(
-                persist_directory=path,
-                embedding_function=self.embedding_function,
-                collection_name=collection_name,
-            )
-            return db
-        except Exception:
-            # Create a new, empty Chroma instance for the first run
-            return Chroma(
-                persist_directory=path,
-                embedding_function=self.embedding_function,
-                collection_name=collection_name,
-            )
 
     def _get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
         """
@@ -228,7 +209,7 @@ class AiAssistant:
             str: The current status string of the assistant.
         """
         return self.status
-    
+
     def get_assistant_conversation_summary(self) -> str:
         """
         Returns the current conversation summary of the assistant.
@@ -272,76 +253,17 @@ class AiAssistant:
 # endregion
 # region Database RAG methods
 
-    def add_document_to_db(self, document_path: str, source_name: str) -> None:
-        """
-        Takes a raw document string, chunks it, and adds the chunks to the vector database.
-
-        Args:
-            document_path (str): The file path to the document to be added.
-            source_name (str): A name/identifier for the document to use in the metadata.
-        """
-        print(f"\n--- Adding Document: {source_name} ---")
-        # Check if the document was already added to the database
-        if self.documents_vectorstore:
-            existing_docs = self.documents_vectorstore.similarity_search(
-                query=source_name, k=10)
-            for doc in existing_docs:
-                if doc.metadata.get("source") == source_name:
-                    print(
-                        f"Document '{source_name}' already exists in the database. Skipping addition.")
-                    return
-        # Load the document using PyPDFLoader
-        loader = PyPDFLoader(document_path)
-        pages = loader.load()  # Pages are returned as a list of Document objects
-        # Initialize Text Splitter
-        text_splitter = RecursiveCharacterTextSplitter(
-            separators=["\n\n", "\n", " ", ""],
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-        )
-        # Convert text chunks to LangChain Document objects and add metadata
-        document_chunks = text_splitter.split_documents(pages)
-
-        # Enhance Metadata for easier tracking
-        # The chunking process already created LangChain Document objects,
-        # but we can iterate to add a 'full_source' and 'chunk_index' field.
-        for i, chunk in enumerate(document_chunks):
-            page_info = f"Page: {chunk.metadata.get('page', 'N/A')}"
-            chunk.metadata.update({
-                "source": source_name,  # Overwrite the 'source' path if PyPDFLoader set a full path
-                "chunk_index": i,
-                "full_source": f"File: {source_name}, {page_info}, Chunk: {i}"
-            })
-            # Clean up any potential extra metadata from the loader if necessary (e.g., total_pages)
-            if 'total_pages' in chunk.metadata:
-                del chunk.metadata['total_pages']
-
-        # Add documents to the Vector Store and Persist
-        if document_chunks:
-            print(
-                f"Generated {len(document_chunks)} chunks of size up to {self.chunk_size}.")
-            # Use Chroma's add_documents method to insert and embed the chunks
-            self.documents_vectorstore.add_documents(documents=document_chunks)
-            print(
-                f"Successfully added {len(document_chunks)} chunks to the database.")
-        else:
-            print("Document was empty or too short to chunk.")
-
-    def build_rag_prompt(self, query: str, vectorstore_name: str) -> Dict[str, Any]:
+    def build_rag_prompt(self, query: str, collection_name: str) -> Dict[str, Any]:
         """
         Retrieves documents from the vectorstore and builds the final RAG prompt.
 
         Args:
             query (str): The user's input query.
-            vectorstore_name (str): The name of the vectorstore to use ('documents' or 'urls').
+            collection_name (str): The name of the collection to use ('documents' or 'none').
 
         Returns:
             Dict[str, Any]: Contains the final prompt string, retrieved docs, and context string.
         """
-        vectorstore = None
-        if vectorstore_name == "documents":
-            vectorstore = self.documents_vectorstore
-
         # Improve query formulation before retrieval to maximize relevance of retrieved chunks
         self.status = "Melhorando a formulação da consulta para recuperação."
         improved_query = self.query_improver.invoke({"input": query}).content
@@ -349,19 +271,24 @@ class AiAssistant:
         # Retrieve relevant documents from the vectorstore
         self.status = "Recuperando documentos relevantes da base de dados."
         context_string = ""
-        if vectorstore:
-            document_chunks = vectorstore.similarity_search(
-                improved_query, k=self.n_chunks)
-            # Format retrieved docs into context
-            formatted_context_chunks = [
-                self.document_prompt.format(
-                    page_content=dc.page_content,
-                    source=dc.metadata.get("source", "Unknown"),
-                    page=dc.metadata.get("page", "N/A"),
+        if self.db_client is not None:
+            collection = self.db_client.get_collection(name=collection_name)
+            if collection is not None:
+                results = collection.query(
+                    query_texts=[improved_query],
+                    n_results=self.n_chunks
                 )
-                for dc in document_chunks
-            ]
-            context_string = "\n".join(formatted_context_chunks)
+                formatted_context_chunks = [
+                    self.document_prompt.format(
+                        page_content=dc.page_content,
+                        source=dc.metadata.get("source", "Unknown"),
+                        page=dc.metadata.get("page", "N/A"),
+                    )
+                    for dc in results['documents'][0]
+                ]
+                context_string = "\n".join(formatted_context_chunks)
+        else:
+            print("Base de dados inacessivel. Nao foi possivel recuperar documentos.")
 
         # Check if we have URLs to extract context from and add to context
         urls = self.web_extractor.extract_and_validate_urls(text=query)
@@ -394,13 +321,13 @@ class AiAssistant:
 # endregion
 # region Inference related methods
 
-    def run_inference_pipeline(self, user_query: str, vectorstore_name: str = "documents") -> str:
+    def run_inference_pipeline(self, user_query: str, collection_name: str = "documents") -> str:
         """
         Runs the full inference pipeline: builds the prompt (with or without RAG), runs inference, and returns the answer.
 
         Args:
             user_query (str): The user's input query.
-            vectorstore_name (str): The name of the vectorstore to use ('documents' or 'None').
+            collection_name (str): The name of the collection to use ('documents' or 'None').
 
         Returns:
             str: The final response from the inference pipeline.
@@ -409,8 +336,7 @@ class AiAssistant:
         print("Building RAG prompt...")
         self.status = "Construindo o prompt para a consulta do usuário."
         prompt_data = self.build_rag_prompt(
-            query=user_query, vectorstore_name=vectorstore_name)
-
+            query=user_query, collection_name=collection_name)
         # Step 2: Run inference
         print("Running inference...")
         self.status = "Executando inferência com a IA."
@@ -435,41 +361,16 @@ class AiAssistant:
 if __name__ == "__main__":
     ############ Object creation and setup ############
     # Model to be used
-    embedding_model_name = "qwen3-embedding:0.6b"
     inference_model_name = "nemotron-3-nano:30b"
 
     # Initialize the AI Assistant
     print("Initializing AI Assistant...")
     ai_assistant = AiAssistant(
-        embedding_model_name=embedding_model_name,
         inference_model_name=inference_model_name,
-        documents_db_path="./dbs/chroma_documents_db",
-        collection_name="dev_collection"
+        db_ip_address="localhost"
     )
-
-    # Setting pdf chunking parameters
-    ai_assistant.set_chunking_parameters(
-        chunk_size=3000, chunk_overlap=200)
     ai_assistant.set_chunks_to_retrieve(n_chunks=3)
 
-    ############ Database formation ############
-    # Example PDF files to add to the database
-    pdf_files = [
-        "/home/vini/Downloads/Passagem - SP - Setembro.pdf",
-        "/home/vini/Downloads/Hotel SP Setembro 2025.pdf",
-        "/home/vini/Downloads/box 31 servicos.pdf",
-        "/home/vini/Downloads/contrato natal.pdf",
-        "/home/vini/Downloads/Relatório_de_Atividades___Integração_de_Dados.pdf",
-        "/home/vini/Downloads/apex_manual.pdf"
-    ]
-    # pdf_files = [
-    #     "/home/vini/Downloads/5g_docs/COE_ELET - 00 - CÓDIGO DE CONDUTA ELETROBRAS 2024 - COMPLIANCE.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GA-0001 - 02 - TRANSPORTE DE PASSAGEIROS E UTILIZAÇÃO DE VEÍCULOS - ADM.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GF-0004 - 03 - REEMBOLSO DE DESPESAS E VIAGENS - FI.pdf",
-    #     "/home/vini/Downloads/5g_docs/PGC-GSC-0001 - 01 - PGC-GSC-0001 - Procedimento de Avaliação de Fornecedores Rev Final - CONT.pdf",
-    #     "/home/vini/Downloads/5g_docs/PLT-0001 - 02 - PLT-0001 - 02 - POLÍTICA DE TECNOLOGIA DE INFORMAÇÃO TI.pdf",
-    #     "/home/vini/Downloads/5g_docs/PLT-0008 - 01 - PLT-0008- POLÍTICA DO SISTEMA DE GESTÃO INTEGRADA - GMASST.pdf",
-    # ]
     # Example queries to test
     querys = [
         {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?"},
@@ -492,21 +393,13 @@ if __name__ == "__main__":
     #     {"question": "Quais práticas são proibidas nas relações com agentes públicos?"}
     # ]
 
-    ############ Adding documents to the database ############
-    for pdf_file in pdf_files:
-        # Add the PDF content to the RAG database
-        ai_assistant.add_document_to_db(
-            document_path=pdf_file,
-            source_name=os.path.basename(pdf_file)
-        )
-
     ############ Running Inference ############
     q_a = []
     for query in querys:
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
         response = ai_assistant.run_inference_pipeline(
-            user_query=query["question"], vectorstore_name="documents")
+            user_query=query["question"], collection_name="documents")
 
         # Print the response and sources if applicable
         print(f"USUARIO: {query['question']}")

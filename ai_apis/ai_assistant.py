@@ -3,7 +3,6 @@ from langchain_chroma import Chroma
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
-import chromadb
 from typing import Dict, Any, List
 import os
 import subprocess
@@ -39,11 +38,22 @@ class AiAssistant:
             inference_model_name=self.inference_model_name)
         # Dealing with history of conversation
         HISTORY_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Você resume conversas em português de forma objetiva."),
-            ("human",
-             "Resumo atual:\n{summary}\n\n"
-             "Novas mensagens:\n{new_lines}\n\n"
-             "Atualize o resumo em português."),
+            (
+                "system",
+                "Produza um resumo claro, objetivo e fiel em português."
+            ),
+            (
+                "human",
+                "Resumo existente:\n{summary}\n\n"
+                "Novas mensagens:\n{new_lines}\n\n"
+                "Atualize o resumo seguindo rigorosamente as regras abaixo:\n"
+                "- Preserve integralmente o significado e os detalhes das partes que foram mais relevantes para responder à pergunta mais recente.\n"
+                "- Priorize entender a intenção atual expressa nas mensagens mais recentes.\n"
+                "- Informações antigas podem ser reduzidas ou removidas se não contribuírem diretamente para essa intenção.\n"
+                "- Não repita instruções, papéis ou metarreferências.\n"
+                "- Escreva de forma contínua, objetiva e sem listas.\n"
+                "- O resultado deve servir como memória consolidada para interações futuras."
+            ),
         ])
         self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
         self.history_summary = ""
@@ -59,13 +69,12 @@ class AiAssistant:
             DOCUMENT_PROMPT_TEMPLATE)
         self.rag_prompt = ChatPromptTemplate.from_messages([
             ("system",
-             "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO e HISTORICO DE CONVERSA fornecidos, "
+             "Voce e um assistente de IA que ajuda a responder perguntas com base no CONTEXTO e SUMARIO do HISTORICO DE CONVERSA fornecidos, "
              "mas tambem pode usar seu conhecimento geral. Cada CHUNK DE CONTEXTO e um trecho de um CONTEUDO de documento que pode conter informaçoes relevantes. "
              "Voce deve sempre retornar a fonte e a pagina de cada CHUNK DE CONTEXTO que voce usou para construir sua resposta.\n"
              "Este e o SUMARIO do que foi falado no HISTORICO DE CONVERSA ate agora:\n{history_summary}\n"
-             "CONTEXTO:\n"
-             "\n{context}"),
-            ("human", "{input}"),
+             "CONTEXTO:\n{context}\n"),
+            ("human", "PERGUNTA ATUAL: {input}"),
         ])
         # Chunk parameters
         self.chunk_size = 10000  # tokens

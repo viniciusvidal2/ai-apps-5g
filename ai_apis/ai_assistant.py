@@ -115,11 +115,11 @@ class AiAssistant:
             )
             client.heartbeat()
             print(
-                f"✅ Successfully connected to ChromaDB at {self.ip_address}:{self.port}")
+                f"✅ Successfully connected to ChromaDB at {self.db_ip_address}:8000")
             return client
         except (ConnectError, ConnectTimeout) as e:
             print(
-                f"❌ Connection Failed: Could not reach ChromaDB at {self.ip_address}:{self.port}.")
+                f"❌ Connection Failed: Could not reach ChromaDB at {self.db_ip_address}:8000.")
             print(f"Internal Error: {e}")
             return None
         except Exception as e:
@@ -265,40 +265,47 @@ class AiAssistant:
             Dict[str, Any]: Contains the final prompt string, retrieved docs, and context string.
         """
         # Improve query formulation before retrieval to maximize relevance of retrieved chunks
+        print("Improving query formulation for better retrieval...")
         self.status = "Melhorando a formulação da consulta para recuperação."
         improved_query = self.query_improver.invoke({"input": query}).content
 
         # Retrieve relevant documents from the vectorstore
+        print("Retrieving relevant documents from the vectorstore...")
         self.status = "Recuperando documentos relevantes da base de dados."
         context_string = ""
         if self.db_client is not None:
-            collection = self.db_client.get_collection(name=collection_name)
-            if collection is not None:
+            try:
+                collection = self.db_client.get_collection(
+                    name=collection_name)
                 results = collection.query(
                     query_texts=[improved_query],
                     n_results=self.n_chunks
                 )
                 formatted_context_chunks = [
                     self.document_prompt.format(
-                        page_content=dc.page_content,
-                        source=dc.metadata.get("source", "Unknown"),
-                        page=dc.metadata.get("page", "N/A"),
+                        page_content=dc,
+                        source=md.get("document_name", "Unknown"),
+                        page=md.get("page_number", "N/A"),
                     )
-                    for dc in results['documents'][0]
+                    for dc, md in zip(results['documents'][0], results['metadatas'][0])
                 ]
                 context_string = "\n".join(formatted_context_chunks)
-        else:
-            print("Base de dados inacessivel. Nao foi possivel recuperar documentos.")
+            except Exception as e:
+                print(f"Error retrieving documents from the database: {e}")
+                self.status = "Base de dados inacessível. Não foi possível recuperar documentos."
 
         # Check if we have URLs to extract context from and add to context
         urls = self.web_extractor.extract_and_validate_urls(text=query)
         if urls:
+            print(
+                f"Found URLs in the query. Extracting relevant context from the web for {len(urls)} URLs...")
             self.status = "Extraindo contexto relevante das URLs fornecidas."
             url_context = self.find_context_from_urls(
                 urls, query, top_k=self.n_chunks)
             context_string = "\n".join([context_string, url_context])
 
         # Fill the RAG prompt
+        print("Filling the RAG prompt with retrieved context and conversation history...")
         self.status = "Preenchendo o prompt RAG final."
         final_prompt_value = self.rag_prompt.format_prompt(
             history_summary=self.history_summary if self.history_summary else "Nenhuma conversa anterior.",
@@ -306,12 +313,12 @@ class AiAssistant:
             input=query,
         )
 
-        # final_prompt_string = final_prompt_value.to_string()
-        # # Debug print
-        # print("\n" + "=" * 50)
-        # print("🌟 FINAL PROMPT BUILT 🌟")
-        # print(final_prompt_string)
-        # print("=" * 50 + "\n")
+        final_prompt_string = final_prompt_value.to_string()
+        # Debug print
+        print("\n" + "=" * 50)
+        print("🌟 FINAL PROMPT BUILT 🌟")
+        print(final_prompt_string)
+        print("=" * 50 + "\n")
 
         return {
             "prompt": final_prompt_value,
@@ -372,26 +379,26 @@ if __name__ == "__main__":
     ai_assistant.set_chunks_to_retrieve(n_chunks=3)
 
     # Example queries to test
-    querys = [
-        {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?"},
-        {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao."},
-        {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?"},
-        {"question": "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?"}
-    ]
     # querys = [
-    #     {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"}
-    #     {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?"}
-    #     {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?"}
-    #     {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?"}
-    #     {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?"}
-    #     {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?"},
-    #     {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?"},
-    #     {"question": "Quais despesas não são reembolsáveis segundo o procedimento?"},
-    #     {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?"},
-    #     {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?"},
-    #     {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?"},
-    #     {"question": "Quais práticas são proibidas nas relações com agentes públicos?"}
+    #     {"question": "Qual é o código da minha reserva na passagem aérea para sao paulo?"},
+    #     {"question": "Na primeira pergunta queria saber o 'código da reserva', na parte de informaçao da viagem, por favor me confirme novamente. Também me forneça o Nome do passageiro, e seu documento de identificaçao."},
+    #     {"question": "No documento do contrato de natal, qual é o valor total do contrato por mês?"},
+    #     {"question": "Qual é a base da multa aplicada pelas agencias conforme a resoluçao normativa sob o link https://www2.aneel.gov.br/cedoc/ren2019846.html?"}
     # ]
+    querys = [
+        {"question": "Quais são os compromissos da Santo Antônio Energia em relação à saúde, segurança e meio ambiente?"},
+        {"question": "Como a Santo Antônio Energia promove a participação das partes interessadas no Sistema de Gestão Integrada?"},
+        {"question": "Quais são os principais critérios para que a Área de TI da Santo Antônio Energia defina o nível de apoio aos sistemas?"},
+        {"question": "Quais práticas são proibidas segundo a Política de TI da Santo Antônio Energia?"},
+        {"question": "Quais critérios são utilizados para avaliar fornecedores de serviços na Santo Antônio Energia?"},
+        {"question": "O que acontece quando um fornecedor obtém um IDF inferior a 70?"},
+        {"question": "Quais são os limites de reembolso para refeições durante viagens corporativas?"},
+        {"question": "Quais despesas não são reembolsáveis segundo o procedimento?"},
+        {"question": "Quais são as responsabilidades da empresa contratada no transporte de passageiros?"},
+        {"question": "Como funciona o transporte de integrantes em finais de semana, feriados e período noturno?"},
+        {"question": "Quais são os pilares que fundamentam o Código de Conduta da Eletrobras?"},
+        {"question": "Quais práticas são proibidas nas relações com agentes públicos?"}
+    ]
 
     ############ Running Inference ############
     q_a = []
@@ -399,7 +406,7 @@ if __name__ == "__main__":
         print("\n\n\n" + "-" * 80)
         print(f"--- Running Inference with {inference_model_name} ---")
         response = ai_assistant.run_inference_pipeline(
-            user_query=query["question"], collection_name="documents")
+            user_query=query["question"], collection_name="my_collection")
 
         # Print the response and sources if applicable
         print(f"USUARIO: {query['question']}")

@@ -313,12 +313,12 @@ class AiAssistant:
             input=query,
         )
 
-        final_prompt_string = final_prompt_value.to_string()
-        # Debug print
-        print("\n" + "=" * 50)
-        print("🌟 FINAL PROMPT BUILT 🌟")
-        print(final_prompt_string)
-        print("=" * 50 + "\n")
+        # final_prompt_string = final_prompt_value.to_string()
+        # # Debug print
+        # print("\n" + "=" * 50)
+        # print("🌟 FINAL PROMPT BUILT 🌟")
+        # print(final_prompt_string)
+        # print("=" * 50 + "\n")
 
         return {
             "prompt": final_prompt_value,

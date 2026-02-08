@@ -220,6 +220,33 @@ class AiAssistant:
             str: The current conversation summary.
         """
         return self.history_summary
+    
+    def get_collection_names(self) -> List[str]:
+        """
+        Returns the list of collection names available in the database.
+
+        Returns:
+            List[str]: The list of collection names available in the database.
+        """
+        if self.db_client is not None:
+            try:
+                collections = self.db_client.list_collections()
+                return [col.name for col in collections]
+            except Exception as e:
+                print(f"Error retrieving collections from the database: {e}")
+                return []
+        else:
+            print("Database client is not initialized.")
+            return []
+        
+    def get_inference_model_name(self) -> str:
+        """
+        Returns the name of the current inference model being used by the assistant.
+
+        Returns:
+            str: The name of the current inference model.
+        """
+        return self.inference_model_name
 
 # endregion
 # region webbased methods
@@ -253,7 +280,7 @@ class AiAssistant:
         return combined_text
 
 # endregion
-# region Database RAG methods
+# region Inference related methods
 
     def build_rag_prompt(self, query: str, collection_name: str) -> Dict[str, Any]:
         """
@@ -326,9 +353,6 @@ class AiAssistant:
             "prompt": final_prompt_value,
             "context_string": context_string,
         }
-
-# endregion
-# region Inference related methods
 
     def run_inference_pipeline(self, user_query: str, collection_name: str = "documents") -> str:
         """

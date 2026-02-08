@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 import uvicorn
 from modules.ai_assistant import AiAssistant
-from schemas import AppConfig
+from schemas import AppConfig, AiAssistantInferenceRequest
 
 
 def create_agent(config: AppConfig) -> FastAPI:
@@ -16,6 +16,9 @@ def create_agent(config: AppConfig) -> FastAPI:
     Returns:
         FastAPI: The configured FastAPI application instance.
     """
+
+    # region Application setup and endpoints
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """
@@ -28,7 +31,9 @@ def create_agent(config: AppConfig) -> FastAPI:
         # --- startup ---
         print("Starting application...")
         app.state.ai_assistant = AiAssistant(
-            inference_model_name=config.inference_model_name, db_ip_address=config.db_ip_address)
+            inference_model_name=config.inference_model_name,
+            db_ip_address=config.db_ip_address
+        )
         print("Ai Assistant agent is ready!")
 
         yield
@@ -63,6 +68,9 @@ def create_agent(config: AppConfig) -> FastAPI:
         """
         return {"status": "Running smoothly!"}
 
+    # endregion
+    # region AI Assistant gets
+
     @app.get("/ai_assistant/status")
     def get_status() -> dict:
         """
@@ -72,6 +80,48 @@ def create_agent(config: AppConfig) -> FastAPI:
             dict: The current status of the AI assistant.
         """
         return {"status": app.state.ai_assistant.get_assistant_status()}
+
+    @app.get("/ai_assistant/collections")
+    def get_collections() -> dict:
+        """
+        Returns the list of collection names available in the database.
+
+        Returns:
+            dict: The list of collection names available in the database.
+        """
+        return {"collection_names": app.state.ai_assistant.get_collection_names()}
+
+    # endregion
+    # region AI Assistant posts
+
+    @app.post("/ai_assistant/inference")
+    def run_inference(request: AiAssistantInferenceRequest) -> dict:
+        """
+        Runs the inference pipeline of the AI assistant based on the provided request data.
+
+        Args:
+            request (AiAssistantInferenceRequest): The input data for the inference request.
+
+        Returns:
+            dict: The response from the AI assistant after running the inference pipeline.
+        """
+        # Treat the requested model and switch if it's different from the current one
+        requested_model_name = request.inference_model_name
+        if requested_model_name != app.state.ai_assistant.get_inference_model_name():
+            app.state.ai_assistant.switch_assistant_model(
+                inference_model_name=requested_model_name)
+        # Set the conversation history for the user session
+        app.state.ai_assistant.set_assistant_conversation_summary(
+            summary=request.conversation_summary
+        )
+        # Run the inference pipeline and return the response
+        response = app.state.ai_assistant.run_inference_pipeline(
+            user_query=request.query,
+            collection_name=request.collection_name
+        )
+        return {"response": response}
+    
+    # endregion
 
     return app
 

@@ -58,8 +58,13 @@ def test_collections():
     print("Response:", response.json(), "\n")
 
 
-def test_inference():
-    """Test the inference endpoint of the API."""
+def test_inference() -> str:
+    """
+    Test the inference endpoint of the API.
+    
+    Returns:
+        str: The job ID returned by the inference endpoint.
+    """
     print("Testing POST /ai_assistant/inference")
     request_data = AiAssistantInferenceRequest(
         query="Quais a companhias aéreas que operam no aeroporto de Guarulhos?",
@@ -71,9 +76,37 @@ def test_inference():
         inference_model_name="gemma3:4b"
     )
     response = httpx.post(
-        f"{BASE_URL}/ai_assistant/inference", json=request_data.dict())
+        f"{BASE_URL}/ai_assistant/inference", json=request_data.model_dump())
     assert response.status_code == 200
     print("Response:", response.json(), "\n")
+    return response.json().get("job_id")
+
+def test_inference_result(job_id: str) -> None:
+    """Test the inference result endpoint of the API."""
+    print(f"Testing GET /ai_assistant/inference/{job_id}")
+    # Wait for the inference job to complete
+    status = ""
+    while status != "completed":
+        response = httpx.get(f"{BASE_URL}/ai_assistant/inference/{job_id}")
+        assert response.status_code == 200
+        response_data = response.json()
+        print("Response:", response_data, "\n")
+        status = response_data.get("status")
+        response_message = response_data.get("response")
+        status_message = response_data.get("status_message")
+        if status == "completed":
+            print("Inference job completed successfully!")
+            print(f"Final status message: {status_message}")
+            print("Inference response:", response_message, "\n")
+            break
+        elif status == "failed":
+            print("Inference job failed with an error.")
+            print(f"Error message: {response_message}")
+            break
+        else:
+            print("Inference job is still processing, waiting...")
+            print(f"Current status: {status}")
+            time.sleep(2)
 
 
 def main():
@@ -82,7 +115,8 @@ def main():
     test_root()
     test_status()
     test_collections()
-    test_inference()
+    job_id = test_inference()
+    test_inference_result(job_id)
     print("All checks passed ✅")
 
 

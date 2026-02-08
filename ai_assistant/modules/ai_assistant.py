@@ -295,7 +295,7 @@ class AiAssistant:
         """
         # Improve query formulation before retrieval to maximize relevance of retrieved chunks
         print("Improving query formulation for better retrieval...")
-        self.status = "Melhorando a formulação da consulta para recuperação."
+        self.status = "Melhorando a formulação da consulta."
         improved_query = self.query_improver.invoke({"input": query}).content
 
         # Retrieve relevant documents from the vectorstore

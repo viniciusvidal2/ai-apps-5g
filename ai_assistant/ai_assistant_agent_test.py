@@ -2,7 +2,7 @@ import sys
 import time
 import httpx
 
-BASE_URL = "http://0.0.0.0:8001/ai_assistant"
+BASE_URL = "http://0.0.0.0:8001"
 
 
 def wait_for_api(timeout: int = 30) -> None:
@@ -36,15 +36,15 @@ def wait_for_api(timeout: int = 30) -> None:
 def test_root():
     """Test the root endpoint of the API."""
     print("Testing GET root endpoint")
-    response = httpx.get(f"{BASE_URL}")
+    response = httpx.get(f"{BASE_URL}/")
     assert response.status_code == 200
     print("Response:", response.json(), "\n")
 
 
 def test_status():
     """Test the ai assistant status endpoint of the API."""
-    print("Testing GET /status")
-    response = httpx.get(f"{BASE_URL}/status")
+    print("Testing GET /ai_assistant/status")
+    response = httpx.get(f"{BASE_URL}/ai_assistant/status")
     assert response.status_code == 200
     print("Response:", response.json(), "\n")
 

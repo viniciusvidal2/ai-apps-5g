@@ -7,7 +7,7 @@ from typing import Dict, Any, List
 import subprocess
 from time import sleep
 import requests
-from ai_apis.web_content_extractor import WebContentExtractor
+from modules.web_content_extractor import WebContentExtractor
 
 
 class AiAssistant:
@@ -22,6 +22,7 @@ class AiAssistant:
         """
         self.inference_model_name = inference_model_name
         self.db_ip_address = db_ip_address
+        self.status = "Iniciando o assistente de IA..."
 
         # Connect to the ChromaDB server
         print("Connecting to ChromaDB server...")
@@ -177,6 +178,7 @@ class AiAssistant:
     def close_assistant(self) -> None:
         """Closes the assistant and performs any necessary cleanup, especially in the models."""
         subprocess.run(["ollama", "stop", self.inference_model_name])
+        print("Assistant closed and resources cleaned up.")
 
     def _get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
         """

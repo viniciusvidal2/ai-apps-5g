@@ -1,6 +1,7 @@
 import sys
 import time
 import httpx
+import argparse
 from schemas import AiAssistantInferenceRequest
 
 BASE_URL = "http://0.0.0.0:8001"
@@ -111,13 +112,21 @@ def test_inference_result(job_id: str) -> None:
 
 def main():
     """Main function to run the tests."""
+    # Parse the input arguments for the base URL of the API
+    global BASE_URL
+    parser = argparse.ArgumentParser(description="Run AI Assistant Agent tests.")
+    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8001", help="Base URL of the AI Assistant API")
+    args = parser.parse_args()
+    BASE_URL = args.base_url
+
+    # Run the tests
     wait_for_api()
     test_root()
     test_status()
     test_collections()
     job_id = test_inference()
     test_inference_result(job_id)
-    print("All checks passed ✅")
+    print("All tests passed ✅")
 
 
 if __name__ == "__main__":

@@ -7,20 +7,20 @@ WORKDIR /app
 # System dependencies
 # ------------------------
 RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    openssl \
-    iputils-ping \
-    && update-ca-certificates
+  ca-certificates \
+  openssl \
+  iputils-ping \
+  && update-ca-certificates
 
 RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-distutils \
-    python3-pip \
-    curl \
-    git \
-    nano \
-    zstd \
-    && rm -rf /var/lib/apt/lists/*
+  python3 \
+  python3-distutils \
+  python3-pip \
+  curl \
+  git \
+  nano \
+  zstd \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
 
@@ -39,9 +39,9 @@ RUN mkdir -p /app/ollama_models
 # Python deps
 # ------------------------
 RUN pip install --no-cache-dir setuptools==75.1.0
-COPY requirements/requirements_ai_assistant.txt /app/requirements_ai_assistant.txt
+COPY requirements/ai_assistant.txt /app/ai_assistant.txt
 RUN pip install --no-cache-dir --timeout=100 --retries=100 \
-    -r requirements_ai_assistant.txt
+  -r /app/ai_assistant.txt
 ENV PYTHONUNBUFFERED=1
 
 # ------------------------
@@ -49,53 +49,53 @@ ENV PYTHONUNBUFFERED=1
 # ------------------------
 ARG OLLAMA_MODELS_TO_PULL=""
 RUN if [ -n "$OLLAMA_MODELS_TO_PULL" ]; then \
-      echo "Checking Ollama manifests in filesystem" && \
-      ollama serve > /var/log/ollama.log 2>&1 & \
-      OLLAMA_PID=$! && \
-      sleep 5 && \
-      for model in $OLLAMA_MODELS_TO_PULL; do \
-        NAME="${model%%:*}" ; \
-        VERSION="${model##*:}" ; \
-        MANIFEST="/app/ollama_models/manifests/registry.ollama.ai/library/${NAME}/${VERSION}" ; \
-        if [ -f "$MANIFEST" ]; then \
-          echo "✔ Manifest exists for $model — skipping pull" ; \
-        else \
-          echo "⬇ Pulling $model (manifest not found)" ; \
-          ollama pull "$model" ; \
-        fi ; \
-      done && \
-      kill $OLLAMA_PID ; \
-    else \
-      echo "No Ollama models requested at build time" ; \
-    fi
+  echo "Checking Ollama manifests in filesystem" && \
+  ollama serve > /var/log/ollama.log 2>&1 & \
+  OLLAMA_PID=$! && \
+  sleep 5 && \
+  for model in $OLLAMA_MODELS_TO_PULL; do \
+  NAME="${model%%:*}" ; \
+  VERSION="${model##*:}" ; \
+  MANIFEST="/app/ollama_models/manifests/registry.ollama.ai/library/${NAME}/${VERSION}" ; \
+  if [ -f "$MANIFEST" ]; then \
+  echo "✔ Manifest exists for $model — skipping pull" ; \
+  else \
+  echo "⬇ Pulling $model (manifest not found)" ; \
+  ollama pull "$model" ; \
+  fi ; \
+  done && \
+  kill $OLLAMA_PID ; \
+  else \
+  echo "No Ollama models requested at build time" ; \
+  fi
 
 # Huggingface embedding model cache
 ENV HF_HOME=/opt/hf
 RUN mkdir -p /opt/hf
-COPY agents/config/download_models.py /app/agents/config/download_models.py
-RUN python3 /app/agents/config/download_models.py
+COPY ai_assistant/modules/download_models.py /app/ai_assistant/modules/download_models.py
+RUN python3 /app/ai_assistant/modules/download_models.py
 
 # ------------------------
 # App files
 # ------------------------
-RUN mkdir -p /app/dbs
-COPY dbs /app/dbs
-
-RUN mkdir -p /app/ai_apis /app/agents
-COPY ai_apis/ai_assistant.py /app/ai_apis/ai_assistant.py
-COPY ai_apis/web_content_extractor.py /app/ai_apis/web_content_extractor.py
-COPY agents/ai_assistant_agent.py /app/agents/ai_assistant_agent.py
-COPY agents/start_ai_assistant_docker.sh /app/agents/start_ai_assistant_docker.sh
-
+RUN mkdir -p /app/ai_assistant/modules
+COPY ai_assistant/modules/ai_assistant.py /app/ai_assistant/modules/ai_assistant.py
+COPY ai_assistant/modules/web_content_extractor.py /app/ai_assistant/modules/web_content_extractor.py
+COPY ai_assistant/modules/__init__.py /app/ai_assistant/modules/__init__.py
+COPY ai_assistant/schemas.py /app/ai_assistant/schemas.py
+COPY ai_assistant/ai_assistant_agent.py /app/ai_assistant/ai_assistant_agent.py
+COPY ai_assistant/start_ai_assistant_docker.sh /app/ai_assistant/start_ai_assistant_docker.sh
 RUN chmod +x \
-    /app/ai_apis/ai_assistant.py \
-    /app/ai_apis/web_content_extractor.py \
-    /app/agents/ai_assistant_agent.py \
-    /app/agents/start_ai_assistant_docker.sh
+  /app/ai_assistant/modules/ai_assistant.py \
+  /app/ai_assistant/modules/web_content_extractor.py \
+  /app/ai_assistant/modules/__init__.py \
+  /app/ai_assistant/schemas.py \
+  /app/ai_assistant/ai_assistant_agent.py \
+  /app/ai_assistant/start_ai_assistant_docker.sh
 
 # ------------------------
 # Runtime
 # ------------------------
-EXPOSE 1883
 EXPOSE 11434
-ENTRYPOINT ["/app/agents/start_ai_assistant_docker.sh"]
+EXPOSE 8001
+ENTRYPOINT ["/app/ai_assistant/start_ai_assistant_docker.sh"]

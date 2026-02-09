@@ -28,7 +28,7 @@ COPY rest_apis/common.py /app/common.py
 RUN chmod +x /app/kill_ai_assistant_agent_docker.py /app/common.py
 
 # Expose the REST API port
-EXPOSE 8001
+EXPOSE 8003
 
 # Set the command to run the REST API
 CMD ["/app/kill_ai_assistant_agent_docker.py"]

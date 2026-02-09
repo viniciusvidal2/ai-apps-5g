@@ -4,7 +4,7 @@ This repository is meant for any rest APIs we use both for OCI integrations and 
 
 ## Local testing - AI Assistant Agent
 
-We must be able to start and stop the ai assistant agent docker using this REST API interface. It will be just an endpoint for the IHM code to reach. The instruction will cover both dockers, which share ports with the host machine (8001 and 8002).
+We must be able to start and stop the ai assistant agent docker using this REST API interface. It will be just an endpoint for the IHM code to reach. The instruction will cover both dockers, which share ports with the host machine (8002 and 8003).
 
 ### Building de dockers for the APIs
 
@@ -27,7 +27,8 @@ docker build -t kill-docker-rest-api -f dockerfiles/Dockerfile.killaiassistantdo
 The dockers will deal with docker containers in the host machine. Use the following command to run the start docker:
 
 ```bash
-docker run --rm --network host \
+docker run --rm \
+-p 8002:8002 \
 -v /var/run/docker.sock:/var/run/docker.sock \
 -v $(which docker):/usr/bin/docker \
 --name start-docker-rest-api \
@@ -37,7 +38,8 @@ start-docker-rest-api:latest
 For the kill docker:
 
 ```bash
-docker run --rm --network host \
+docker run --rm \
+-p 8003:8003 \
 -v /var/run/docker.sock:/var/run/docker.sock \
 -v $(which docker):/usr/bin/docker \
 --name kill-docker-rest-api \

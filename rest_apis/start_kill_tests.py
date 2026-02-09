@@ -2,44 +2,38 @@ import requests
 import argparse
 
 
-def start_ai_assistant_agent(broker: str, port: int, user_id: int, input_topic: str, output_topic: str, inference_model_name: str) -> requests.Response:
+def start_ai_assistant_agent(port: int, db_ip_address: str, inference_model_name: str, container_name: str) -> requests.Response:
     """Sends a request to start an AiAssistant agent inside a Docker container.
 
     Args:
-        broker (str): The broker address.
         port (int): The broker port.
-        user_id (int): The user ID for the AiAssistant agent.
-        input_topic (str): The MQTT input topic.
-        output_topic (str): The MQTT output topic.
+        db_ip_address (str): The database IP address for the AiAssistant agent.
         inference_model_name (str): The name of the inference model to use.
+        container_name (str): The name of the Docker container.
 
     Returns:
         requests.Response: The response from the REST API.
     """
     url = "http://localhost:8002/ai_assistant/start_docker"
     payload = {
-        "broker": broker,
         "port": port,
-        "user_id": user_id,
-        "input_topic": input_topic,
-        "output_topic": output_topic,
+        "db_ip_address": db_ip_address,
         "inference_model_name": inference_model_name,
-        "container_name": f"ai_assistant_{user_id}"
+        "container_name": container_name
     }
     response = requests.post(url, json=payload)
     return response
 
 
-def kill_ai_assistant_agent(user_id: int) -> requests.Response:
+def kill_ai_assistant_agent(container_name: str) -> requests.Response:
     """Sends a request to kill an AiAssistant agent inside a Docker container.
 
     Args:
-        user_id (int): The user ID of the AiAssistant agent to be killed.
+        container_name (str): The name of the Docker container to be killed.
     """
-    url = "http://localhost:8001/ai_assistant/kill_docker"
+    url = "http://localhost:8003/ai_assistant/kill_docker"
     payload = {
-        "user_id": user_id,
-        "container_name": f"ai_assistant_{user_id}"
+        "container_name": container_name
     }
     response = requests.post(url, json=payload)
     return response
@@ -55,11 +49,11 @@ def main():
 
     if args.action == "start":
         response = start_ai_assistant_agent(
-            broker="0.0.0.0", port=1883, user_id=1, input_topic="input", output_topic="output", inference_model_name="gemma3:4b"
+            port=8001, db_ip_address="0.0.0.0", inference_model_name="gemma3:4b", container_name="ai_assistant_1"
         )
         print("Start AI Assistant Agent Response:")
     elif args.action == "kill":
-        response = kill_ai_assistant_agent(user_id=1)
+        response = kill_ai_assistant_agent(container_name="ai_assistant_1")
         print("Kill AI Assistant Agent Response:")
     print(response.json())
 

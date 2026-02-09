@@ -24,15 +24,12 @@ def start_ai_assistant_agent_docker():
     # Call the docker with the provided parameters
     try:
         command = [
-            "docker", "run", "-d", "--network=host",
-            "--add-host=host.docker.internal:host-gateway",
+            "docker", "run", "-d",
+            "-p", "8001:8001",
             "--name", input_data.container_name,
             "ai_assistant_image",
-            f"--broker={input_data.broker}",
             f"--port={input_data.port}",
-            f"--user_id={input_data.user_id}",
-            f"--input_topic={input_data.input_topic}",
-            f"--output_topic={input_data.output_topic}",
+            f"--db_ip_address={input_data.db_ip_address}",
             f"--inference_model_name={input_data.inference_model_name}"
         ]
         result = subprocess.run(

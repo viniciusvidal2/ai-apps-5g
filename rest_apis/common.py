@@ -8,11 +8,8 @@ class AiAssistantInputData(BaseModel):
     Args:
         BaseModel: _BaseModel_ from pydantic library.
     """
-    broker: str
     port: int
-    user_id: int
-    input_topic: str
-    output_topic: str
+    db_ip_address: str
     inference_model_name: str
     container_name: str
 
@@ -23,5 +20,4 @@ class AiAssistantKillData(BaseModel):
     Args:
         BaseModel: _BaseModel_ from pydantic library.
     """
-    user_id: int
     container_name: str

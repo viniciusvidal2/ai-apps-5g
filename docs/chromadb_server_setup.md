@@ -31,7 +31,7 @@ You should build the image with the following command:
 
 ```bash
 cd ai-apps-5g
-docker build -t chroma_server -f dockerfiles/Dockerfile.chromadb .
+docker build -t chroma_server -f database_manager/Dockerfile .
 ```
 
 We must have the remote chromadb server running to access it through HTTP client. To run the image we must make sure we pass port 8000 and the shared colume where we built our chroma database. The full command should be:

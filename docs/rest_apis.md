@@ -12,14 +12,14 @@ Run the following commands to build the start ai assistant agent docker:
 
 ```bash
 cd ai_apps_5g
-docker build -t start-docker-rest-api -f dockerfiles/Dockerfile.startaiassistantdocker .
+docker build -t start-docker-rest-api -f rest_apis/Dockerfile.startaiassistantdocker .
 ```
 
 Run the following commands to build the kill ai assistant agent docker:
 
 ```bash
 cd ai_apps_5g
-docker build -t kill-docker-rest-api -f dockerfiles/Dockerfile.killaiassistantdocker .
+docker build -t kill-docker-rest-api -f rest_apis/Dockerfile.killaiassistantdocker .
 ```
 
 ### Running the dockers

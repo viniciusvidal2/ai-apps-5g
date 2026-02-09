@@ -36,7 +36,7 @@ You can find more models in [ollama library website link](https://ollama.com/lib
 Use the following command to build the image. __gemma3:4b__ is mandatory, but you can add as many as you like from the list above:
 
 ```bash
-docker build -t ai_assistant_image -f dockerfiles/Dockerfile.aiassistantagent --build-arg OLLAMA_MODELS_TO_PULL="gemma3:4b OTHER_MODELS" .
+docker build -t ai_assistant_image -f ai_assistant/Dockerfile --build-arg OLLAMA_MODELS_TO_PULL="gemma3:4b OTHER_MODELS" .
 ```
 
 ## Running the docker container

@@ -10,8 +10,7 @@ This is the database manager folder, where we can:
 The first step you should perform to create the database is installing the script dependencies in your system (which you can do in root, but conda or virtual environment are recommended):
 
 ```bash
-cd requirements
-pip install -r requirements_chromadb.txt
+pip install -r database_manager/requirements.txt
 ```
 
 You database should be described in a yaml file similar to the default one, __database_manager/database_description.yaml__ (or just change the values in this one). The file should be passed as an argument to the script alongside the database output path, which you will pass as a shared volume to the chromadb server docker container in the following sections.

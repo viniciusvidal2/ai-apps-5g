@@ -16,7 +16,7 @@ Create a virtual environment of your preference and run the following commands t
 
 ```bash
 cd ai_apps_5g
-pip install -r requirements/ai_assistant.py
+pip install -r ai_assistant/requirements.txt
 ```
 
 ## Setting ollama models

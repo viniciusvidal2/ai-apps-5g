@@ -39,9 +39,9 @@ RUN mkdir -p /app/ollama_models
 # Python deps
 # ------------------------
 RUN pip install --no-cache-dir setuptools==75.1.0
-COPY requirements/ai_assistant.txt /app/ai_assistant.txt
+COPY ai_assistant/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --timeout=100 --retries=100 \
-  -r /app/ai_assistant.txt
+  -r /app/requirements.txt
 ENV PYTHONUNBUFFERED=1
 
 # ------------------------

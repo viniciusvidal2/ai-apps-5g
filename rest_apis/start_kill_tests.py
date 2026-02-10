@@ -31,7 +31,7 @@ def kill_ai_assistant_agent(container_name: str) -> requests.Response:
     Args:
         container_name (str): The name of the Docker container to be killed.
     """
-    url = "http://localhost:8003/ai_assistant/kill_docker"
+    url = "http://localhost:8002/ai_assistant/kill_docker"
     payload = {
         "container_name": container_name
     }

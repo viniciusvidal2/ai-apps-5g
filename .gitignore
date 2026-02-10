@@ -172,8 +172,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-ollama_models/blobs
-ollama_models/manifests
+db
 chroma_*
 answers*
 

@@ -18,8 +18,6 @@ class AiAssistantInferenceRequest(BaseModel):
     """
     query: str
     conversation_summary: str
-    user_id: str
-    session_id: str
     n_chunks: int = 3
     collection_name: str = "documents"
     inference_model_name: str = "gemma3:4b"

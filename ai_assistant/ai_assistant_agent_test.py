@@ -70,8 +70,6 @@ def test_inference() -> str:
     request_data = AiAssistantInferenceRequest(
         query="Quais a companhias aéreas que operam no aeroporto de Guarulhos?",
         conversation_summary="",
-        user_id="test_user",
-        session_id="test_session",
         n_chunks=3,
         collection_name="none",
         inference_model_name="gemma3:4b"

@@ -2,6 +2,7 @@ from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 from httpx import ConnectError, ConnectTimeout
 import chromadb
+from chromadb.utils import embedding_functions
 from chromadb.config import Settings
 from typing import Dict, Any, List
 import subprocess
@@ -22,6 +23,10 @@ class AiAssistant:
         """
         self.inference_model_name = inference_model_name
         self.db_ip_address = db_ip_address
+        self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="Qwen/Qwen3-Embedding-0.6B",
+            device="cpu"
+        )
         self.status = "Iniciando o assistente de IA..."
 
         # Connect to the ChromaDB server
@@ -220,7 +225,7 @@ class AiAssistant:
             str: The current conversation summary.
         """
         return self.history_summary
-    
+
     def get_collection_names(self) -> List[str]:
         """
         Returns the list of collection names available in the database.
@@ -238,7 +243,7 @@ class AiAssistant:
         else:
             print("Database client is not initialized.")
             return []
-        
+
     def get_inference_model_name(self) -> str:
         """
         Returns the name of the current inference model being used by the assistant.
@@ -305,10 +310,10 @@ class AiAssistant:
         if self.db_client is not None:
             try:
                 collection = self.db_client.get_collection(
-                    name=collection_name)
+                    name=collection_name, embedding_function=self.ef)
                 results = collection.query(
                     query_texts=[improved_query],
-                    n_results=self.n_chunks
+                    n_results=self.n_chunks,
                 )
                 formatted_context_chunks = [
                     self.document_prompt.format(

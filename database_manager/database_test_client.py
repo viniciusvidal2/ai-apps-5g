@@ -1,5 +1,6 @@
 import argparse
 import chromadb
+from chromadb.utils import embedding_functions
 from chromadb.config import Settings
 from httpx import ConnectError, ConnectTimeout
 
@@ -15,6 +16,10 @@ class DatabaseTestClient():
         """
         self.ip_address = ip
         self.port = port
+        self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="Qwen/Qwen3-Embedding-0.6B",
+            device="cpu"
+        )
 
     def init_remote_client(self) -> bool:
         """
@@ -64,7 +69,8 @@ class DatabaseTestClient():
         Returns:
             dict: The query results.
         """
-        collection = self.client.get_or_create_collection(name=collection_name)
+        collection = self.client.get_or_create_collection(
+            name=collection_name, embedding_function=self.ef)
         results = collection.query(
             query_texts=[query_text],
             n_results=n_results
@@ -105,6 +111,7 @@ def main() -> None:
     db_test_client = DatabaseTestClient(ip=args.ip, port=args.port)
     if not db_test_client.init_remote_client():
         return
+    print("📋 Available Collections:")
     db_test_client.list_collections()
 
     # Sample query

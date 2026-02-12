@@ -117,8 +117,10 @@ def main() -> None:
     # Sample query
     results = db_test_client.query_collection(
         collection_name=args.collection, query_text=args.query, n_results=3)
+    print(f"Test query '{args.query}' results:")
     for doc, score in zip(results['documents'][0], results['distances'][0]):
         print(f"Score: {score:.4f}, Document: {doc}")
+        print("-" * 100)
 
 
 if __name__ == "__main__":

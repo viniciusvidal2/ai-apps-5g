@@ -41,7 +41,7 @@ docker build -t ai_assistant_image -f ai_assistant/Dockerfile --build-arg OLLAMA
 
 ## Running the docker container
 
-Use the following command to run the docker container from the built image.
+Use the following command to run the docker container from the built image. __DB_IP_ADDRESS__ must be replaced with the IP address of the machine running the chromaDB server, and __[YOUR_MODEL_NAME]__ must be replaced with the model name you want to use. The DB_IP_ADDRESS can be found using the command `hostname -I` on the machine running the chromaDB server. __DO NOT USE LOCALHOST OR 0.0.0.0__.
 
 ```bash
 docker run --rm -d -p 8001:8001 --name ai_assistant_agent ai_assistant_image --port=8001 --db_ip_address=DB_IP_ADDRESS --inference_model_name "[YOUR_MODEL_NAME]"

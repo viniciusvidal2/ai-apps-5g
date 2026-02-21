@@ -1,164 +1,115 @@
-"""Service helpers for REST APIs, MQTT, and streaming responses."""
+"""Service helpers for REST APIs and streaming responses."""
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any, AsyncGenerator, Dict
 
 from fastapi import HTTPException
 
 from ihm.server import state
 from ihm.server.config import USE_AI_ASSISTANT
-from ihm.server.modules.mqtt_manager import initialize_mqtt_client
-from ihm.server.modules.rest_api_client import kill_ai_assistant_agent, start_ai_assistant_agent
+from ihm.server.modules.rest_api_client import (
+    kill_ai_assistant_agent,
+    start_ai_assistant_agent,
+    wait_for_ai_assistant_health,
+)
+
+logger = logging.getLogger(__name__)
+
+
+async def _container_is_reachable() -> bool:
+    """Quickly check whether the shared AI Assistant container is reachable."""
+    try:
+        await wait_for_ai_assistant_health(timeout_seconds=8, poll_interval_seconds=1.0)
+        return True
+    except HTTPException:
+        return False
+
+
+async def _start_container_and_wait_ready(user_id: str, session_id: str) -> None:
+    """Start the shared container and wait until health check succeeds."""
+    await start_ai_assistant_agent(user_id=user_id, session_id=session_id)
+    await wait_for_ai_assistant_health()
+    state.docker_container_running = True
+    state.last_user_id = user_id
 
 
 async def start_services_if_needed(user_id: str, session_id: str) -> None:
-    """Start the AI Assistant via REST APIs for a specific session if not already running."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"📦 START_SERVICES_IF_NEEDED - Session ID: {session_id}, User ID: {user_id}")
-    print(f"📦 START_SERVICES_IF_NEEDED - Session ID: {session_id}, User ID: {user_id}")
-    
+    """Start shared AI Assistant services if they are not running yet."""
+    logger.info(
+        "START_SERVICES_IF_NEEDED - session_id=%s user_id=%s",
+        session_id,
+        user_id,
+    )
+
     if not USE_AI_ASSISTANT:
-        logger.info(f"⏭️  SKIPPING - USE_AI_ASSISTANT is False")
-        print(f"⏭️  SKIPPING - USE_AI_ASSISTANT is False")
-        return
-    
-    # Check if this session already has a Docker container running
-    if session_id in state.session_docker_containers and state.session_docker_containers[session_id]:
-        logger.info(f"⏭️  SKIPPING - Docker already running for session {session_id}")
-        print(f"⏭️  SKIPPING - Docker already running for session {session_id}")
+        logger.info("SKIPPING start; USE_AI_ASSISTANT is False")
         return
 
-    logger.info(f"🔄 STARTING SERVICES - Calling start_ai_assistant_agent")
-    print(f"🔄 STARTING SERVICES - Calling start_ai_assistant_agent")
-    
-    await start_ai_assistant_agent(user_id=user_id, session_id=session_id)
-    state.session_docker_containers[session_id] = True
-    state.last_user_id = user_id
-    
-    logger.info(f"⏳ WAITING 2 seconds for Docker to initialize...")
-    print(f"⏳ WAITING 2 seconds for Docker to initialize...")
-    await asyncio.sleep(2)
-    
-    logger.info(f"📡 INITIALIZING MQTT CLIENT for session {session_id}")
-    print(f"📡 INITIALIZING MQTT CLIENT for session {session_id}")
-    mqtt_client = initialize_mqtt_client()
-    if not mqtt_client:
-        raise HTTPException(status_code=503, detail="MQTT client failed to initialize")
-    state.session_mqtt_clients[session_id] = mqtt_client
-    
-    logger.info(f"✅ SERVICES STARTED - Session {session_id} ready!")
-    print(f"✅ SERVICES STARTED - Session {session_id} ready!")
+    if state.docker_container_running:
+        if await _container_is_reachable():
+            logger.info("SKIPPING start; shared AI Assistant container is already running")
+            return
+        logger.warning(
+            "Shared container state is stale (flag=true, health unreachable). Restarting..."
+        )
+        state.docker_container_running = False
+
+    await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
+    logger.info("SERVICES STARTED - shared container ready")
 
 
 async def shutdown_services_if_idle(session_id: str, user_id: str) -> bool:
-    """Stop the AI Assistant via REST APIs for a specific session immediately."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"🔌 SHUTDOWN_SERVICES - Session ID: {session_id}, User ID: {user_id}")
-    print(f"🔌 SHUTDOWN_SERVICES - Session ID: {session_id}, User ID: {user_id}")
-    
-    # Disconnect MQTT client for this session
-    if session_id in state.session_mqtt_clients:
-        logger.info(f"📡 DISCONNECTING MQTT CLIENT for session {session_id}")
-        print(f"📡 DISCONNECTING MQTT CLIENT for session {session_id}")
-        try:
-            state.session_mqtt_clients[session_id].disconnect()
-        except Exception as e:
-            logger.warning(f"⚠️  Error disconnecting MQTT client: {e}")
-            print(f"⚠️  Error disconnecting MQTT client: {e}")
-        finally:
-            del state.session_mqtt_clients[session_id]
-    
-    # Stop Docker container for this session
-    if session_id in state.session_docker_containers and state.session_docker_containers[session_id]:
-        logger.info(f"🔄 STOPPING DOCKER - Calling kill_ai_assistant_agent")
-        print(f"🔄 STOPPING DOCKER - Calling kill_ai_assistant_agent")
-        try:
-            await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
-        except Exception as e:
-            logger.warning(f"⚠️  Error stopping Docker: {e}")
-            print(f"⚠️  Error stopping Docker: {e}")
-        finally:
-            del state.session_docker_containers[session_id]
-        logger.info(f"✅ SERVICES STOPPED for session {session_id}")
-        print(f"✅ SERVICES STOPPED for session {session_id}")
-        return True
-    
-    logger.info(f"⏭️  NO SERVICES TO STOP for session {session_id}")
-    print(f"⏭️  NO SERVICES TO STOP for session {session_id}")
-    return False
+    """Stop shared AI Assistant services when no active sessions remain."""
+    logger.info("SHUTDOWN_SERVICES - session_id=%s user_id=%s", session_id, user_id)
+
+    if state.active_sessions:
+        logger.info(
+            "SKIPPING shutdown; active sessions still present (%s)",
+            len(state.active_sessions),
+        )
+        return False
+
+    if not state.docker_container_running:
+        logger.info("SKIPPING shutdown; shared container is already stopped")
+        return False
+
+    try:
+        await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
+    finally:
+        state.docker_container_running = False
+
+    logger.info("SERVICES STOPPED - shared container stopped")
+    return True
 
 
 async def ensure_services_ready(user_id: str, session_id: str) -> None:
-    """Ensure REST-backed services are running for a specific session before handling a request."""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"🔍 ENSURE_SERVICES_READY - Session ID: {session_id}, User ID: {user_id}")
-    print(f"🔍 ENSURE_SERVICES_READY - Session ID: {session_id}, User ID: {user_id}")
-    
+    """Ensure shared AI Assistant services are ready before inference."""
+    logger.info("ENSURE_SERVICES_READY - session_id=%s user_id=%s", session_id, user_id)
+
     if not USE_AI_ASSISTANT:
-        logger.info(f"⏭️  SKIPPING - USE_AI_ASSISTANT is False")
-        print(f"⏭️  SKIPPING - USE_AI_ASSISTANT is False")
+        logger.info("SKIPPING readiness check; USE_AI_ASSISTANT is False")
         return
 
-    # Check if this session's Docker container is running
-    if session_id not in state.session_docker_containers or not state.session_docker_containers[session_id]:
-        logger.info(f"🔄 STARTING DOCKER - Calling start_ai_assistant_agent")
-        print(f"🔄 STARTING DOCKER - Calling start_ai_assistant_agent")
-        await start_ai_assistant_agent(user_id=user_id, session_id=session_id)
-        state.session_docker_containers[session_id] = True
-        state.last_user_id = user_id
-
-    # Check if this session has an MQTT client
-    if session_id not in state.session_mqtt_clients:
-        logger.info(f"📡 INITIALIZING MQTT CLIENT for session {session_id}")
-        print(f"📡 INITIALIZING MQTT CLIENT for session {session_id}")
-        mqtt_client = initialize_mqtt_client()
-        if not mqtt_client:
-            raise HTTPException(status_code=503, detail="MQTT client failed to initialize")
-        state.session_mqtt_clients[session_id] = mqtt_client
-    
-    logger.info(f"✅ SERVICES READY for session {session_id}")
-    print(f"✅ SERVICES READY for session {session_id}")
-
-
-async def build_sse_stream(
-    mqtt_task: asyncio.Task[Dict[str, Any]],
-) -> AsyncGenerator[str, None]:
-    """Yield SSE events while waiting for the MQTT response."""
-    message_id = f"ai-{id(mqtt_task)}"
-    yield format_sse_event({"type": "start-step"})
-    yield format_sse_event({"type": "text-start", "id": message_id})
-
-    while not mqtt_task.done():
-        await asyncio.sleep(1)
-        yield ": heartbeat\n\n"
-
-    response = await mqtt_task
-    answer_text = response.get("response", "") if isinstance(response, dict) else str(
-        response
-    )
-    for word in answer_text.split():
-        yield format_sse_event(
-            {"type": "text-delta", "id": message_id, "delta": f"{word} "}
+    if state.docker_container_running:
+        if await _container_is_reachable():
+            logger.info("SERVICES READY - shared container healthy")
+            return
+        logger.warning(
+            "Shared container state is stale during inference (flag=true, health unreachable). Restarting..."
         )
-        await asyncio.sleep(0.05)
+        state.docker_container_running = False
 
-    yield format_sse_event({"type": "text-end", "id": message_id})
-    yield format_sse_event({"type": "finish-step"})
-    yield format_sse_event({"type": "finish"})
-    yield "data: [DONE]\n\n"
+    await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
+    logger.info("SERVICES READY - shared container healthy")
 
 
 async def build_mock_stream(query: str) -> AsyncGenerator[str, None]:
     """Generate a short mock streaming response when the assistant is disabled."""
     message_id = f"mock-{hash(query)}"
+    yield format_sse_event({"type": "data-statusMessage", "data": "Modo mock ativo"})
     yield format_sse_event({"type": "start-step"})
     yield format_sse_event({"type": "text-start", "id": message_id})
 
@@ -176,4 +127,4 @@ async def build_mock_stream(query: str) -> AsyncGenerator[str, None]:
 
 def format_sse_event(payload: Dict[str, Any]) -> str:
     """Serialize a JSON payload into a Server-Sent Event string."""
-    return f"data: {json.dumps(payload)}\n\n"
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"

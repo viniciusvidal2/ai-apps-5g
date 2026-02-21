@@ -13,8 +13,5 @@ redis==7.1.0
 # Environment and configuration
 python-dotenv==1.2.1
 
-# MQTT client for AI Assistant agent communication
-paho-mqtt==2.1.0
-
 # REST API client
 httpx==0.28.1

@@ -58,7 +58,7 @@ export default async function Page(props: { params: Promise<{ id: string }> }) {
         initialLastContext={chat.lastContext ?? undefined}
         initialMessages={uiMessages}
         initialVisibilityType={chat.visibility}
-        isReadonly={fixedGuestUser.id !== chat.userId}
+        isReadonly={session.user.id !== chat.userId}
       />
       <DataStreamHandler />
     </>

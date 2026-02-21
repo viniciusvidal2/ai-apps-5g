@@ -8,9 +8,10 @@ class InferenceRequest(BaseModel):
     query: str
     user_id: str
     session_id: str
+    conversation_summary: str = ""
     n_chunks: int = 3
     inference_model_name: str = "gemma3:4b"
-    vectorstore_name: str = "none"  # "documents" or "none"
+    collection_name: str = "none"  # "documents" or "none"
 
 
 class InferenceResponse(BaseModel):

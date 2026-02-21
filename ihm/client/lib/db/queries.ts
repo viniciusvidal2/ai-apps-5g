@@ -556,6 +556,28 @@ export async function updateChatLastContextById({
   }
 }
 
+export async function updateChatConversationSummaryById({
+  chatId,
+  conversationSummary,
+}: {
+  chatId: string;
+  conversationSummary: string;
+}) {
+  try {
+    return await db
+      .update(chat)
+      .set({ conversationSummary })
+      .where(eq(chat.id, chatId));
+  } catch (error) {
+    console.warn(
+      "Failed to update conversationSummary for chat",
+      chatId,
+      error
+    );
+    return;
+  }
+}
+
 export async function getMessageCountByUserId({
   id,
   differenceInHours,

@@ -31,6 +31,7 @@ export const chat = pgTable("Chat", {
   visibility: varchar("visibility", { enum: ["public", "private"] })
     .notNull()
     .default("private"),
+  conversationSummary: text("conversationSummary").notNull().default(""),
   lastContext: jsonb("lastContext").$type<AppUsage | null>(),
 });
 

@@ -19,8 +19,8 @@ export const INFERENCE_MODELS = [
   { id: "qwen3-embedding:0.6b", name: "Qwen3 Embedding 0.6B" },
 ] as const;
 
-// Available vectorstore options
-export const VECTORSTORE_OPTIONS = [
+// Available collection options
+export const COLLECTION_OPTIONS = [
   { id: "documents", name: "Documentos" },
   { id: "none", name: "Nenhum" },
 ] as const;
@@ -28,7 +28,7 @@ export const VECTORSTORE_OPTIONS = [
 export interface RAGParams {
   n_chunks?: number;
   inference_model_name: string;
-  vectorstore_name: string;
+  collection_name: string;
 }
 
 interface RAGControlsProps {
@@ -49,10 +49,10 @@ function PureRAGControls({
     });
   };
 
-  const handleVectorstoreChange = (value: string) => {
+  const handleCollectionChange = (value: string) => {
     onParamsChange({
       ...params,
-      vectorstore_name: value,
+      collection_name: value,
     });
   };
 
@@ -89,20 +89,20 @@ function PureRAGControls({
 
       <div className="flex items-center gap-2">
         <Label
-          htmlFor="vectorstore"
+          htmlFor="collection-name"
           className="text-xs font-normal text-muted-foreground whitespace-nowrap"
         >
-          Vectorstore:
+          Collection:
         </Label>
         <Select
-          value={params.vectorstore_name}
-          onValueChange={handleVectorstoreChange}
+          value={params.collection_name}
+          onValueChange={handleCollectionChange}
         >
-          <SelectTrigger id="vectorstore" className="h-7 w-[120px] text-xs">
+          <SelectTrigger id="collection-name" className="h-7 w-[120px] text-xs">
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
-            {VECTORSTORE_OPTIONS.map((option) => (
+            {COLLECTION_OPTIONS.map((option) => (
               <SelectItem key={option.id} value={option.id} className="text-xs">
                 {option.name}
               </SelectItem>
@@ -115,4 +115,3 @@ function PureRAGControls({
 }
 
 export const RAGControls = memo(PureRAGControls);
-

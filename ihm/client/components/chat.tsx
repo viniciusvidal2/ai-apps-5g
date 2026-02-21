@@ -64,6 +64,7 @@ export function Chat({
 
   const [input, setInput] = useState<string>("");
   const [usage, setUsage] = useState<AppUsage | undefined>(initialLastContext);
+  const [backendStatusMessage, setBackendStatusMessage] = useState<string>("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
   
@@ -78,7 +79,7 @@ export function Chat({
     const defaultParams = {
       n_chunks: getNChunksFromModel(initialChatModel),
       inference_model_name: "gemma3:4b",
-      vectorstore_name: "none",
+      collection_name: "none",
     };
     
     if (typeof window === "undefined") {
@@ -92,7 +93,10 @@ export function Chat({
         return {
           n_chunks: getNChunksFromModel(initialChatModel),
           inference_model_name: parsed.inference_model_name ?? defaultParams.inference_model_name,
-          vectorstore_name: parsed.vectorstore_name ?? defaultParams.vectorstore_name,
+          collection_name:
+            parsed.collection_name ??
+            parsed.vectorstore_name ??
+            defaultParams.collection_name,
         };
       } catch {
         return defaultParams;
@@ -158,11 +162,16 @@ export function Chat({
       if (dataPart.type === "data-usage") {
         setUsage(dataPart.data);
       }
+      if (dataPart.type === "data-statusMessage") {
+        setBackendStatusMessage(dataPart.data);
+      }
     },
     onFinish: () => {
+      setBackendStatusMessage("");
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
+      setBackendStatusMessage("");
       if (error instanceof ChatSDKError) {
         // Check if it's a credit card error
         if (
@@ -229,6 +238,7 @@ export function Chat({
           selectedModelId={initialChatModel}
           setMessages={setMessages}
           status={status}
+          statusMessage={backendStatusMessage}
           votes={votes}
         />
 

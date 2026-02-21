@@ -13,6 +13,7 @@ import { PreviewMessage, ThinkingMessage } from "./message";
 type MessagesProps = {
   chatId: string;
   status: UseChatHelpers<ChatMessage>["status"];
+  statusMessage?: string;
   votes: Vote[] | undefined;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
@@ -25,6 +26,7 @@ type MessagesProps = {
 function PureMessages({
   chatId,
   status,
+  statusMessage,
   votes,
   messages,
   setMessages,
@@ -92,7 +94,9 @@ function PureMessages({
 
           {status === "submitted" &&
             messages.length > 0 &&
-            messages.at(-1)?.role === "user" && <ThinkingMessage />}
+            messages.at(-1)?.role === "user" && (
+              <ThinkingMessage statusMessage={statusMessage} />
+            )}
 
           <div
             className="min-h-[24px] min-w-[24px] shrink-0"
@@ -121,6 +125,9 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
   }
 
   if (prevProps.status !== nextProps.status) {
+    return false;
+  }
+  if (prevProps.statusMessage !== nextProps.statusMessage) {
     return false;
   }
   if (prevProps.selectedModelId !== nextProps.selectedModelId) {

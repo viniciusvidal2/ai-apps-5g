@@ -17,7 +17,7 @@ if str(project_root) not in os.sys.path:
     os.sys.path.append(str(project_root))
 
 DEFAULT_HOST = os.getenv("HOST", "0.0.0.0")
-DEFAULT_PORT = int(os.getenv("PORT", 8000))
+DEFAULT_PORT = int(os.getenv("PORT", 8003))
 INFERENCE_MODEL_NAME = os.getenv("INFERENCE_MODEL", "gemma3:27b")
 USE_AI_ASSISTANT = os.getenv("USE_AI_ASSISTANT", "false").lower() == "true"
 AI_ASSISTANT_API_URL = os.getenv("AI_ASSISTANT_API_URL", "http://localhost:8001")

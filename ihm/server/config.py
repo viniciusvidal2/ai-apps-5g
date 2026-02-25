@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 # Load environment variables from config file in the same directory as this file
 config_file = Path(__file__).parent / "config.env"
 load_dotenv(config_file)
-print(f"🔧 Loading config from: {config_file}")
-print(f"🔧 Config file exists: {config_file.exists()}")
+print(f"[config] Loading config from: {config_file}")
+print(f"[config] Config file exists: {config_file.exists()}")
 
 # Add project root directory to path (for potential imports)
 project_root = Path(__file__).parent.parent.parent
@@ -37,8 +37,8 @@ AI_ASSISTANT_POLL_INTERVAL_SECONDS = float(
 )
 AI_ASSISTANT_INTERNAL_PORT = int(os.getenv("AI_ASSISTANT_INTERNAL_PORT", "8001"))
 
-print(f"🔧 USE_AI_ASSISTANT env value: '{os.getenv('USE_AI_ASSISTANT', 'NOT_SET')}'")
-print(f"🔧 USE_AI_ASSISTANT parsed to: {USE_AI_ASSISTANT}")
+print(f"[config] USE_AI_ASSISTANT env value: '{os.getenv('USE_AI_ASSISTANT', 'NOT_SET')}'")
+print(f"[config] USE_AI_ASSISTANT parsed to: {USE_AI_ASSISTANT}")
 AI_ASSISTANT_START_API_URL = os.getenv(
     "AI_ASSISTANT_START_API_URL",
     "http://localhost:8002/ai_assistant/start_docker",
@@ -48,11 +48,11 @@ AI_ASSISTANT_KILL_API_URL = os.getenv(
     "http://localhost:8002/ai_assistant/kill_docker",
 )
 
-print(f"🔧 AI_ASSISTANT_API_URL: {AI_ASSISTANT_API_URL}")
-print(f"🔧 AI_ASSISTANT_START_API_URL: {AI_ASSISTANT_START_API_URL}")
-print(f"🔧 AI_ASSISTANT_KILL_API_URL: {AI_ASSISTANT_KILL_API_URL}")
-print(f"🔧 AI_ASSISTANT_CONTAINER_NAME: {AI_ASSISTANT_CONTAINER_NAME}")
-print(f"🔧 INFERENCE_MODEL: {INFERENCE_MODEL_NAME}")
+print(f"[config] AI_ASSISTANT_API_URL: {AI_ASSISTANT_API_URL}")
+print(f"[config] AI_ASSISTANT_START_API_URL: {AI_ASSISTANT_START_API_URL}")
+print(f"[config] AI_ASSISTANT_KILL_API_URL: {AI_ASSISTANT_KILL_API_URL}")
+print(f"[config] AI_ASSISTANT_CONTAINER_NAME: {AI_ASSISTANT_CONTAINER_NAME}")
+print(f"[config] INFERENCE_MODEL: {INFERENCE_MODEL_NAME}")
 print("=" * 80)
 
 logging.basicConfig(

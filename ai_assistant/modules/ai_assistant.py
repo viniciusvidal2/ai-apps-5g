@@ -309,8 +309,7 @@ class AiAssistant:
         context_string = ""
         if self.db_client is not None:
             try:
-                collection = self.db_client.get_collection(
-                    name=collection_name, embedding_function=self.ef)
+                collection = self.db_client.get_collection(name=collection_name)
                 results = collection.query(
                     query_texts=[improved_query],
                     n_results=self.n_chunks,

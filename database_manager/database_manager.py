@@ -68,7 +68,6 @@ class DatabaseManager():
             # Create metadata and id for this specific chunk
             metadatas.append({
                 "document_name": document_name,
-                # Chroma prefers strings or simple types
                 "page_number": str(page_numbers)
             })
             ids.append(f"{document_name}_chunk_{i}")
@@ -156,19 +155,19 @@ def create_database() -> None:
     parser.add_argument(
         "--db_path", "-d",
         type=str,
-        default=os.path.join(current_script_path, 'chroma_db'),
+        default="/home/vini/Desktop/ons_db",
         help="Path to the ChromaDB database (default: ./chroma_db)"
     )
     parser.add_argument(
         "--yaml_path", "-y",
         type=str,
-        default=os.path.join(current_script_path, 'database_description.yaml'),
+        default="/home/vini/ai-apps-5g/database_manager/ons_database.yaml",
         help="Path to the database description YAML file (default: ./database_description.yaml)"
     )
     parser.add_argument(
         "--device", "-dev",
         type=str,
-        default="cpu",
+        default="cuda",
         help="Device to use for embedding (cpu or cuda) (default: cpu)"
     )
     args = parser.parse_args()

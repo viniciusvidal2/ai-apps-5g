@@ -1,0 +1,5 @@
+paho-mqtt==2.1.0
+ollama==0.4.7
+torch==2.4.1
+torchmetrics==1.2.1
+torchvision==0.19.1

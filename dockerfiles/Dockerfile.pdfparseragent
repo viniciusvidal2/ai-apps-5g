@@ -1,0 +1,31 @@
+FROM ubuntu:22.04
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-distutils \
+    python3-pip \
+    curl \
+    git \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+# Update pip
+RUN pip install --upgrade pip
+
+# Copy code to inside the image
+COPY requirements/requirements_pdf_parser.txt /app/requirements_pdf_parser.txt
+RUN pip install --no-cache-dir --timeout=100 --retries=100 -r requirements_pdf_parser.txt
+
+# Copy interesting folders and app file
+COPY ai_apis/pdf_lookup.py /app/ai_apis/pdf_lookup.py
+COPY agents/pdf_parse_agent.py /app/agents/pdf_parse_agent.py
+
+# Expose the MQTT port for the PDF parser agent
+EXPOSE 1883
+
+# Set the command to run the PDF parser agent
+ENTRYPOINT ["python3", "-m", "agents.pdf_parse_agent"]

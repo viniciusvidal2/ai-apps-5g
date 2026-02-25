@@ -1,0 +1,49 @@
+FROM ubuntu:22.04
+
+# Set the working directory inside the container
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-distutils \
+    python3-pip \
+    curl \
+    git \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+# Update pip
+RUN pip install --upgrade pip
+
+# Install ollama
+RUN curl -fsSL https://ollama.com/install.sh | sh
+
+# Copy code to inside the image
+RUN pip install setuptools==75.1.0
+COPY requirements/requirements_chatbot.txt /app/requirements_chatbot.txt
+RUN pip install --no-cache-dir --timeout=100 --retries=100 -r requirements_chatbot.txt
+
+# Set the ollama models custom directory and copy model to it
+RUN mkdir -p /app/ollama_models/blobs && \
+    mkdir -p /app/ollama_models/manifests/registry.ollama.ai/library/gemma3
+COPY ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b /app/ollama_models/blobs/sha256-3116c52250752e00dd06b16382e952bd33c34fd79fc4fe3a5d2c77cf7de1b14b
+COPY ollama_models/blobs/sha256-120007c81bf8b4eb54e896a4a3e5ff9949f124b0ea42295277c8523f7fa9c7f6 /app/ollama_models/blobs/sha256-120007c81bf8b4eb54e896a4a3e5ff9949f124b0ea42295277c8523f7fa9c7f6
+COPY ollama_models/blobs/sha256-dd084c7d92a3c1c14cc09ae77153b903fd2024b64a100a0cc8ec9316063d2dbc /app/ollama_models/blobs/sha256-dd084c7d92a3c1c14cc09ae77153b903fd2024b64a100a0cc8ec9316063d2dbc
+COPY ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348 /app/ollama_models/blobs/sha256-e0a42594d802e5d31cdc786deb4823edb8adff66094d49de8fffe976d753e348
+COPY ollama_models/blobs/sha256-e796792eba26c4d3b04b0ac5adb01a453dd9ec2dfd83b6c59cbf6fe5f30b0f68 /app/ollama_models/blobs/sha256-e796792eba26c4d3b04b0ac5adb01a453dd9ec2dfd83b6c59cbf6fe5f30b0f68
+COPY ollama_models/blobs/sha256-f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31 /app/ollama_models/blobs/sha256-f838f048d36876f9f411d302e8fc45cea6793a37cd978af1b6a0b042fcfb2f31
+COPY ollama_models/manifests/registry.ollama.ai/library/gemma3/27b /app/ollama_models/manifests/registry.ollama.ai/library/gemma3/27b
+ENV OLLAMA_MODELS="/app/ollama_models"
+
+# Copy interesting folders and app file
+COPY ai_apis/chat_with_history.py /app/ai_apis/chat_with_history.py
+COPY agents/chatbot_agent.py /app/agents/chatbot_agent.py
+COPY agents/start_chatbot_docker.sh /app/agents/start_chatbot_docker.sh
+RUN chmod +x /app/agents/start_chatbot_docker.sh
+
+# Expose the MQTT port
+EXPOSE 1883
+
+# Set the command to run the agent as a module
+ENTRYPOINT ["/app/agents/start_chatbot_docker.sh"]

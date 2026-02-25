@@ -26,6 +26,7 @@ class DatabaseManager():
         )
         pipeline_options = PdfPipelineOptions()
         pipeline_options.do_table_structure = True
+        pipeline_options.do_ocr = False
         self.converter = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(
@@ -33,7 +34,7 @@ class DatabaseManager():
                 )
             }
         )
-        self.chunker = HybridChunker(max_tokens=1024)
+        self.chunker = HybridChunker()
 
     def add_document(self, collection_name: str, document_path: str) -> None:
         """

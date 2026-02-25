@@ -190,3 +190,4 @@ package.json
 mcp.json
 .cursorignore
 q_and_a_ai_assistant.md
+.vscode

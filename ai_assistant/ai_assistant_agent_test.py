@@ -59,19 +59,26 @@ def test_collections():
     print("Response:", response.json(), "\n")
 
 
-def test_inference() -> str:
+def test_inference(query: str = "What are the commitments of Santo Antonio Energia with the environment?",
+                   collection: str = "my_collection",
+                   n_chunks: int = 3) -> str:
     """
     Test the inference endpoint of the API.
-    
+
+    Args:
+        query (str, optional): The query to test the inference endpoint with. Defaults to "What are the commitments of Santo Antonio Energia with the environment?".
+        collection (str, optional): The collection name to use for inference. Defaults to "my_collection".
+        n_chunks (int, optional): The number of chunks to use for inference. Defaults to 3.
+
     Returns:
         str: The job ID returned by the inference endpoint.
     """
     print("Testing POST /ai_assistant/inference")
     request_data = AiAssistantInferenceRequest(
-        query="Quais a companhias aéreas que operam no aeroporto de Guarulhos?",
+        query=query,
         conversation_summary="",
-        n_chunks=3,
-        collection_name="none",
+        n_chunks=n_chunks,
+        collection_name=collection,
         inference_model_name="gemma3:4b"
     )
     response = httpx.post(
@@ -79,6 +86,7 @@ def test_inference() -> str:
     assert response.status_code == 200
     print("Response:", response.json(), "\n")
     return response.json().get("job_id")
+
 
 def test_inference_result(job_id: str) -> None:
     """Test the inference result endpoint of the API."""
@@ -112,8 +120,16 @@ def main():
     """Main function to run the tests."""
     # Parse the input arguments for the base URL of the API
     global BASE_URL
-    parser = argparse.ArgumentParser(description="Run AI Assistant Agent tests.")
-    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8001", help="Base URL of the AI Assistant API")
+    parser = argparse.ArgumentParser(
+        description="Run AI Assistant Agent tests.")
+    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8001",
+                        help="Base URL of the AI Assistant API")
+    parser.add_argument("--query", type=str, default="What are the commitments of Santo Antonio Energia with the environment?",
+                        help="Query to test the inference endpoint")
+    parser.add_argument("--collection", type=str, default="my_collection",
+                        help="Collection name to use for inference")
+    parser.add_argument("--n-chunks", type=int, default=3,
+                        help="Number of chunks to use for inference")
     args = parser.parse_args()
     BASE_URL = args.base_url
 
@@ -122,7 +138,8 @@ def main():
     test_root()
     test_status()
     test_collections()
-    job_id = test_inference()
+    job_id = test_inference(
+        query=args.query, collection=args.collection, n_chunks=args.n_chunks)
     test_inference_result(job_id)
     print("All tests passed ✅")
 

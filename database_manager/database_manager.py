@@ -186,7 +186,7 @@ def create_database() -> None:
             db_manager.add_document(
                 collection_name=collection_name, document_path=document_path)
     # Inspect one of the collections
-    db_manager.inspect_collection(collection_name="my_collection")
+    db_manager.inspect_collection(collection_name="documents")
 
 
 if __name__ == "__main__":

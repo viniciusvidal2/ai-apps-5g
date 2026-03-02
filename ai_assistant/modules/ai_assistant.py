@@ -53,12 +53,14 @@ class AiAssistant:
                 "- Informações antigas podem ser reduzidas ou removidas se não contribuírem diretamente para essa intenção.\n"
                 "- Não repita instruções, papéis ou metarreferências.\n"
                 "- Escreva de forma contínua, objetiva e sem listas.\n"
-                "- O resultado deve servir como memória consolidada para interações futuras."
+                "- O resultado deve servir como memória consolidada para interações futuras.\n"
+                "Garanta que a sua resposta seja somente o resumo atualizado, sem nenhuma explicação ou etapa de raciocínio."
             ),
         ])
         self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
         self.history_summary = ""
         # Query improvement stage
+        self.query_improvement_llm = ChatOllama(model="gemma3:4b")
         QUERY_IMPROVEMENT_PROMPT = ChatPromptTemplate.from_messages([
             (
                 "system",
@@ -72,11 +74,12 @@ class AiAssistant:
                 "human",
                 """Dada a pergunta do usuário abaixo, reescreva-a para ser mais clara, objetiva e detalhada, 
                 de forma a maximizar a relevância dos resultados recuperados da base de dados e da web. 
-                Mantenha o significado original, mas melhore a formulação para obter melhores respostas do assistente de IA.\n
+                Mantenha o significado original, mas melhore a formulação para obter melhores respostas do assistente de IA.
+                Garanta que você retorne em sua resposta somente a pergunta melhorada, sem nenhuma justificativa ou etapa de entendimento.\n
                 "Pergunta original: {input}""",
             ),
         ])
-        self.query_improver = QUERY_IMPROVEMENT_PROMPT | self.llm
+        self.query_improver = QUERY_IMPROVEMENT_PROMPT | self.query_improvement_llm
         # Initialize the prompt templates for rag
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---
@@ -183,6 +186,8 @@ class AiAssistant:
     def close_assistant(self) -> None:
         """Closes the assistant and performs any necessary cleanup, especially in the models."""
         subprocess.run(["ollama", "stop", self.inference_model_name])
+        if self.inference_model_name != "gemma3:4b":
+            subprocess.run(["ollama", "stop", "gemma3:4b"])
         print("Assistant closed and resources cleaned up.")
 
     def _get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
@@ -302,6 +307,8 @@ class AiAssistant:
         print("Improving query formulation for better retrieval...")
         self.status = "Melhorando a formulação da consulta."
         improved_query = self.query_improver.invoke({"input": query}).content
+        print(f"Original Query: {query}")
+        print(f"Improved Query: {improved_query}")
 
         # Retrieve relevant documents from the vectorstore
         print("Retrieving relevant documents from the vectorstore...")

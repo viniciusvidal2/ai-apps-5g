@@ -61,7 +61,8 @@ def test_collections():
 
 def test_inference(query: str = "What are the commitments of Santo Antonio Energia with the environment?",
                    collection: str = "my_collection",
-                   n_chunks: int = 3) -> str:
+                   n_chunks: int = 3,
+                   inference_model_name: str = "gemma3:4b") -> str:
     """
     Test the inference endpoint of the API.
 
@@ -69,6 +70,7 @@ def test_inference(query: str = "What are the commitments of Santo Antonio Energ
         query (str, optional): The query to test the inference endpoint with. Defaults to "What are the commitments of Santo Antonio Energia with the environment?".
         collection (str, optional): The collection name to use for inference. Defaults to "my_collection".
         n_chunks (int, optional): The number of chunks to use for inference. Defaults to 3.
+        inference_model_name (str, optional): The inference model name to use. Defaults to "gemma3:4b".
 
     Returns:
         str: The job ID returned by the inference endpoint.
@@ -79,7 +81,7 @@ def test_inference(query: str = "What are the commitments of Santo Antonio Energ
         conversation_summary="",
         n_chunks=n_chunks,
         collection_name=collection,
-        inference_model_name="gemma3:4b"
+        inference_model_name=inference_model_name
     )
     response = httpx.post(
         f"{BASE_URL}/ai_assistant/inference", json=request_data.model_dump())
@@ -130,6 +132,8 @@ def main():
                         help="Collection name to use for inference")
     parser.add_argument("--n-chunks", type=int, default=3,
                         help="Number of chunks to use for inference")
+    parser.add_argument("--inference-model-name", type=str, default="gemma3:4b",
+                        help="Inference model name to use for inference")
     args = parser.parse_args()
     BASE_URL = args.base_url
 
@@ -139,7 +143,7 @@ def main():
     test_status()
     test_collections()
     job_id = test_inference(
-        query=args.query, collection=args.collection, n_chunks=args.n_chunks)
+        query=args.query, collection=args.collection, n_chunks=args.n_chunks, inference_model_name=args.inference_model_name)
     test_inference_result(job_id)
     print("All tests passed ✅")
 

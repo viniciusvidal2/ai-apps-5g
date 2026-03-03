@@ -1,0 +1,18 @@
+names:
+- Boots
+- Ear Protectors
+- Glasses
+- Gloves
+- Helmet
+- Mask
+- Vest
+nc: 7
+roboflow:
+  license: CC BY 4.0
+  project: epi-2-sem-no
+  url: https://universe.roboflow.com/iagos-workspace/epi-2-sem-no/dataset/2
+  version: 2
+  workspace: iagos-workspace
+test: ../test/images
+train: ../train/images
+val: ../valid/images

@@ -34,7 +34,7 @@ class AiAssistant:
         self.db_client = self._connect_to_chromadb()
 
         # This assumes you have the model pulled and Ollama is running
-        self.expected_llm_models = self._get_available_ollama_models()
+        self.expected_llm_models = self.get_available_ollama_models()
         self.set_assistant_model(
             inference_model_name=self.inference_model_name)
         # Dealing with history of conversation
@@ -190,7 +190,7 @@ class AiAssistant:
             subprocess.run(["ollama", "stop", "gemma3:4b"])
         print("Assistant closed and resources cleaned up.")
 
-    def _get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
+    def get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
         """
         Returns a list of available Ollama model names (e.g. gemma3:4b).
 
@@ -316,7 +316,8 @@ class AiAssistant:
         context_string = ""
         if self.db_client is not None:
             try:
-                collection = self.db_client.get_collection(name=collection_name)
+                collection = self.db_client.get_collection(
+                    name=collection_name)
                 results = collection.query(
                     query_texts=[improved_query],
                     n_results=self.n_chunks,

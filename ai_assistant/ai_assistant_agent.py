@@ -98,6 +98,16 @@ def create_agent(config: AppConfig) -> FastAPI:
         """
         return {"collection_names": app.state.ai_assistant.get_collection_names()}
 
+    @app.get("/ai_assistant/available_models")
+    def get_available_models() -> dict:
+        """
+        Returns the list of available Ollama models.
+
+        Returns:
+            dict: The list of available Ollama models.
+        """
+        return {"available_models": app.state.ai_assistant.get_available_ollama_models()}
+
     @app.get("/ai_assistant/conversation_summary")
     def get_conversation_summary() -> dict:
         """

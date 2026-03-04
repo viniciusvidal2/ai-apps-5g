@@ -59,6 +59,14 @@ def test_collections():
     print("Response:", response.json(), "\n")
 
 
+def test_models():
+    """Test the ai assistant available models endpoint of the API."""
+    print("Testing GET /ai_assistant/available_models")
+    response = httpx.get(f"{BASE_URL}/ai_assistant/available_models")
+    assert response.status_code == 200
+    print("Response:", response.json(), "\n")
+
+
 def test_inference(query: str = "What are the commitments of Santo Antonio Energia with the environment?",
                    collection: str = "my_collection",
                    n_chunks: int = 3,
@@ -142,6 +150,7 @@ def main():
     test_root()
     test_status()
     test_collections()
+    test_models()
     job_id = test_inference(
         query=args.query, collection=args.collection, n_chunks=args.n_chunks, inference_model_name=args.inference_model_name)
     test_inference_result(job_id)

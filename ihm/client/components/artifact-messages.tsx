@@ -4,16 +4,13 @@ import { motion } from "framer-motion";
 import { memo } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
-import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
 import { PreviewMessage, ThinkingMessage } from "./message";
 
 type ArtifactMessagesProps = {
-  chatId: string;
   status: UseChatHelpers<ChatMessage>["status"];
   statusMessage?: string;
-  votes: Vote[] | undefined;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
@@ -22,10 +19,8 @@ type ArtifactMessagesProps = {
 };
 
 function PureArtifactMessages({
-  chatId,
   status,
   statusMessage,
-  votes,
   messages,
   setMessages,
   regenerate,
@@ -53,7 +48,6 @@ function PureArtifactMessages({
     >
       {messages.map((message, index) => (
         <PreviewMessage
-          chatId={chatId}
           isLoading={status === "streaming" && index === messages.length - 1}
           isReadonly={isReadonly}
           key={message.id}
@@ -63,11 +57,6 @@ function PureArtifactMessages({
             hasSentMessage && index === messages.length - 1
           }
           setMessages={setMessages}
-          vote={
-            votes
-              ? votes.find((vote) => vote.messageId === message.id)
-              : undefined
-          }
         />
       ))}
 
@@ -102,9 +91,6 @@ function areEqual(
     return false;
   }
   if (!equal(prevProps.messages, nextProps.messages)) {
-    return false;
-  }
-  if (!equal(prevProps.votes, nextProps.votes)) {
     return false;
   }
 

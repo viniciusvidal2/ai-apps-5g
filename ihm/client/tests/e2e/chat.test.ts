@@ -14,7 +14,7 @@ test.describe("Chat activity", () => {
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toContain("It's just green duh!");
+    expect(assistantMessage?.content).toContain("It's just green duh!");
   });
 
   test("Redirect to /chat/:id after submitting message", async () => {
@@ -22,7 +22,7 @@ test.describe("Chat activity", () => {
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toContain("It's just green duh!");
+    expect(assistantMessage?.content).toContain("It's just green duh!");
     await chatPage.hasChatIdInUrl();
   });
 
@@ -31,7 +31,7 @@ test.describe("Chat activity", () => {
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toContain(
+    expect(assistantMessage?.content).toContain(
       "With Next.js, you can ship fast!"
     );
   });
@@ -63,7 +63,7 @@ test.describe("Chat activity", () => {
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toContain("It's just green duh!");
+    expect(assistantMessage?.content).toContain("It's just green duh!");
 
     const userMessage = await chatPage.getRecentUserMessage();
     await userMessage.edit("Why is the sky blue?");
@@ -71,7 +71,7 @@ test.describe("Chat activity", () => {
     await chatPage.isGenerationComplete();
 
     const updatedAssistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(updatedAssistantMessage.content).toContain("It's just blue duh!");
+    expect(updatedAssistantMessage?.content).toContain("It's just blue duh!");
   });
 
   test("Hide suggested actions after sending message", async () => {
@@ -80,63 +80,54 @@ test.describe("Chat activity", () => {
     await chatPage.isElementNotVisible("suggested-actions");
   });
 
-  test("Upload file and send image attachment with message", async () => {
-    await chatPage.addImageAttachment();
-
-    await chatPage.isElementVisible("attachments-preview");
-    await chatPage.isElementVisible("input-attachment-loader");
-    await chatPage.isElementNotVisible("input-attachment-loader");
-
-    await chatPage.sendUserMessage("Who painted this?");
-
-    const userMessage = await chatPage.getRecentUserMessage();
-    expect(userMessage.attachments).toHaveLength(1);
-
-    await chatPage.isGenerationComplete();
-
-    const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toBe("This painting is by Monet!");
-  });
-
   test("Call weather tool", async () => {
     await chatPage.sendUserMessage("What's the weather in sf?");
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-
-    expect(assistantMessage.content).toBe(
-      "The current temperature in San Francisco is 17°C."
+    expect(assistantMessage?.content).toBe(
+      "The current temperature in San Francisco is 17Â°C."
     );
   });
 
-  test("Upvote message", async () => {
-    await chatPage.sendUserMessage("Why is the sky blue?");
-    await chatPage.isGenerationComplete();
-
-    const assistantMessage = await chatPage.getRecentAssistantMessage();
-    await assistantMessage.upvote();
-    await chatPage.isVoteComplete();
+  test("Chat UI hides attachment and visibility controls", async ({ page }) => {
+    await expect(page.getByTestId("attachments-button")).toHaveCount(0);
+    await expect(page.getByTestId("visibility-selector")).toHaveCount(0);
   });
 
-  test("Downvote message", async () => {
+  test("Assistant responses do not show like/dislike actions", async ({
+    page,
+  }) => {
     await chatPage.sendUserMessage("Why is the sky blue?");
     await chatPage.isGenerationComplete();
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    await assistantMessage.downvote();
-    await chatPage.isVoteComplete();
+    expect(assistantMessage).not.toBeNull();
+
+    await expect(
+      assistantMessage!.element.getByTestId("message-upvote")
+    ).toHaveCount(0);
+    await expect(
+      assistantMessage!.element.getByTestId("message-downvote")
+    ).toHaveCount(0);
   });
 
-  test("Update vote", async () => {
+  test("Sidebar history menu no longer shows share options", async ({
+    page,
+  }) => {
     await chatPage.sendUserMessage("Why is the sky blue?");
     await chatPage.isGenerationComplete();
 
-    const assistantMessage = await chatPage.getRecentAssistantMessage();
-    await assistantMessage.upvote();
-    await chatPage.isVoteComplete();
+    const moreButton = page.getByRole("button", { name: "More" }).first();
 
-    await assistantMessage.downvote();
-    await chatPage.isVoteComplete();
+    if (!(await moreButton.isVisible().catch(() => false))) {
+      await chatPage.openSideBar();
+    }
+
+    await moreButton.click();
+
+    await expect(page.getByText("Compartilhar")).toHaveCount(0);
+    await expect(page.getByText("Excluir")).toBeVisible();
   });
 
   test("Create message from url query", async ({ page }) => {
@@ -148,7 +139,7 @@ test.describe("Chat activity", () => {
     expect(userMessage.content).toBe("Why is the sky blue?");
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
-    expect(assistantMessage.content).toContain("It's just blue duh!");
+    expect(assistantMessage?.content).toContain("It's just blue duh!");
   });
 
   test("auto-scrolls to bottom after submitting new messages", async () => {

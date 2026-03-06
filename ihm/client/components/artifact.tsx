@@ -17,7 +17,7 @@ import { imageArtifact } from "@/artifacts/image/client";
 import { sheetArtifact } from "@/artifacts/sheet/client";
 import { textArtifact } from "@/artifacts/text/client";
 import { useArtifact } from "@/hooks/use-artifact";
-import type { Document, Vote } from "@/lib/db/schema";
+import type { Document } from "@/lib/db/schema";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import { fetcher } from "@/lib/utils";
 import { ArtifactActions } from "./artifact-actions";
@@ -65,7 +65,6 @@ function PureArtifact({
   messages,
   setMessages,
   regenerate,
-  votes,
   isReadonly,
   selectedVisibilityType,
   selectedModelId,
@@ -80,7 +79,6 @@ function PureArtifact({
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
-  votes: Vote[] | undefined;
   sendMessage: UseChatHelpers<ChatMessage>["sendMessage"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
   isReadonly: boolean;
@@ -323,14 +321,12 @@ function PureArtifact({
               <div className="flex h-full flex-col items-center justify-between">
                 <ArtifactMessages
                   artifactStatus={artifact.status}
-                  chatId={chatId}
                   isReadonly={isReadonly}
                   messages={messages}
                   regenerate={regenerate}
                   setMessages={setMessages}
                   status={status}
                   statusMessage={statusMessage}
-                  votes={votes}
                 />
 
                 <div className="relative flex w-full flex-row items-end gap-2 px-4 pb-4">
@@ -516,9 +512,6 @@ export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
     return false;
   }
   if (prevProps.statusMessage !== nextProps.statusMessage) {
-    return false;
-  }
-  if (!equal(prevProps.votes, nextProps.votes)) {
     return false;
   }
   if (prevProps.input !== nextProps.input) {

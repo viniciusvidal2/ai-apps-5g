@@ -1,5 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { chatModels } from "@/lib/ai/models";
 
@@ -55,14 +53,6 @@ export class ChatPage {
     await response.finished();
   }
 
-  async isVoteComplete() {
-    const response = await this.page.waitForResponse((currentResponse) =>
-      currentResponse.url().includes("/api/vote")
-    );
-
-    await response.finished();
-  }
-
   async hasChatIdInUrl() {
     await expect(this.page).toHaveURL(CHAT_ID_REGEX);
   }
@@ -79,26 +69,6 @@ export class ChatPage {
 
   async isElementNotVisible(elementId: string) {
     await expect(this.page.getByTestId(elementId)).not.toBeVisible();
-  }
-
-  async addImageAttachment() {
-    this.page.on("filechooser", async (fileChooser) => {
-      const filePath = path.join(
-        process.cwd(),
-        "public",
-        "images",
-        "mouth of the seine, monet.jpg"
-      );
-      const imageBuffer = fs.readFileSync(filePath);
-
-      await fileChooser.setFiles({
-        name: "mouth of the seine, monet.jpg",
-        mimeType: "image/jpeg",
-        buffer: imageBuffer,
-      });
-    });
-
-    await this.page.getByTestId("attachments-button").click();
   }
 
   async getSelectedModel() {
@@ -118,21 +88,6 @@ export class ChatPage {
     await this.page.getByTestId("model-selector").click();
     await this.page.getByTestId(`model-selector-item-${chatModelId}`).click();
     expect(await this.getSelectedModel()).toBe(chatModel.name);
-  }
-
-  async getSelectedVisibility() {
-    const visibilityId = await this.page
-      .getByTestId("visibility-selector")
-      .innerText();
-    return visibilityId;
-  }
-
-  async chooseVisibilityFromSelector(chatVisibility: "public" | "private") {
-    await this.page.getByTestId("visibility-selector").click();
-    await this.page
-      .getByTestId(`visibility-selector-item-${chatVisibility}`)
-      .click();
-    expect(await this.getSelectedVisibility()).toBe(chatVisibility);
   }
 
   async getRecentAssistantMessage() {
@@ -170,12 +125,6 @@ export class ChatPage {
         await lastMessageElement
           .getByTestId("message-reasoning-toggle")
           .click();
-      },
-      async upvote() {
-        await lastMessageElement.getByTestId("message-upvote").click();
-      },
-      async downvote() {
-        await lastMessageElement.getByTestId("message-downvote").click();
       },
     };
   }

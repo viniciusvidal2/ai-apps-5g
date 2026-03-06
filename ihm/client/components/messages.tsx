@@ -4,7 +4,6 @@ import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
-import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
@@ -12,10 +11,8 @@ import { Greeting } from "./greeting";
 import { PreviewMessage, ThinkingMessage } from "./message";
 
 type MessagesProps = {
-  chatId: string;
   status: UseChatHelpers<ChatMessage>["status"];
   statusMessage?: string;
-  votes: Vote[] | undefined;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
   regenerate: UseChatHelpers<ChatMessage>["regenerate"];
@@ -25,10 +22,8 @@ type MessagesProps = {
 };
 
 function PureMessages({
-  chatId,
   status,
   statusMessage,
-  votes,
   messages,
   setMessages,
   regenerate,
@@ -78,7 +73,6 @@ function PureMessages({
 
           {messages.map((message, index) => (
             <PreviewMessage
-              chatId={chatId}
               isLoading={
                 status === "streaming" && messages.length - 1 === index
               }
@@ -90,11 +84,6 @@ function PureMessages({
                 hasSentMessage && index === messages.length - 1
               }
               setMessages={setMessages}
-              vote={
-                votes
-                  ? votes.find((vote) => vote.messageId === message.id)
-                  : undefined
-              }
             />
           ))}
 
@@ -141,9 +130,6 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
     return false;
   }
   if (!equal(prevProps.messages, nextProps.messages)) {
-    return false;
-  }
-  if (!equal(prevProps.votes, nextProps.votes)) {
     return false;
   }
 

@@ -1,6 +1,8 @@
 """Pydantic models used across the FastAPI server."""
 from pydantic import BaseModel
 
+from ihm.server.config import INFERENCE_MODEL_NAME
+
 
 class InferenceRequest(BaseModel):
     """Model for inference requests."""
@@ -10,7 +12,7 @@ class InferenceRequest(BaseModel):
     session_id: str
     conversation_summary: str = ""
     n_chunks: int = 3
-    inference_model_name: str = "gemma3:4b"
+    inference_model_name: str = INFERENCE_MODEL_NAME
     collection_name: str = "none"  # "documents" or "none"
 
 
@@ -41,3 +43,15 @@ class ServiceResponse(BaseModel):
     status: str
     message: str
     active_sessions_count: int
+
+
+class AvailableModelsResponse(BaseModel):
+    """Model for available inference models."""
+
+    available_models: list[str]
+
+
+class CollectionsResponse(BaseModel):
+    """Model for available database collections."""
+
+    collection_names: list[str]

@@ -95,7 +95,7 @@ export async function POST(request: Request) {
       (model) => model.id === requestBody.selectedChatModel
     );
     const n_chunks = ragParams.n_chunks ?? fallbackModel?.n_chunks ?? 10;
-    const inference_model_name = ragParams.inference_model_name ?? "gemma3:4b";
+    const inference_model_name = ragParams.inference_model_name;
     const collection_name = ragParams.collection_name ?? "none";
     const conversationSummary = existingChat?.conversationSummary ?? "";
 
@@ -109,8 +109,8 @@ export async function POST(request: Request) {
         session_id: sessionId || `fallback-session-${userId}`,
         conversation_summary: conversationSummary,
         n_chunks,
-        inference_model_name,
         collection_name,
+        ...(inference_model_name ? { inference_model_name } : {}),
       }),
     });
 

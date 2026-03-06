@@ -312,9 +312,14 @@ class AiAssistant:
 
         # Retrieve relevant documents from the vectorstore
         print("Retrieving relevant documents from the vectorstore...")
-        self.status = "Recuperando documentos relevantes da base de dados."
         context_string = ""
-        if self.db_client is not None:
+        use_collection = collection_name.strip().lower() != "none"
+        if use_collection:
+            self.status = "Recuperando documentos relevantes da base de dados."
+        else:
+            self.status = "Consulta sem RAG na base de dados."
+
+        if use_collection and self.db_client is not None:
             try:
                 collection = self.db_client.get_collection(
                     name=collection_name)

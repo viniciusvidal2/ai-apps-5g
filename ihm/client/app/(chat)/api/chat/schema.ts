@@ -17,7 +17,7 @@ const partSchema = z.union([textPartSchema, filePartSchema]);
 const ragParamsSchema = z.object({
   n_chunks: z.number().optional(),
   inference_model_name: z.string().optional(),
-  collection_name: z.enum(["documents", "none"]).optional(),
+  collection_name: z.string().optional(),
 }).optional();
 
 export const postRequestBodySchema = z.object({

@@ -206,3 +206,29 @@ async def get_ai_assistant_conversation_summary() -> str:
 
     data = response.json()
     return str(data.get("conversation_summary", ""))
+
+
+async def get_ai_assistant_available_models() -> Dict[str, Any]:
+    """Fetch the current list of available inference models from AI Assistant."""
+    models_url = f"{AI_ASSISTANT_API_URL}/ai_assistant/available_models"
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(models_url)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI Assistant available models fetch failed ({response.status_code}): {response.text}",
+        )
+    return response.json()
+
+
+async def get_ai_assistant_collections() -> Dict[str, Any]:
+    """Fetch the current list of ChromaDB collections from AI Assistant."""
+    collections_url = f"{AI_ASSISTANT_API_URL}/ai_assistant/collections"
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(collections_url)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI Assistant collections fetch failed ({response.status_code}): {response.text}",
+        )
+    return response.json()

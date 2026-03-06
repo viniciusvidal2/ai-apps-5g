@@ -30,10 +30,42 @@ import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
 import { MultimodalInput } from "./multimodal-input";
-import { type RAGParams } from "./rag-controls";
+import {
+  NONE_COLLECTION_OPTION,
+  type RAGOption,
+  type RAGParams,
+} from "./rag-controls";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
 import { toast } from "./toast";
 import type { VisibilityType } from "./visibility-selector";
+
+type RAGOptionState = {
+  inferenceModels: RAGOption[];
+  collections: RAGOption[];
+  isLoading: boolean;
+};
+
+function normalizeRAGOptions(values: unknown): RAGOption[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+
+  return values.flatMap((value) => {
+    if (typeof value !== "string") {
+      return [];
+    }
+
+    const normalizedValue = value.trim();
+    if (!normalizedValue || seen.has(normalizedValue)) {
+      return [];
+    }
+
+    seen.add(normalizedValue);
+    return [{ id: normalizedValue, name: normalizedValue }];
+  });
+}
 
 export function Chat({
   id,
@@ -66,36 +98,40 @@ export function Chat({
   const [backendStatusMessage, setBackendStatusMessage] = useState<string>("");
   const [showCreditCardAlert, setShowCreditCardAlert] = useState(false);
   const [currentModelId, setCurrentModelId] = useState(initialChatModel);
-  
+
   // Helper function to get n_chunks from model
   const getNChunksFromModel = (modelId: string): number => {
     const model = chatModels.find((m) => m.id === modelId);
     return model?.n_chunks ?? 10;
   };
-  
+
   // RAG parameters with localStorage persistence
   const [ragParams, setRAGParams] = useState<RAGParams>(() => {
     const defaultParams = {
       n_chunks: getNChunksFromModel(initialChatModel),
-      inference_model_name: "gemma3:4b",
       collection_name: "none",
     };
-    
+
     if (typeof window === "undefined") {
       return defaultParams;
     }
+
     const stored = localStorage.getItem("rag-params");
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // Ensure n_chunks is set based on current model, keep other params
         return {
           n_chunks: getNChunksFromModel(initialChatModel),
-          inference_model_name: parsed.inference_model_name ?? defaultParams.inference_model_name,
+          inference_model_name:
+            typeof parsed.inference_model_name === "string"
+              ? parsed.inference_model_name
+              : undefined,
           collection_name:
-            parsed.collection_name ??
-            parsed.vectorstore_name ??
-            defaultParams.collection_name,
+            typeof parsed.collection_name === "string"
+              ? parsed.collection_name
+              : typeof parsed.vectorstore_name === "string"
+                ? parsed.vectorstore_name
+                : defaultParams.collection_name,
         };
       } catch {
         return defaultParams;
@@ -103,7 +139,121 @@ export function Chat({
     }
     return defaultParams;
   });
-  
+
+  const [ragOptionState, setRAGOptionState] = useState<RAGOptionState>({
+    inferenceModels: [],
+    collections: [NONE_COLLECTION_OPTION],
+    isLoading: true,
+  });
+
+  useEffect(() => {
+    if (isReadonly) {
+      setRAGOptionState({
+        inferenceModels: [],
+        collections: [NONE_COLLECTION_OPTION],
+        isLoading: false,
+      });
+      return;
+    }
+
+    const backendUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003";
+    const abortController = new AbortController();
+
+    const loadRagOptions = async () => {
+      try {
+        const [modelsResponse, collectionsResponse] = await Promise.all([
+          fetch(`${backendUrl}/ai_assistant/available_models`, {
+            signal: abortController.signal,
+          }),
+          fetch(`${backendUrl}/ai_assistant/collections`, {
+            signal: abortController.signal,
+          }),
+        ]);
+
+        if (!modelsResponse.ok || !collectionsResponse.ok) {
+          throw new Error(
+            `Failed to load RAG options (models=${modelsResponse.status}, collections=${collectionsResponse.status})`
+          );
+        }
+
+        const [modelsData, collectionsData] = await Promise.all([
+          modelsResponse.json(),
+          collectionsResponse.json(),
+        ]);
+
+        const inferenceModels = normalizeRAGOptions(
+          modelsData.available_models
+        );
+        const collections = normalizeRAGOptions(
+          collectionsData.collection_names
+        ).filter((option) => option.id !== NONE_COLLECTION_OPTION.id);
+
+        setRAGOptionState({
+          inferenceModels,
+          collections: [NONE_COLLECTION_OPTION, ...collections],
+          isLoading: false,
+        });
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        console.error("Error loading RAG options:", error);
+        setRAGOptionState({
+          inferenceModels: [],
+          collections: [NONE_COLLECTION_OPTION],
+          isLoading: false,
+        });
+      }
+    };
+
+    void loadRagOptions();
+
+    return () => {
+      abortController.abort();
+    };
+  }, [isReadonly]);
+
+  useEffect(() => {
+    if (ragOptionState.isLoading) {
+      return;
+    }
+
+    const validModelIds = new Set(
+      ragOptionState.inferenceModels.map((model) => model.id)
+    );
+    const validCollectionIds = new Set(
+      ragOptionState.collections.map((collection) => collection.id)
+    );
+
+    setRAGParams((current) => {
+      const nextInferenceModel =
+        current.inference_model_name &&
+        validModelIds.has(current.inference_model_name)
+          ? current.inference_model_name
+          : ragOptionState.inferenceModels[0]?.id;
+
+      const nextCollection =
+        current.collection_name && validCollectionIds.has(current.collection_name)
+          ? current.collection_name
+          : NONE_COLLECTION_OPTION.id;
+
+      if (
+        current.inference_model_name === nextInferenceModel &&
+        current.collection_name === nextCollection
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        inference_model_name: nextInferenceModel,
+        collection_name: nextCollection,
+      };
+    });
+  }, [ragOptionState]);
+
   // Sync n_chunks when model changes
   useEffect(() => {
     const newNChunks = getNChunksFromModel(currentModelId);
@@ -115,6 +265,7 @@ export function Chat({
   useEffect(() => {
     localStorage.setItem("rag-params", JSON.stringify(ragParams));
   }, [ragParams]);
+
   const currentModelIdRef = useRef(currentModelId);
   const ragParamsRef = useRef(ragParams);
 
@@ -251,6 +402,9 @@ export function Chat({
               stop={stop}
               usage={usage}
               ragParams={ragParams}
+              ragCollections={ragOptionState.collections}
+              ragInferenceModels={ragOptionState.inferenceModels}
+              ragOptionsLoading={ragOptionState.isLoading}
               onRAGParamsChange={setRAGParams}
             />
           )}

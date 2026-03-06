@@ -8,6 +8,9 @@ active_sessions: Dict[str, Dict[str, Any]] = {}
 # Global flag: we keep a single AI Assistant container for all sessions.
 docker_container_running: bool = False
 
+# Serializes container lifecycle operations across concurrent requests.
+service_lock = asyncio.Lock()
+
 # Guards inferences to avoid context/status collisions in the shared container.
 inference_lock = asyncio.Lock()
 

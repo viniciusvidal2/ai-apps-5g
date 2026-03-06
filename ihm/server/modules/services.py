@@ -48,41 +48,43 @@ async def start_services_if_needed(user_id: str, session_id: str) -> None:
         logger.info("SKIPPING start; USE_AI_ASSISTANT is False")
         return
 
-    if state.docker_container_running:
-        if await _container_is_reachable():
-            logger.info("SKIPPING start; shared AI Assistant container is already running")
-            return
-        logger.warning(
-            "Shared container state is stale (flag=true, health unreachable). Restarting..."
-        )
-        state.docker_container_running = False
+    async with state.service_lock:
+        if state.docker_container_running:
+            if await _container_is_reachable():
+                logger.info("SKIPPING start; shared AI Assistant container is already running")
+                return
+            logger.warning(
+                "Shared container state is stale (flag=true, health unreachable). Restarting..."
+            )
+            state.docker_container_running = False
 
-    await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
-    logger.info("SERVICES STARTED - shared container ready")
+        await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
+        logger.info("SERVICES STARTED - shared container ready")
 
 
 async def shutdown_services_if_idle(session_id: str, user_id: str) -> bool:
     """Stop shared AI Assistant services when no active sessions remain."""
     logger.info("SHUTDOWN_SERVICES - session_id=%s user_id=%s", session_id, user_id)
 
-    if state.active_sessions:
-        logger.info(
-            "SKIPPING shutdown; active sessions still present (%s)",
-            len(state.active_sessions),
-        )
-        return False
+    async with state.service_lock:
+        if state.active_sessions:
+            logger.info(
+                "SKIPPING shutdown; active sessions still present (%s)",
+                len(state.active_sessions),
+            )
+            return False
 
-    if not state.docker_container_running:
-        logger.info("SKIPPING shutdown; shared container is already stopped")
-        return False
+        if not state.docker_container_running:
+            logger.info("SKIPPING shutdown; shared container is already stopped")
+            return False
 
-    try:
-        await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
-    finally:
-        state.docker_container_running = False
+        try:
+            await kill_ai_assistant_agent(user_id=user_id, session_id=session_id)
+        finally:
+            state.docker_container_running = False
 
-    logger.info("SERVICES STOPPED - shared container stopped")
-    return True
+        logger.info("SERVICES STOPPED - shared container stopped")
+        return True
 
 
 async def ensure_services_ready(user_id: str, session_id: str) -> None:
@@ -93,17 +95,18 @@ async def ensure_services_ready(user_id: str, session_id: str) -> None:
         logger.info("SKIPPING readiness check; USE_AI_ASSISTANT is False")
         return
 
-    if state.docker_container_running:
-        if await _container_is_reachable():
-            logger.info("SERVICES READY - shared container healthy")
-            return
-        logger.warning(
-            "Shared container state is stale during inference (flag=true, health unreachable). Restarting..."
-        )
-        state.docker_container_running = False
+    async with state.service_lock:
+        if state.docker_container_running:
+            if await _container_is_reachable():
+                logger.info("SERVICES READY - shared container healthy")
+                return
+            logger.warning(
+                "Shared container state is stale during inference (flag=true, health unreachable). Restarting..."
+            )
+            state.docker_container_running = False
 
-    await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
-    logger.info("SERVICES READY - shared container healthy")
+        await _start_container_and_wait_ready(user_id=user_id, session_id=session_id)
+        logger.info("SERVICES READY - shared container healthy")
 
 
 async def build_mock_stream(query: str) -> AsyncGenerator[str, None]:

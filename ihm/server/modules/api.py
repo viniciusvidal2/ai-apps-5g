@@ -10,12 +10,16 @@ from fastapi.responses import StreamingResponse
 from ihm.server import state
 from ihm.server.config import AI_ASSISTANT_POLL_INTERVAL_SECONDS, USE_AI_ASSISTANT
 from ihm.server.models import (
+    AvailableModelsResponse,
+    CollectionsResponse,
     HealthResponse,
     InferenceRequest,
     ServiceRequest,
     ServiceResponse,
 )
 from ihm.server.modules.rest_api_client import (
+    get_ai_assistant_available_models,
+    get_ai_assistant_collections,
     get_ai_assistant_conversation_summary,
     get_ai_assistant_health,
     get_ai_assistant_inference,
@@ -32,6 +36,11 @@ from ihm.server.modules.services import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _runtime_request_context() -> tuple[str, str]:
+    """Provide stable identifiers for service readiness checks outside inference."""
+    return (state.last_user_id or "1", "runtime-options")
 
 
 @router.get("/", response_model=HealthResponse)
@@ -70,6 +79,48 @@ async def health_check() -> HealthResponse:
             f"agent health: {ai_status}"
         ),
     )
+
+
+@router.get(
+    "/ai_assistant/available_models",
+    response_model=AvailableModelsResponse,
+)
+async def available_models() -> AvailableModelsResponse:
+    """Proxy the current AI Assistant model list for the browser client."""
+    if not USE_AI_ASSISTANT:
+        return AvailableModelsResponse(available_models=[])
+
+    user_id, session_id = _runtime_request_context()
+    await ensure_services_ready(user_id=user_id, session_id=session_id)
+    data = await get_ai_assistant_available_models()
+
+    models = [
+        model.strip()
+        for model in data.get("available_models", [])
+        if isinstance(model, str) and model.strip()
+    ]
+    return AvailableModelsResponse(available_models=models)
+
+
+@router.get(
+    "/ai_assistant/collections",
+    response_model=CollectionsResponse,
+)
+async def collections() -> CollectionsResponse:
+    """Proxy the current AI Assistant collection list for the browser client."""
+    if not USE_AI_ASSISTANT:
+        return CollectionsResponse(collection_names=[])
+
+    user_id, session_id = _runtime_request_context()
+    await ensure_services_ready(user_id=user_id, session_id=session_id)
+    data = await get_ai_assistant_collections()
+
+    collection_names = [
+        collection_name.strip()
+        for collection_name in data.get("collection_names", [])
+        if isinstance(collection_name, str) and collection_name.strip()
+    ]
+    return CollectionsResponse(collection_names=collection_names)
 
 
 @router.post("/turn_on_services", response_model=ServiceResponse)

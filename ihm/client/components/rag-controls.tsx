@@ -11,34 +11,36 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// Available inference models
-export const INFERENCE_MODELS = [
-  { id: "gemma3:4b", name: "Gemma3 4B" },
-  { id: "gemma3:12b", name: "Gemma3 12B" },
-  { id: "gemma3:27b", name: "Gemma3 27B" },
-  { id: "qwen3-embedding:0.6b", name: "Qwen3 Embedding 0.6B" },
-] as const;
+export interface RAGOption {
+  id: string;
+  name: string;
+}
 
-// Available collection options
-export const COLLECTION_OPTIONS = [
-  { id: "documents", name: "Documentos" },
-  { id: "none", name: "Nenhum" },
-] as const;
+export const NONE_COLLECTION_OPTION: RAGOption = {
+  id: "none",
+  name: "Nenhum",
+};
 
 export interface RAGParams {
   n_chunks?: number;
-  inference_model_name: string;
+  inference_model_name?: string;
   collection_name: string;
 }
 
 interface RAGControlsProps {
   params: RAGParams;
+  inferenceModels: RAGOption[];
+  collections: RAGOption[];
+  isLoading: boolean;
   onParamsChange: (params: RAGParams) => void;
   className?: string;
 }
 
 function PureRAGControls({
   params,
+  inferenceModels,
+  collections,
+  isLoading,
   onParamsChange,
   className,
 }: RAGControlsProps) {
@@ -71,14 +73,23 @@ function PureRAGControls({
           Modelo:
         </Label>
         <Select
+          disabled={isLoading || inferenceModels.length === 0}
           value={params.inference_model_name}
           onValueChange={handleModelChange}
         >
           <SelectTrigger id="inference-model" className="h-7 w-[140px] text-xs">
-            <SelectValue placeholder="Selecione" />
+            <SelectValue
+              placeholder={
+                isLoading
+                  ? "Carregando..."
+                  : inferenceModels.length === 0
+                    ? "Indisponivel"
+                    : "Selecione"
+              }
+            />
           </SelectTrigger>
           <SelectContent>
-            {INFERENCE_MODELS.map((model) => (
+            {inferenceModels.map((model) => (
               <SelectItem key={model.id} value={model.id} className="text-xs">
                 {model.name}
               </SelectItem>
@@ -102,7 +113,7 @@ function PureRAGControls({
             <SelectValue placeholder="Selecione" />
           </SelectTrigger>
           <SelectContent>
-            {COLLECTION_OPTIONS.map((option) => (
+            {collections.map((option) => (
               <SelectItem key={option.id} value={option.id} className="text-xs">
                 {option.name}
               </SelectItem>

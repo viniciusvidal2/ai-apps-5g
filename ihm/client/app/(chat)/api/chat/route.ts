@@ -1,6 +1,7 @@
 import { auth, type UserType } from "@/app/(auth)/auth";
 import type { VisibilityType } from "@/components/visibility-selector";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
+import { chatModels } from "@/lib/ai/models";
 import {
   deleteChatById,
   getChatById,
@@ -90,7 +91,10 @@ export async function POST(request: Request) {
     const query = textPart && "text" in textPart ? textPart.text : "";
 
     const ragParams = requestBody.ragParams || {};
-    const n_chunks = ragParams.n_chunks ?? 3;
+    const fallbackModel = chatModels.find(
+      (model) => model.id === requestBody.selectedChatModel
+    );
+    const n_chunks = ragParams.n_chunks ?? fallbackModel?.n_chunks ?? 10;
     const inference_model_name = ragParams.inference_model_name ?? "gemma3:4b";
     const collection_name = ragParams.collection_name ?? "none";
     const conversationSummary = existingChat?.conversationSummary ?? "";

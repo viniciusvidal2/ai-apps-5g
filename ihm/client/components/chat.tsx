@@ -71,7 +71,7 @@ export function Chat({
   // Helper function to get n_chunks from model
   const getNChunksFromModel = (modelId: string): number => {
     const model = chatModels.find((m) => m.id === modelId);
-    return model?.n_chunks ?? 3; // Default to 3 if model not found
+    return model?.n_chunks ?? 10;
   };
   
   // RAG parameters with localStorage persistence

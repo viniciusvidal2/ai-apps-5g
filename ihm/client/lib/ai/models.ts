@@ -12,12 +12,12 @@ export const chatModels: ChatModel[] = [
     id: "search-mode-default",
     name: "Padrão",
     description: "Respostas rápidas e diretas",
-    n_chunks: 3,
+    n_chunks: 10,
   },
   {
     id: "search-mode-wide",
     name: "Busca ampla",
     description: "Análise mais detalhada e abrangente",
-    n_chunks: 10,
+    n_chunks: 20,
   },
 ];

@@ -280,6 +280,7 @@ export function Chat({
         setInput={setInput}
         setMessages={setMessages}
         status={status}
+        statusMessage={backendStatusMessage}
         stop={stop}
         votes={votes}
       />

@@ -3,6 +3,7 @@ import equal from "fast-deep-equal";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
+import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
@@ -60,6 +61,11 @@ function PureMessages({
     }
   }, [status, messagesContainerRef]);
 
+  const showAssistantActivity = shouldShowAssistantActivity({
+    messages,
+    status,
+  });
+
   return (
     <div
       className="overscroll-behavior-contain -webkit-overflow-scrolling-touch flex-1 touch-pan-y overflow-y-scroll"
@@ -92,11 +98,9 @@ function PureMessages({
             />
           ))}
 
-          {status === "submitted" &&
-            messages.length > 0 &&
-            messages.at(-1)?.role === "user" && (
-              <ThinkingMessage statusMessage={statusMessage} />
-            )}
+          {showAssistantActivity && (
+            <ThinkingMessage statusMessage={statusMessage} />
+          )}
 
           <div
             className="min-h-[24px] min-w-[24px] shrink-0"

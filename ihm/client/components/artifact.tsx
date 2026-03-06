@@ -57,6 +57,7 @@ function PureArtifact({
   input,
   setInput,
   status,
+  statusMessage,
   stop,
   attachments,
   setAttachments,
@@ -73,6 +74,7 @@ function PureArtifact({
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
+  statusMessage?: string;
   stop: UseChatHelpers<ChatMessage>["stop"];
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
@@ -327,6 +329,7 @@ function PureArtifact({
                   regenerate={regenerate}
                   setMessages={setMessages}
                   status={status}
+                  statusMessage={statusMessage}
                   votes={votes}
                 />
 
@@ -510,6 +513,9 @@ function PureArtifact({
 
 export const Artifact = memo(PureArtifact, (prevProps, nextProps) => {
   if (prevProps.status !== nextProps.status) {
+    return false;
+  }
+  if (prevProps.statusMessage !== nextProps.statusMessage) {
     return false;
   }
   if (!equal(prevProps.votes, nextProps.votes)) {

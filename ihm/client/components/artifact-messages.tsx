@@ -3,6 +3,7 @@ import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo } from "react";
 import { useMessages } from "@/hooks/use-messages";
+import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
 import type { Vote } from "@/lib/db/schema";
 import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
@@ -11,6 +12,7 @@ import { PreviewMessage, ThinkingMessage } from "./message";
 type ArtifactMessagesProps = {
   chatId: string;
   status: UseChatHelpers<ChatMessage>["status"];
+  statusMessage?: string;
   votes: Vote[] | undefined;
   messages: ChatMessage[];
   setMessages: UseChatHelpers<ChatMessage>["setMessages"];
@@ -22,6 +24,7 @@ type ArtifactMessagesProps = {
 function PureArtifactMessages({
   chatId,
   status,
+  statusMessage,
   votes,
   messages,
   setMessages,
@@ -35,6 +38,11 @@ function PureArtifactMessages({
     onViewportLeave,
     hasSentMessage,
   } = useMessages({
+    status,
+  });
+
+  const showAssistantActivity = shouldShowAssistantActivity({
+    messages,
     status,
   });
 
@@ -63,9 +71,9 @@ function PureArtifactMessages({
         />
       ))}
 
-      {status === "submitted" &&
-        messages.length > 0 &&
-        messages.at(-1)?.role === "user" && <ThinkingMessage />}
+      {showAssistantActivity && (
+        <ThinkingMessage statusMessage={statusMessage} />
+      )}
 
       <motion.div
         className="min-h-[24px] min-w-[24px] shrink-0"
@@ -81,20 +89,19 @@ function areEqual(
   prevProps: ArtifactMessagesProps,
   nextProps: ArtifactMessagesProps
 ) {
-  if (
-    prevProps.artifactStatus === "streaming" &&
-    nextProps.artifactStatus === "streaming"
-  ) {
-    return true;
+  if (prevProps.artifactStatus !== nextProps.artifactStatus) {
+    return false;
   }
-
   if (prevProps.status !== nextProps.status) {
     return false;
   }
-  if (prevProps.status && nextProps.status) {
+  if (prevProps.statusMessage !== nextProps.statusMessage) {
     return false;
   }
   if (prevProps.messages.length !== nextProps.messages.length) {
+    return false;
+  }
+  if (!equal(prevProps.messages, nextProps.messages)) {
     return false;
   }
   if (!equal(prevProps.votes, nextProps.votes)) {

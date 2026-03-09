@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """API routes for the AI Assistant server."""
 import asyncio
 import json
@@ -38,6 +40,49 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _truncate_text(value: str, max_chars: int = 160) -> str:
+    """Trim request payloads before logging them."""
+    normalized = " ".join(value.split())
+    if len(normalized) <= max_chars:
+        return normalized
+    return f"{normalized[: max_chars - 3]}..."
+
+
+def _request_metadata(request: Request) -> Dict[str, str]:
+    """Extract request headers commonly needed for backend debugging."""
+    return {
+        "origin": request.headers.get("origin", ""),
+        "referer": request.headers.get("referer", ""),
+        "user_agent": request.headers.get("user-agent", ""),
+    }
+
+
+async def _register_or_touch_session(session_id: str, user_id: str, source: str) -> tuple[int, int]:
+    """Track a session entirely on the server side."""
+    async with state.service_lock:
+        state.register_session(session_id=session_id, user_id=user_id, source=source)
+        return (
+            state.count_active_sessions(),
+            state.count_active_sessions(user_id=user_id),
+        )
+
+
+async def _remove_session(session_id: str, user_id_hint: str) -> tuple[str, int, int]:
+    """Remove a session from runtime state and return updated counters."""
+    async with state.service_lock:
+        session_data = state.remove_session(session_id)
+        user_id = (
+            session_data["user_id"]
+            if session_data
+            else user_id_hint or state.last_user_id or "1"
+        )
+        return (
+            user_id,
+            state.count_active_sessions(),
+            state.count_active_sessions(user_id=user_id),
+        )
+
+
 def _runtime_request_context() -> tuple[str, str]:
     """Provide stable identifiers for service readiness checks outside inference."""
     return (state.last_user_id or "1", "runtime-options")
@@ -55,7 +100,7 @@ async def health_check() -> HealthResponse:
     if not USE_AI_ASSISTANT:
         return HealthResponse(status="healthy", message="Server working in mock mode")
 
-    active_sessions = len(state.active_sessions)
+    active_sessions = state.count_active_sessions()
 
     if not state.docker_container_running:
         return HealthResponse(
@@ -124,30 +169,40 @@ async def collections() -> CollectionsResponse:
 
 
 @router.post("/turn_on_services", response_model=ServiceResponse)
-async def turn_on_services(request: ServiceRequest) -> ServiceResponse:
+async def turn_on_services(
+    service_request: ServiceRequest,
+    request: Request,
+) -> ServiceResponse:
     """Register a session and start shared services if needed."""
-    state.active_sessions[request.session_id] = {"user_id": request.user_id}
-    state.last_user_id = request.user_id
-    active_count = len(state.active_sessions)
-
-    user_session_count = sum(
-        1
-        for session_data in state.active_sessions.values()
-        if session_data.get("user_id") == request.user_id
+    metadata = _request_metadata(request)
+    active_count, user_session_count = await _register_or_touch_session(
+        session_id=service_request.session_id,
+        user_id=service_request.user_id,
+        source="turn_on_services",
     )
 
     logger.info(
-        "SESSION STARTED - user_id=%s session_id=%s active_sessions=%s user_sessions=%s",
-        request.user_id,
-        request.session_id,
+        "TURN_ON_SERVICES REQUEST - user_id=%s session_id=%s active_sessions=%s user_sessions=%s origin=%s referer=%s user_agent=%s payload=%s",
+        service_request.user_id,
+        service_request.session_id,
         active_count,
         user_session_count,
+        metadata["origin"],
+        metadata["referer"],
+        metadata["user_agent"],
+        {
+            "session_id": service_request.session_id,
+            "user_id": service_request.user_id,
+        },
     )
 
-    await start_services_if_needed(user_id=request.user_id, session_id=request.session_id)
+    await start_services_if_needed(
+        user_id=service_request.user_id,
+        session_id=service_request.session_id,
+    )
     return ServiceResponse(
         status="ok",
-        message=f"Services started for session {request.session_id}",
+        message=f"Services started for session {service_request.session_id}",
         active_sessions_count=active_count,
     )
 
@@ -158,6 +213,7 @@ async def turn_off_services(
     background_tasks: BackgroundTasks,
 ) -> Dict[str, str]:
     """Remove a session and stop shared services when no sessions remain."""
+    metadata = _request_metadata(request)
     try:
         data: Dict[str, str] = {}
         body = await request.body()
@@ -171,28 +227,28 @@ async def turn_off_services(
         if not session_id:
             raise HTTPException(status_code=400, detail="No session_id provided")
 
-        session_data = state.active_sessions.pop(session_id, None)
-        user_id = session_data.get("user_id") if session_data else state.last_user_id or "1"
-        active_count = len(state.active_sessions)
-
-        user_session_count = sum(
-            1
-            for active_session_data in state.active_sessions.values()
-            if active_session_data.get("user_id") == user_id
+        user_id, active_count, user_session_count = await _remove_session(
+            session_id=session_id,
+            user_id_hint=data.get("user_id", ""),
         )
 
         logger.info(
-            "SESSION ENDED - user_id=%s session_id=%s active_sessions=%s user_sessions=%s",
+            "TURN_OFF_SERVICES REQUEST - user_id=%s session_id=%s active_sessions=%s user_sessions=%s origin=%s referer=%s user_agent=%s payload=%s",
             user_id,
             session_id,
             active_count,
             user_session_count,
+            metadata["origin"],
+            metadata["referer"],
+            metadata["user_agent"],
+            data,
         )
 
         background_tasks.add_task(
             shutdown_services_if_idle,
             session_id=session_id,
             user_id=user_id,
+            trigger="turn_off_services",
         )
 
         return {
@@ -205,10 +261,16 @@ async def turn_off_services(
         logger.warning("Error in turn_off_services (client may have disconnected): %s", exc)
         if "session_id" in locals() and session_id:
             try:
+                cleanup_user_id = (
+                    user_id
+                    if "user_id" in locals()
+                    else data.get("user_id", "") or state.last_user_id or "1"
+                )
                 background_tasks.add_task(
                     shutdown_services_if_idle,
                     session_id=session_id,
-                    user_id=user_id,
+                    user_id=cleanup_user_id,
+                    trigger="turn_off_services_exception",
                 )
             except Exception as cleanup_error:
                 logger.error("Error adding cleanup background task: %s", cleanup_error)
@@ -216,10 +278,10 @@ async def turn_off_services(
 
 
 async def _build_ai_assistant_stream(
-    request: InferenceRequest,
+    inference_request: InferenceRequest,
 ) -> AsyncGenerator[str, None]:
     """Stream inference status and final answer from AI Assistant HTTP polling."""
-    message_id = f"ai-{request.session_id}-{id(request)}"
+    message_id = f"ai-{inference_request.session_id}-{id(inference_request)}"
     message_started = False
 
     if state.inference_lock.locked():
@@ -232,15 +294,18 @@ async def _build_ai_assistant_stream(
 
     try:
         async with state.inference_lock:
-            await ensure_services_ready(user_id=request.user_id, session_id=request.session_id)
+            await ensure_services_ready(
+                user_id=inference_request.user_id,
+                session_id=inference_request.session_id,
+            )
 
             inference_payload = {
-                "query": request.query,
-                "conversation_summary": request.conversation_summary,
-                "n_chunks": request.n_chunks,
-                "collection_name": request.collection_name,
-                "inference_model_name": request.inference_model_name,
-                "session_id": request.session_id,
+                "query": inference_request.query,
+                "conversation_summary": inference_request.conversation_summary,
+                "n_chunks": inference_request.n_chunks,
+                "collection_name": inference_request.collection_name,
+                "inference_model_name": inference_request.inference_model_name,
+                "session_id": inference_request.session_id,
             }
 
             yield format_sse_event(
@@ -297,6 +362,12 @@ async def _build_ai_assistant_stream(
 
     except HTTPException as exc:
         error_text = str(exc.detail)
+        logger.error(
+            "INFERENCE STREAM FAILED - session_id=%s user_id=%s detail=%s",
+            inference_request.session_id,
+            inference_request.user_id,
+            error_text,
+        )
         if not message_started:
             yield format_sse_event({"type": "start-step"})
             yield format_sse_event({"type": "text-start", "id": message_id})
@@ -309,7 +380,12 @@ async def _build_ai_assistant_stream(
 
     except Exception as exc:  # pragma: no cover - defensive
         error_text = f"Unexpected inference error: {exc}"
-        logger.exception(error_text)
+        logger.exception(
+            "INFERENCE STREAM FAILED - session_id=%s user_id=%s error=%s",
+            inference_request.session_id,
+            inference_request.user_id,
+            error_text,
+        )
         if not message_started:
             yield format_sse_event({"type": "start-step"})
             yield format_sse_event({"type": "text-start", "id": message_id})
@@ -329,12 +405,40 @@ async def _build_ai_assistant_stream(
 
 
 @router.post("/inference")
-async def run_inference(request: InferenceRequest):
+async def run_inference(
+    inference_request: InferenceRequest,
+    request: Request,
+):
     """Stream inference responses as Server-Sent Events (SSE)."""
+    metadata = _request_metadata(request)
+    active_count, user_session_count = await _register_or_touch_session(
+        session_id=inference_request.session_id,
+        user_id=inference_request.user_id,
+        source="inference",
+    )
+
+    logger.info(
+        "INFERENCE REQUEST - user_id=%s session_id=%s active_sessions=%s user_sessions=%s collection_name=%s inference_model_name=%s n_chunks=%s query_chars=%s query_preview=%s conversation_summary_chars=%s conversation_summary_preview=%s origin=%s referer=%s user_agent=%s",
+        inference_request.user_id,
+        inference_request.session_id,
+        active_count,
+        user_session_count,
+        inference_request.collection_name,
+        inference_request.inference_model_name,
+        inference_request.n_chunks,
+        len(inference_request.query),
+        _truncate_text(inference_request.query),
+        len(inference_request.conversation_summary),
+        _truncate_text(inference_request.conversation_summary),
+        metadata["origin"],
+        metadata["referer"],
+        metadata["user_agent"],
+    )
+
     if USE_AI_ASSISTANT:
-        generator = _build_ai_assistant_stream(request)
+        generator = _build_ai_assistant_stream(inference_request)
     else:
-        generator = build_mock_stream(request.query)
+        generator = build_mock_stream(inference_request.query)
 
     return StreamingResponse(
         generator,

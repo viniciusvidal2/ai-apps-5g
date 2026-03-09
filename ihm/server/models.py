@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 """Pydantic models used across the FastAPI server."""
+from typing import List
+
 from pydantic import BaseModel
 
 from ihm.server.config import INFERENCE_MODEL_NAME
@@ -48,10 +52,10 @@ class ServiceResponse(BaseModel):
 class AvailableModelsResponse(BaseModel):
     """Model for available inference models."""
 
-    available_models: list[str]
+    available_models: List[str]
 
 
 class CollectionsResponse(BaseModel):
     """Model for available database collections."""
 
-    collection_names: list[str]
+    collection_names: List[str]

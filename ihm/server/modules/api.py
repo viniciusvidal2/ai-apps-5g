@@ -154,7 +154,7 @@ async def available_models() -> AvailableModelsResponse:
 async def collections() -> CollectionsResponse:
     """Proxy the current AI Assistant collection list for the browser client."""
     if not USE_AI_ASSISTANT:
-        return CollectionsResponse(collection_names=[])
+        return CollectionsResponse(collection_names=[], ready=True)
 
     user_id, session_id = _runtime_request_context()
     await ensure_services_ready(user_id=user_id, session_id=session_id)
@@ -165,7 +165,10 @@ async def collections() -> CollectionsResponse:
         for collection_name in data.get("collection_names", [])
         if isinstance(collection_name, str) and collection_name.strip()
     ]
-    return CollectionsResponse(collection_names=collection_names)
+    return CollectionsResponse(
+        collection_names=collection_names,
+        ready=bool(data.get("ready", True)),
+    )
 
 
 @router.post("/turn_on_services", response_model=ServiceResponse)

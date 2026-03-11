@@ -96,7 +96,7 @@ def create_agent(config: AppConfig) -> FastAPI:
         Returns:
             dict: The list of collection names available in the database.
         """
-        return {"collection_names": app.state.ai_assistant.get_collection_names()}
+        return app.state.ai_assistant.get_collections_state()
 
     @app.get("/ai_assistant/available_models")
     def get_available_models() -> dict:

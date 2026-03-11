@@ -59,3 +59,4 @@ class CollectionsResponse(BaseModel):
     """Model for available database collections."""
 
     collection_names: List[str]
+    ready: bool

@@ -238,16 +238,28 @@ class AiAssistant:
         Returns:
             List[str]: The list of collection names available in the database.
         """
+        return self.get_collections_state()["collection_names"]
+
+    def get_collections_state(self) -> Dict[str, Any]:
+        """
+        Returns the current collection list together with its readiness state.
+
+        Returns:
+            Dict[str, Any]: Current collection names and whether the database is ready.
+        """
         if self.db_client is not None:
             try:
                 collections = self.db_client.list_collections()
-                return [col.name for col in collections]
+                return {
+                    "collection_names": [col.name for col in collections],
+                    "ready": True,
+                }
             except Exception as e:
                 print(f"Error retrieving collections from the database: {e}")
-                return []
+                return {"collection_names": [], "ready": False}
         else:
             print("Database client is not initialized.")
-            return []
+            return {"collection_names": [], "ready": False}
 
     def get_inference_model_name(self) -> str:
         """

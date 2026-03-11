@@ -27,11 +27,14 @@ export interface RAGParams {
   collection_name: string;
 }
 
+export type RAGOptionLoadStatus = "loading" | "ready" | "unavailable";
+
 interface RAGControlsProps {
   params: RAGParams;
   inferenceModels: RAGOption[];
   collections: RAGOption[];
-  isLoading: boolean;
+  inferenceModelsStatus: RAGOptionLoadStatus;
+  collectionsStatus: RAGOptionLoadStatus;
   onParamsChange: (params: RAGParams) => void;
   className?: string;
 }
@@ -40,7 +43,8 @@ function PureRAGControls({
   params,
   inferenceModels,
   collections,
-  isLoading,
+  inferenceModelsStatus,
+  collectionsStatus,
   onParamsChange,
   className,
 }: RAGControlsProps) {
@@ -73,14 +77,24 @@ function PureRAGControls({
           Modelo:
         </Label>
         <Select
-          disabled={isLoading || inferenceModels.length === 0}
-          value={params.inference_model_name}
+          disabled={
+            inferenceModelsStatus !== "ready" || inferenceModels.length === 0
+          }
+          value={
+            inferenceModelsStatus === "ready"
+              ? params.inference_model_name
+              : undefined
+          }
           onValueChange={handleModelChange}
         >
-          <SelectTrigger id="inference-model" className="h-7 w-[140px] text-xs">
+          <SelectTrigger
+            id="inference-model"
+            className="h-7 w-[140px] text-xs"
+            data-testid="rag-model-trigger"
+          >
             <SelectValue
               placeholder={
-                isLoading
+                inferenceModelsStatus === "loading"
                   ? "Carregando..."
                   : inferenceModels.length === 0
                     ? "Indisponivel"
@@ -106,11 +120,26 @@ function PureRAGControls({
           Collection:
         </Label>
         <Select
-          value={params.collection_name}
+          disabled={collectionsStatus !== "ready"}
+          value={
+            collectionsStatus === "ready" ? params.collection_name : undefined
+          }
           onValueChange={handleCollectionChange}
         >
-          <SelectTrigger id="collection-name" className="h-7 w-[120px] text-xs">
-            <SelectValue placeholder="Selecione" />
+          <SelectTrigger
+            id="collection-name"
+            className="h-7 w-[120px] text-xs"
+            data-testid="rag-collection-trigger"
+          >
+            <SelectValue
+              placeholder={
+                collectionsStatus === "loading"
+                  ? "Carregando..."
+                  : collectionsStatus === "unavailable"
+                    ? "Indisponivel"
+                    : "Selecione"
+              }
+            />
           </SelectTrigger>
           <SelectContent>
             {collections.map((option) => (

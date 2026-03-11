@@ -33,6 +33,7 @@ import { MultimodalInput } from "./multimodal-input";
 import {
   NONE_COLLECTION_OPTION,
   type RAGOption,
+  type RAGOptionLoadStatus,
   type RAGParams,
 } from "./rag-controls";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
@@ -41,9 +42,26 @@ import type { VisibilityType } from "./visibility-selector";
 
 type RAGOptionState = {
   inferenceModels: RAGOption[];
+  inferenceModelsStatus: RAGOptionLoadStatus;
   collections: RAGOption[];
-  isLoading: boolean;
+  collectionsStatus: RAGOptionLoadStatus;
 };
+
+const COLLECTIONS_POLL_INTERVAL_MS = Number(
+  process.env.NEXT_PUBLIC_RAG_COLLECTIONS_POLL_INTERVAL_MS ?? "1000"
+);
+const COLLECTIONS_MAX_ATTEMPTS = Number(
+  process.env.NEXT_PUBLIC_RAG_COLLECTIONS_MAX_ATTEMPTS ?? "30"
+);
+
+function createInitialRAGOptionState(): RAGOptionState {
+  return {
+    inferenceModels: [],
+    inferenceModelsStatus: "loading",
+    collections: [NONE_COLLECTION_OPTION],
+    collectionsStatus: "loading",
+  };
+}
 
 function normalizeRAGOptions(values: unknown): RAGOption[] {
   if (!Array.isArray(values)) {
@@ -65,6 +83,47 @@ function normalizeRAGOptions(values: unknown): RAGOption[] {
     seen.add(normalizedValue);
     return [{ id: normalizedValue, name: normalizedValue }];
   });
+}
+
+function getValidatedOptionId(
+  currentValue: string | undefined,
+  options: RAGOption[],
+  fallbackValue: string | undefined
+): string | undefined {
+  if (currentValue && options.some((option) => option.id === currentValue)) {
+    return currentValue;
+  }
+
+  return fallbackValue;
+}
+
+function getEffectiveRAGParams(
+  params: RAGParams,
+  optionState: RAGOptionState
+): RAGParams {
+  const inference_model_name =
+    optionState.inferenceModelsStatus === "ready"
+      ? getValidatedOptionId(
+          params.inference_model_name,
+          optionState.inferenceModels,
+          optionState.inferenceModels[0]?.id
+        )
+      : undefined;
+
+  const collection_name =
+    optionState.collectionsStatus === "ready"
+      ? getValidatedOptionId(
+          params.collection_name,
+          optionState.collections,
+          NONE_COLLECTION_OPTION.id
+        ) ?? NONE_COLLECTION_OPTION.id
+      : NONE_COLLECTION_OPTION.id;
+
+  return {
+    ...params,
+    inference_model_name,
+    collection_name,
+  };
 }
 
 export function Chat({
@@ -140,18 +199,17 @@ export function Chat({
     return defaultParams;
   });
 
-  const [ragOptionState, setRAGOptionState] = useState<RAGOptionState>({
-    inferenceModels: [],
-    collections: [NONE_COLLECTION_OPTION],
-    isLoading: true,
-  });
+  const [ragOptionState, setRAGOptionState] = useState<RAGOptionState>(
+    createInitialRAGOptionState
+  );
 
   useEffect(() => {
     if (isReadonly) {
       setRAGOptionState({
         inferenceModels: [],
+        inferenceModelsStatus: "ready",
         collections: [NONE_COLLECTION_OPTION],
-        isLoading: false,
+        collectionsStatus: "ready",
       });
       return;
     }
@@ -160,55 +218,112 @@ export function Chat({
       process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003";
     const abortController = new AbortController();
 
-    const loadRagOptions = async () => {
-      try {
-        const [modelsResponse, collectionsResponse] = await Promise.all([
-          fetch(`${backendUrl}/ai_assistant/available_models`, {
-            signal: abortController.signal,
-          }),
-          fetch(`${backendUrl}/ai_assistant/collections`, {
-            signal: abortController.signal,
-          }),
-        ]);
+    setRAGOptionState(createInitialRAGOptionState());
 
-        if (!modelsResponse.ok || !collectionsResponse.ok) {
+    const loadInferenceModels = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/ai_assistant/available_models`, {
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
           throw new Error(
-            `Failed to load RAG options (models=${modelsResponse.status}, collections=${collectionsResponse.status})`
+            `Failed to load RAG models (${response.status})`
           );
         }
 
-        const [modelsData, collectionsData] = await Promise.all([
-          modelsResponse.json(),
-          collectionsResponse.json(),
-        ]);
+        const data = await response.json();
+        const inferenceModels = normalizeRAGOptions(data.available_models);
 
-        const inferenceModels = normalizeRAGOptions(
-          modelsData.available_models
-        );
-        const collections = normalizeRAGOptions(
-          collectionsData.collection_names
-        ).filter((option) => option.id !== NONE_COLLECTION_OPTION.id);
-
-        setRAGOptionState({
+        setRAGOptionState((current) => ({
+          ...current,
           inferenceModels,
-          collections: [NONE_COLLECTION_OPTION, ...collections],
-          isLoading: false,
-        });
+          inferenceModelsStatus: "ready",
+        }));
       } catch (error) {
         if (abortController.signal.aborted) {
           return;
         }
 
-        console.error("Error loading RAG options:", error);
-        setRAGOptionState({
+        console.error("Error loading RAG models:", error);
+        setRAGOptionState((current) => ({
+          ...current,
           inferenceModels: [],
-          collections: [NONE_COLLECTION_OPTION],
-          isLoading: false,
-        });
+          inferenceModelsStatus: "unavailable",
+        }));
       }
     };
 
-    void loadRagOptions();
+    const loadCollections = async () => {
+      let lastError: unknown;
+
+      for (
+        let attempt = 1;
+        attempt <= COLLECTIONS_MAX_ATTEMPTS;
+        attempt += 1
+      ) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`${backendUrl}/ai_assistant/collections`, {
+            signal: abortController.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to load RAG collections (${response.status})`
+            );
+          }
+
+          const data = await response.json();
+          const isReady = data.ready !== false;
+
+          if (isReady) {
+            const collections = normalizeRAGOptions(
+              data.collection_names
+            ).filter((option) => option.id !== NONE_COLLECTION_OPTION.id);
+
+            setRAGOptionState((current) => ({
+              ...current,
+              collections: [NONE_COLLECTION_OPTION, ...collections],
+              collectionsStatus: "ready",
+            }));
+            return;
+          }
+        } catch (error) {
+          if (abortController.signal.aborted) {
+            return;
+          }
+
+          lastError = error;
+        }
+
+        if (attempt < COLLECTIONS_MAX_ATTEMPTS) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, COLLECTIONS_POLL_INTERVAL_MS)
+          );
+        }
+      }
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      console.error(
+        "RAG collections remained unavailable after polling:",
+        lastError
+      );
+      setRAGOptionState((current) => ({
+        ...current,
+        collections: [NONE_COLLECTION_OPTION],
+        collectionsStatus: "unavailable",
+      }));
+    };
+
+    void loadInferenceModels();
+    void loadCollections();
 
     return () => {
       abortController.abort();
@@ -216,15 +331,12 @@ export function Chat({
   }, [isReadonly]);
 
   useEffect(() => {
-    if (ragOptionState.isLoading) {
+    if (ragOptionState.inferenceModelsStatus !== "ready") {
       return;
     }
 
     const validModelIds = new Set(
       ragOptionState.inferenceModels.map((model) => model.id)
-    );
-    const validCollectionIds = new Set(
-      ragOptionState.collections.map((collection) => collection.id)
     );
 
     setRAGParams((current) => {
@@ -234,25 +346,42 @@ export function Chat({
           ? current.inference_model_name
           : ragOptionState.inferenceModels[0]?.id;
 
-      const nextCollection =
-        current.collection_name && validCollectionIds.has(current.collection_name)
-          ? current.collection_name
-          : NONE_COLLECTION_OPTION.id;
-
-      if (
-        current.inference_model_name === nextInferenceModel &&
-        current.collection_name === nextCollection
-      ) {
+      if (current.inference_model_name === nextInferenceModel) {
         return current;
       }
 
       return {
         ...current,
         inference_model_name: nextInferenceModel,
+      };
+    });
+  }, [ragOptionState.inferenceModels, ragOptionState.inferenceModelsStatus]);
+
+  useEffect(() => {
+    if (ragOptionState.collectionsStatus !== "ready") {
+      return;
+    }
+
+    const validCollectionIds = new Set(
+      ragOptionState.collections.map((collection) => collection.id)
+    );
+
+    setRAGParams((current) => {
+      const nextCollection =
+        current.collection_name && validCollectionIds.has(current.collection_name)
+          ? current.collection_name
+          : NONE_COLLECTION_OPTION.id;
+
+      if (current.collection_name === nextCollection) {
+        return current;
+      }
+
+      return {
+        ...current,
         collection_name: nextCollection,
       };
     });
-  }, [ragOptionState]);
+  }, [ragOptionState.collections, ragOptionState.collectionsStatus]);
 
   // Sync n_chunks when model changes
   useEffect(() => {
@@ -267,15 +396,15 @@ export function Chat({
   }, [ragParams]);
 
   const currentModelIdRef = useRef(currentModelId);
-  const ragParamsRef = useRef(ragParams);
+  const ragParamsRef = useRef(getEffectiveRAGParams(ragParams, ragOptionState));
 
   useEffect(() => {
     currentModelIdRef.current = currentModelId;
   }, [currentModelId]);
 
   useEffect(() => {
-    ragParamsRef.current = ragParams;
-  }, [ragParams]);
+    ragParamsRef.current = getEffectiveRAGParams(ragParams, ragOptionState);
+  }, [ragOptionState, ragParams]);
 
   const {
     messages,
@@ -403,8 +532,9 @@ export function Chat({
               usage={usage}
               ragParams={ragParams}
               ragCollections={ragOptionState.collections}
+              ragCollectionsStatus={ragOptionState.collectionsStatus}
               ragInferenceModels={ragOptionState.inferenceModels}
-              ragOptionsLoading={ragOptionState.isLoading}
+              ragInferenceModelsStatus={ragOptionState.inferenceModelsStatus}
               onRAGParamsChange={setRAGParams}
             />
           )}

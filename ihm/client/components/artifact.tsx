@@ -24,6 +24,7 @@ import { ArtifactActions } from "./artifact-actions";
 import { ArtifactCloseButton } from "./artifact-close-button";
 import { ArtifactMessages } from "./artifact-messages";
 import { MultimodalInput } from "./multimodal-input";
+import { NONE_COLLECTION_OPTION } from "./rag-controls";
 import { Toolbar } from "./toolbar";
 import { useSidebar } from "./ui/sidebar";
 import { VersionFooter } from "./version-footer";
@@ -342,8 +343,14 @@ function PureArtifact({
                     setAttachments={setAttachments}
                     setInput={setInput}
                     setMessages={setMessages}
+                    ragCollections={[NONE_COLLECTION_OPTION]}
+                    ragCollectionsStatus="unavailable"
+                    ragInferenceModels={[]}
+                    ragInferenceModelsStatus="unavailable"
+                    ragParams={{ collection_name: NONE_COLLECTION_OPTION.id }}
                     status={status}
                     stop={stop}
+                    onRAGParamsChange={() => {}}
                   />
                 </div>
               </div>

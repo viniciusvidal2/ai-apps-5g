@@ -44,6 +44,7 @@ import { PreviewAttachment } from "./preview-attachment";
 import {
   RAGControls,
   type RAGOption,
+  type RAGOptionLoadStatus,
   type RAGParams,
 } from "./rag-controls";
 import { SuggestedActions } from "./suggested-actions";
@@ -69,7 +70,8 @@ function PureMultimodalInput({
   ragParams,
   ragCollections,
   ragInferenceModels,
-  ragOptionsLoading,
+  ragCollectionsStatus,
+  ragInferenceModelsStatus,
   onRAGParamsChange,
 }: {
   chatId: string;
@@ -90,7 +92,8 @@ function PureMultimodalInput({
   ragParams: RAGParams;
   ragCollections: RAGOption[];
   ragInferenceModels: RAGOption[];
-  ragOptionsLoading: boolean;
+  ragCollectionsStatus: RAGOptionLoadStatus;
+  ragInferenceModelsStatus: RAGOptionLoadStatus;
   onRAGParamsChange: (params: RAGParams) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -324,8 +327,9 @@ function PureMultimodalInput({
         </div>
         <RAGControls
           collections={ragCollections}
+          collectionsStatus={ragCollectionsStatus}
           inferenceModels={ragInferenceModels}
-          isLoading={ragOptionsLoading}
+          inferenceModelsStatus={ragInferenceModelsStatus}
           params={ragParams}
           onParamsChange={onRAGParamsChange}
           className="mt-1"
@@ -382,7 +386,10 @@ export const MultimodalInput = memo(
     if (!equal(prevProps.ragInferenceModels, nextProps.ragInferenceModels)) {
       return false;
     }
-    if (prevProps.ragOptionsLoading !== nextProps.ragOptionsLoading) {
+    if (
+      prevProps.ragCollectionsStatus !== nextProps.ragCollectionsStatus ||
+      prevProps.ragInferenceModelsStatus !== nextProps.ragInferenceModelsStatus
+    ) {
       return false;
     }
 

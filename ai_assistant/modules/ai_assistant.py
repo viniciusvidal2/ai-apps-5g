@@ -231,15 +231,6 @@ class AiAssistant:
         """
         return self.history_summary
 
-    def get_collection_names(self) -> List[str]:
-        """
-        Returns the list of collection names available in the database.
-
-        Returns:
-            List[str]: The list of collection names available in the database.
-        """
-        return self.get_collections_state()["collection_names"]
-
     def get_collections_state(self) -> Dict[str, Any]:
         """
         Returns the current collection list together with its readiness state.

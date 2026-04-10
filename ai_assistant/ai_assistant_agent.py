@@ -8,6 +8,8 @@ from typing import Generator
 from uuid import uuid4
 from modules.ai_assistant import AiAssistant
 from schemas import AppConfig, AiAssistantInferenceRequest
+import threading
+import queue
 
 
 def create_agent(config: AppConfig) -> FastAPI:
@@ -175,55 +177,99 @@ def create_agent(config: AppConfig) -> FastAPI:
         def generate_stream() -> Generator[str, None, None]:
             """
             Generator that runs inference and yields response chunks as JSON strings.
+            Uses a background thread to prevent connection drops while waiting for the LLM.
             """
-            try:
-                # Treat the requested model and switch if it's different from the current one
-                requested_model_name = payload.inference_model_name
-                if requested_model_name != app.state.ai_assistant.get_inference_model_name():
-                    app.state.ai_assistant.switch_assistant_model(
-                        inference_model_name=requested_model_name)
-                # Set the conversation history for the user session
-                app.state.ai_assistant.set_assistant_conversation_summary(
-                    summary=payload.conversation_summary
-                )
-                # Stream inference chunks
-                response_chunks = []
-                for response_chunk in app.state.ai_assistant.run_inference_pipeline(
-                        user_query=payload.query,
-                        collection_name=payload.collection_name):
-                    # Skip the end-of-response marker (it will be handled at the end)
-                    if response_chunk == "[END_OF_RESPONSE]":
-                        continue
-                    response_chunks.append(response_chunk)
-                    # Yield each chunk as JSON
-                    chunk_data = {
-                        "type": "chunk",
-                        "data": response_chunk,
+            # Create a queue to communicate between the main thread and the worker thread
+            q = queue.Queue()
+
+            def inference_worker():
+                try:
+                    # Treat the requested model and switch if it's different from the current one
+                    requested_model_name = payload.inference_model_name
+                    if requested_model_name != app.state.ai_assistant.get_inference_model_name():
+                        app.state.ai_assistant.switch_assistant_model(
+                            inference_model_name=requested_model_name)
+                    # Set the conversation history for the user session
+                    app.state.ai_assistant.set_assistant_conversation_summary(
+                        summary=payload.conversation_summary
+                    )
+                    # Stream inference chunks
+                    for response_chunk in app.state.ai_assistant.run_inference_pipeline(
+                            user_query=payload.query,
+                            collection_name=payload.collection_name):
+                        if response_chunk == "[END_OF_RESPONSE]":
+                            q.put({"type": "end"})
+                        elif isinstance(response_chunk, dict):
+                            q.put(response_chunk)
+                        else:
+                            q.put({"type": "chunk", "data": response_chunk})
+                except Exception as e:
+                    q.put({"type": "error", "error": str(e)})
+            # Create and start the worker thread
+            thread = threading.Thread(target=inference_worker)
+            thread.start()
+            # List to store response chunks
+            response_chunks = []
+            while True:
+                try:
+                    # Wait up to 2 seconds for a chunk
+                    msg = q.get(timeout=2.0)
+                    # Check what to do based on the message type
+                    if msg["type"] == "end":
+                        status_data = {
+                            "type": "status",
+                            "status": msg.get("data", app.state.ai_assistant.get_assistant_status()),
+                            "data": msg.get("data", app.state.ai_assistant.get_assistant_status())
+                        }
+                        yield json.dumps(status_data) + "\n"
+                        break
+                    elif msg["type"] == "error":
+                        error_data = {
+                            "type": "error",
+                            "error": msg["error"],
+                            "status": "An error occurred during inference"
+                        }
+                        yield json.dumps(error_data) + "\n"
+                        return
+                    elif msg["type"] == "chunk":
+                        response_chunks.append(msg["data"])
+                        chunk_data = {
+                            "type": "chunk",
+                            "data": msg["data"],
+                            "status": app.state.ai_assistant.get_assistant_status()
+                        }
+                        yield json.dumps(chunk_data) + "\n"
+                    elif msg["type"] == "status":
+                        status_data = {
+                            "type": "status",
+                            "status": msg.get("data", app.state.ai_assistant.get_assistant_status()),
+                            "data": msg.get("data", app.state.ai_assistant.get_assistant_status())
+                        }
+                        yield json.dumps(status_data) + "\n"
+                    else:
+                        yield json.dumps(msg) + "\n"
+                except queue.Empty:
+                    # Timeout waiting for queue, yield keep-alive status
+                    keep_alive_data = {
+                        "type": "status",
                         "status": app.state.ai_assistant.get_assistant_status()
                     }
-                    yield json.dumps(chunk_data) + "\n"
-                # After streaming is complete, update history and send final response
-                full_response = "".join(response_chunks)
-                app.state.ai_assistant.update_conversation_history_summary(
-                    user_query=payload.query,
-                    context_string=app.state.ai_assistant.get_context_string(),
-                    assistant_response=full_response,
-                )
-                # Send final status update
-                final_data = {
-                    "type": "complete",
-                    "full_response": full_response,
-                    "status": app.state.ai_assistant.get_assistant_status()
-                }
-                yield json.dumps(final_data) + "\n"
+                    yield json.dumps(keep_alive_data) + "\n"
 
-            except Exception as e:
-                error_data = {
-                    "type": "error",
-                    "error": str(e),
-                    "status": "An error occurred during inference"
-                }
-                yield json.dumps(error_data) + "\n"
+            # After streaming is complete, update history and send final response
+            full_response = "".join(response_chunks)
+            app.state.ai_assistant.update_conversation_history_summary(
+                user_query=payload.query,
+                context_string=app.state.ai_assistant.get_context_string(),
+                assistant_response=full_response,
+            )
+            # Send final status update
+            final_data = {
+                "type": "complete",
+                "data": full_response,
+                "status": app.state.ai_assistant.get_assistant_status()
+            }
+            yield json.dumps(final_data) + "\n"
 
         return StreamingResponse(
             generate_stream(),

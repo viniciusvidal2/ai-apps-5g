@@ -168,6 +168,9 @@ def test_inference_streaming(query: str = "What are the commitments of Santo Ant
                     elif chunk_type == "error":
                         print(f"\n{'-' * 50}")
                         print(f"Stream error: {data.get('error')}")
+                    else:
+                        print(
+                            f"\nStatus update: {data.get('status')}", flush=True)
                 except json.JSONDecodeError:
                     # In case it's not JSON, print the raw decoded line
                     print(line, flush=True)
@@ -180,15 +183,15 @@ def main():
     global BASE_URL
     parser = argparse.ArgumentParser(
         description="Run AI Assistant Agent tests.")
-    parser.add_argument("--base-url", type=str, default="http://127.0.0.1:8001",
+    parser.add_argument("--base_url", type=str, default="http://127.0.0.1:8001",
                         help="Base URL of the AI Assistant API")
     parser.add_argument("--query", type=str, default="What are the commitments of Santo Antonio Energia with the environment?",
                         help="Query to test the inference endpoint")
     parser.add_argument("--collection", type=str, default="my_collection",
                         help="Collection name to use for inference")
-    parser.add_argument("--n-chunks", type=int, default=3,
+    parser.add_argument("--n_chunks", type=int, default=3,
                         help="Number of chunks to use for inference")
-    parser.add_argument("--inference-model-name", type=str, default="gemma4:latest",
+    parser.add_argument("--inference_model_name", type=str, default="gemma4:latest",
                         help="Inference model name to use for inference")
     args = parser.parse_args()
     BASE_URL = args.base_url

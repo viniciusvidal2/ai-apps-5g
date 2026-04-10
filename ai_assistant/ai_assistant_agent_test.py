@@ -2,6 +2,7 @@ import sys
 import time
 import httpx
 import argparse
+import json
 from schemas import AiAssistantInferenceRequest
 
 BASE_URL = "http://0.0.0.0:8001"
@@ -126,6 +127,53 @@ def test_inference_result(job_id: str) -> None:
             time.sleep(2)
 
 
+def test_inference_streaming(query: str = "What are the commitments of Santo Antonio Energia with the environment?",
+                             collection: str = "my_collection",
+                             n_chunks: int = 3,
+                             inference_model_name: str = "gemma4:latest") -> None:
+    """
+    Test the inference streaming endpoint of the API.
+
+    Args:
+        query (str, optional): The query to test the inference endpoint with. Defaults to "What are the commitments of Santo Antonio Energia with the environment?".
+        collection (str, optional): The collection name to use for inference. Defaults to "my_collection".
+        n_chunks (int, optional): The number of chunks to use for inference. Defaults to 3.
+        inference_model_name (str, optional): The inference model name to use. Defaults to "gemma4:latest".
+    """
+    print("Testing POST /ai_assistant/inference/stream")
+    request_data = AiAssistantInferenceRequest(
+        query=query,
+        conversation_summary="",
+        n_chunks=n_chunks,
+        collection_name=collection,
+        inference_model_name=inference_model_name
+    )
+    with httpx.stream("POST", f"{BASE_URL}/ai_assistant/inference/stream", json=request_data.model_dump(), timeout=None) as response:
+        assert response.status_code == 200
+        print("Streaming response:")
+        print("-" * 50)
+        for line in response.iter_lines():
+            if line:
+                try:
+                    # The endpoint responds with JSON-formatted NDJSON lines
+                    data = json.loads(line)
+                    chunk_type = data.get("type")
+                    if chunk_type == "chunk":
+                        # Print the stream chunk by chunk directly onto the same line
+                        print(data.get("data", ""), end="", flush=True)
+                    elif chunk_type == "complete":
+                        print(f"\n{'-' * 50}")
+                        print(
+                            f"Streaming finished safely. Status: {data.get('status')}")
+                    elif chunk_type == "error":
+                        print(f"\n{'-' * 50}")
+                        print(f"Stream error: {data.get('error')}")
+                except json.JSONDecodeError:
+                    # In case it's not JSON, print the raw decoded line
+                    print(line, flush=True)
+    print("\nFinished streaming inference response.\n")
+
+
 def main():
     """Main function to run the tests."""
     # Parse the input arguments for the base URL of the API
@@ -140,7 +188,7 @@ def main():
                         help="Collection name to use for inference")
     parser.add_argument("--n-chunks", type=int, default=3,
                         help="Number of chunks to use for inference")
-    parser.add_argument("--inference-model-name", type=str, default="gemma3:4b",
+    parser.add_argument("--inference-model-name", type=str, default="gemma4:latest",
                         help="Inference model name to use for inference")
     args = parser.parse_args()
     BASE_URL = args.base_url
@@ -154,6 +202,8 @@ def main():
     job_id = test_inference(
         query=args.query, collection=args.collection, n_chunks=args.n_chunks, inference_model_name=args.inference_model_name)
     test_inference_result(job_id)
+    test_inference_streaming(
+        query=args.query, collection=args.collection, n_chunks=args.n_chunks, inference_model_name=args.inference_model_name)
     print("All tests passed ✅")
 
 

@@ -1,9 +1,10 @@
 import argparse
 from fastapi import FastAPI, BackgroundTasks, Request
+from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
-from httpx import request
 import uvicorn
-from typing import Dict
+import json
+from typing import Generator
 from uuid import uuid4
 from modules.ai_assistant import AiAssistant
 from schemas import AppConfig, AiAssistantInferenceRequest
@@ -160,6 +161,75 @@ def create_agent(config: AppConfig) -> FastAPI:
             run_ai_assistant_inference, job_id=job_id, inferece_payload=payload, app=request_obj.app)
         return {"job_id": job_id, "status_message": app.state.ai_assistant.get_assistant_status(), "status": "running"}
 
+    @app.post("/ai_assistant/inference/stream")
+    def run_inference_stream(payload: AiAssistantInferenceRequest) -> StreamingResponse:
+        """
+        Runs the inference pipeline with streaming response. Yields response chunks in real-time.
+
+        Args:
+            payload (AiAssistantInferenceRequest): The input data for the inference request.
+
+        Returns:
+            StreamingResponse: Streamed response chunks as JSON lines.
+        """
+        def generate_stream() -> Generator[str, None, None]:
+            """
+            Generator that runs inference and yields response chunks as JSON strings.
+            """
+            try:
+                # Treat the requested model and switch if it's different from the current one
+                requested_model_name = payload.inference_model_name
+                if requested_model_name != app.state.ai_assistant.get_inference_model_name():
+                    app.state.ai_assistant.switch_assistant_model(
+                        inference_model_name=requested_model_name)
+                # Set the conversation history for the user session
+                app.state.ai_assistant.set_assistant_conversation_summary(
+                    summary=payload.conversation_summary
+                )
+                # Stream inference chunks
+                response_chunks = []
+                for response_chunk in app.state.ai_assistant.run_inference_pipeline(
+                        user_query=payload.query,
+                        collection_name=payload.collection_name):
+                    # Skip the end-of-response marker (it will be handled at the end)
+                    if response_chunk == "[END_OF_RESPONSE]":
+                        continue
+                    response_chunks.append(response_chunk)
+                    # Yield each chunk as JSON
+                    chunk_data = {
+                        "type": "chunk",
+                        "data": response_chunk,
+                        "status": app.state.ai_assistant.get_assistant_status()
+                    }
+                    yield json.dumps(chunk_data) + "\n"
+                # After streaming is complete, update history and send final response
+                full_response = "".join(response_chunks)
+                app.state.ai_assistant.update_conversation_history_summary(
+                    user_query=payload.query,
+                    context_string=app.state.ai_assistant.get_context_string(),
+                    assistant_response=full_response,
+                )
+                # Send final status update
+                final_data = {
+                    "type": "complete",
+                    "full_response": full_response,
+                    "status": app.state.ai_assistant.get_assistant_status()
+                }
+                yield json.dumps(final_data) + "\n"
+
+            except Exception as e:
+                error_data = {
+                    "type": "error",
+                    "error": str(e),
+                    "status": "An error occurred during inference"
+                }
+                yield json.dumps(error_data) + "\n"
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="application/x-ndjson"
+        )
+
     # endregion
     # region Background tasks
 
@@ -182,9 +252,20 @@ def create_agent(config: AppConfig) -> FastAPI:
             app.state.ai_assistant.set_assistant_conversation_summary(
                 summary=inferece_payload.conversation_summary
             )
-            response = app.state.ai_assistant.run_inference_pipeline(
+            response_chunks = []
+            for response_chunk in app.state.ai_assistant.run_inference_pipeline(
                 user_query=inferece_payload.query,
-                collection_name=inferece_payload.collection_name
+                collection_name=inferece_payload.collection_name,
+            ):
+                # Skip the end-of-response marker
+                if response_chunk != "[END_OF_RESPONSE]":
+                    response_chunks.append(response_chunk)
+
+            response = "".join(response_chunks)
+            app.state.ai_assistant.update_conversation_history_summary(
+                user_query=inferece_payload.query,
+                context_string=app.state.ai_assistant.get_context_string(),
+                assistant_response=response,
             )
             app.state.job_store[job_id]["response"] = response
             app.state.job_store[job_id]["status_message"] = app.state.ai_assistant.get_assistant_status(

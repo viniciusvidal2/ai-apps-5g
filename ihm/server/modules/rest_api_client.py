@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
-from typing import Any, Dict
+from typing import Any, AsyncGenerator, Dict
 
 import httpx
 from fastapi import HTTPException
@@ -311,6 +312,27 @@ async def submit_ai_assistant_inference(payload: Dict[str, Any]) -> Dict[str, An
             detail=f"AI Assistant inference submit failed ({response.status_code}): {response.text}",
         )
     return response.json()
+
+
+async def stream_ai_assistant_inference(
+    payload: Dict[str, Any],
+) -> AsyncGenerator[Dict[str, Any], None]:
+    """Stream NDJSON lines from the AI Assistant inference/stream endpoint."""
+    stream_url = f"{AI_ASSISTANT_API_URL}/ai_assistant/inference/stream"
+    async with httpx.AsyncClient(timeout=None) as client:
+        async with client.stream("POST", stream_url, json=payload) as response:
+            if response.status_code != 200:
+                body = await response.aread()
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"AI Assistant stream failed ({response.status_code}): {body.decode()}",
+                )
+            async for line in response.aiter_lines():
+                if line.strip():
+                    try:
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        logger.warning("Failed to parse NDJSON line: %s", line)
 
 
 async def get_ai_assistant_inference(job_id: str) -> Dict[str, Any]:

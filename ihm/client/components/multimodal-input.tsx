@@ -99,6 +99,14 @@ function PureMultimodalInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
 
+  const isProcessing = status !== "ready";
+
+  const placeholderText = isProcessing
+    ? "Aguardando resposta..."
+    : messages.length > 0
+      ? "Escreva sua mensagem aqui..."
+      : "Envie uma mensagem...";
+
   const adjustHeight = useCallback(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "44px";
@@ -312,13 +320,21 @@ function PureMultimodalInput({
         <div className="flex flex-row items-start gap-1 sm:gap-2">
           <PromptInputTextarea
             autoFocus
-            className="grow resize-none border-0! border-none! bg-transparent p-2 text-sm outline-none ring-0 [-ms-overflow-style:none] [scrollbar-width:none] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-scrollbar]:hidden"
+            className={cn(
+              "grow resize-none border-0! border-none! bg-transparent p-2 text-sm outline-none ring-0 [-ms-overflow-style:none] [scrollbar-width:none] focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 [&::-webkit-scrollbar]:hidden",
+              isProcessing
+                ? "placeholder:text-muted-foreground/40 cursor-not-allowed"
+                : messages.length > 0
+                  ? "placeholder:text-muted-foreground/50"
+                  : "placeholder:text-muted-foreground"
+            )}
             data-testid="multimodal-input"
+            disabled={isProcessing}
             disableAutoResize={true}
             maxHeight={200}
             minHeight={44}
             onChange={handleInput}
-            placeholder="Envie uma mensagem..."
+            placeholder={placeholderText}
             ref={textareaRef}
             rows={1}
             value={input}
@@ -390,6 +406,9 @@ export const MultimodalInput = memo(
       prevProps.ragCollectionsStatus !== nextProps.ragCollectionsStatus ||
       prevProps.ragInferenceModelsStatus !== nextProps.ragInferenceModelsStatus
     ) {
+      return false;
+    }
+    if (prevProps.messages.length !== nextProps.messages.length) {
       return false;
     }
 

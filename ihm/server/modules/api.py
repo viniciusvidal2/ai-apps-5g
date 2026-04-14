@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 """API routes for the AI Assistant server."""
-import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict
@@ -10,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from ihm.server import state
-from ihm.server.config import AI_ASSISTANT_POLL_INTERVAL_SECONDS, USE_AI_ASSISTANT
+from ihm.server.config import USE_AI_ASSISTANT
 from ihm.server.models import (
     AvailableModelsResponse,
     CollectionsResponse,
@@ -24,8 +23,7 @@ from ihm.server.modules.rest_api_client import (
     get_ai_assistant_collections,
     get_ai_assistant_conversation_summary,
     get_ai_assistant_health,
-    get_ai_assistant_inference,
-    submit_ai_assistant_inference,
+    stream_ai_assistant_inference,
 )
 from ihm.server.modules.services import (
     build_mock_stream,
@@ -283,7 +281,7 @@ async def turn_off_services(
 async def _build_ai_assistant_stream(
     inference_request: InferenceRequest,
 ) -> AsyncGenerator[str, None]:
-    """Stream inference status and final answer from AI Assistant HTTP polling."""
+    """Stream inference chunks in real-time from the AI Assistant NDJSON stream endpoint."""
     message_id = f"ai-{inference_request.session_id}-{id(inference_request)}"
     message_started = False
 
@@ -318,50 +316,46 @@ async def _build_ai_assistant_stream(
                 }
             )
 
-            submit_data = await submit_ai_assistant_inference(inference_payload)
-            job_id = submit_data.get("job_id")
-            if not job_id:
-                raise HTTPException(status_code=502, detail="AI Assistant did not return job_id")
-
-            initial_status = str(submit_data.get("status_message", "Inferencia iniciada"))
-            yield format_sse_event({"type": "data-statusMessage", "data": initial_status})
-
             yield format_sse_event({"type": "start-step"})
             yield format_sse_event({"type": "text-start", "id": message_id})
             message_started = True
 
-            last_status_message = initial_status
-            final_response = ""
+            async for msg in stream_ai_assistant_inference(inference_payload):
+                msg_type = msg.get("type")
 
-            while True:
-                poll_data = await get_ai_assistant_inference(str(job_id))
-                status = str(poll_data.get("status", "running"))
-                status_message = str(poll_data.get("status_message", "")).strip()
+                if msg_type == "chunk":
+                    chunk_text = str(msg.get("data", ""))
+                    if chunk_text:
+                        yield format_sse_event(
+                            {"type": "text-delta", "id": message_id, "delta": chunk_text}
+                        )
 
-                if status_message and status_message != last_status_message:
+                elif msg_type == "status":
+                    status_text = str(msg.get("status") or msg.get("data", "")).strip()
+                    if status_text:
+                        yield format_sse_event(
+                            {"type": "data-statusMessage", "data": status_text}
+                        )
+
+                elif msg_type == "complete":
+                    status_text = str(msg.get("status", "")).strip()
+                    if status_text:
+                        yield format_sse_event(
+                            {"type": "data-statusMessage", "data": status_text}
+                        )
+                    latest_summary = await get_ai_assistant_conversation_summary()
                     yield format_sse_event(
-                        {"type": "data-statusMessage", "data": status_message}
+                        {"type": "data-conversationSummary", "data": latest_summary}
                     )
-                    last_status_message = status_message
 
-                if status == "running":
-                    yield ": heartbeat\n\n"
-                    await asyncio.sleep(AI_ASSISTANT_POLL_INTERVAL_SECONDS)
-                    continue
-
-                final_response = str(poll_data.get("response", ""))
-                break
-
-            for word in final_response.split():
-                yield format_sse_event(
-                    {"type": "text-delta", "id": message_id, "delta": f"{word} "}
-                )
-                await asyncio.sleep(0.02)
-
-            latest_summary = await get_ai_assistant_conversation_summary()
-            yield format_sse_event(
-                {"type": "data-conversationSummary", "data": latest_summary}
-            )
+                elif msg_type == "error":
+                    error_text = str(msg.get("error", "Erro desconhecido na inferencia"))
+                    yield format_sse_event(
+                        {"type": "data-statusMessage", "data": f"Erro: {error_text}"}
+                    )
+                    yield format_sse_event(
+                        {"type": "text-delta", "id": message_id, "delta": error_text}
+                    )
 
     except HTTPException as exc:
         error_text = str(exc.detail)

@@ -49,7 +49,7 @@ def main():
 
     if args.action == "start":
         response = start_ai_assistant_agent(
-            port=8001, db_ip_address="0.0.0.0", inference_model_name="gemma3:4b", container_name="ai_assistant_1"
+            port=8001, db_ip_address="0.0.0.0", inference_model_name="gemma4:latest", container_name="ai_assistant_1"
         )
         print("Start AI Assistant Agent Response:")
     elif args.action == "kill":

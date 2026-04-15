@@ -71,7 +71,7 @@ def test_models():
 def test_inference(query: str = "What are the commitments of Santo Antonio Energia with the environment?",
                    collection: str = "my_collection",
                    n_chunks: int = 3,
-                   inference_model_name: str = "gemma3:4b") -> str:
+                   inference_model_name: str = "gemma4:latest") -> str:
     """
     Test the inference endpoint of the API.
 
@@ -79,7 +79,7 @@ def test_inference(query: str = "What are the commitments of Santo Antonio Energ
         query (str, optional): The query to test the inference endpoint with. Defaults to "What are the commitments of Santo Antonio Energia with the environment?".
         collection (str, optional): The collection name to use for inference. Defaults to "my_collection".
         n_chunks (int, optional): The number of chunks to use for inference. Defaults to 3.
-        inference_model_name (str, optional): The inference model name to use. Defaults to "gemma3:4b".
+        inference_model_name (str, optional): The inference model name to use. Defaults to "gemma4:latest".
 
     Returns:
         str: The job ID returned by the inference endpoint.
@@ -191,7 +191,7 @@ def main():
                         help="Collection name to use for inference")
     parser.add_argument("--n_chunks", type=int, default=3,
                         help="Number of chunks to use for inference")
-    parser.add_argument("--inference_model_name", type=str, default="gemma4:latest",
+    parser.add_argument("--inference_model_name", type=str, default="gemma4:31b",
                         help="Inference model name to use for inference")
     args = parser.parse_args()
     BASE_URL = args.base_url

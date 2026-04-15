@@ -21,10 +21,10 @@ pip install -r ai_assistant/requirements.txt
 
 ## Setting ollama models
 
-The LLM models will reside inside the docker image for now, and are pulled when building the image itself. The command should include the desired models that one must pull. In the current version, __gemma3:4b__ is mandatory. These are the models we can use in our application (tested so far):
+The LLM models will reside inside the docker image for now, and are pulled when building the image itself. The command should include the desired models that one must pull. In the current version, __gemma4:latest__ is mandatory. These are the models we can use in our application (tested so far):
 
-- gemma3:4b
-- gemma3:12b
+- gemma4:latest
+- gemma4:26b
 - gemma3:27b
 - nemotron-3-nano:30b
 - glm-4.7-flash:q8_0
@@ -33,10 +33,10 @@ You can find more models in [ollama library website link](https://ollama.com/lib
 
 ## Building the docker image
 
-Use the following command to build the image. __gemma3:4b__ is mandatory, but you can add as many as you like from the list above:
+Use the following command to build the image. __gemma4:latest__ is mandatory, but you can add as many as you like from the list above:
 
 ```bash
-docker build -t ai_assistant_image -f ai_assistant/Dockerfile --build-arg OLLAMA_MODELS_TO_PULL="gemma3:4b OTHER_MODELS" .
+docker build -t ai_assistant_image -f ai_assistant/Dockerfile --build-arg OLLAMA_MODELS_TO_PULL="gemma4:latest OTHER_MODELS" .
 ```
 
 ## Running the docker container

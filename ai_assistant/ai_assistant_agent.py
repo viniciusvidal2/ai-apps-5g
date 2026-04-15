@@ -376,7 +376,7 @@ def main():
     parser.add_argument("--port", type=int, default=8001)
     parser.add_argument("--db_ip_address", type=str, default="localhost")
     parser.add_argument("--inference_model_name",
-                        type=str, default="gemma3:4b")
+                        type=str, default="gemma4:latest")
     args = parser.parse_args()
     # Create the application configuration and run the API server
     config = AppConfig(

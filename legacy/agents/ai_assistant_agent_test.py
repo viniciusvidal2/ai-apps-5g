@@ -11,7 +11,7 @@ class AiAssistantAgentTest:
         """Initializes a AiAssistantAgentTest object to test assistant interactions
         """
         # Available models that we can test
-        self.available_models = ["gemma3:4b", "gemma3:12b", "gemma3:27b"]
+        self.available_models = ["gemma4:latest", "gemma3:27b"]
         # Start the MQTT client and connect to the broker
         self.mqtt_address = "0.0.0.0"
         self.mqtt_port = 1883

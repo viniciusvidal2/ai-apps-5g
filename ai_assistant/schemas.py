@@ -20,4 +20,4 @@ class AiAssistantInferenceRequest(BaseModel):
     conversation_summary: str
     n_chunks: int = 3
     collection_name: str = "documents"
-    inference_model_name: str = "gemma3:4b"
+    inference_model_name: str = "gemma4:latest"

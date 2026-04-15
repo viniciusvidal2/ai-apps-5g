@@ -66,7 +66,7 @@ test.describe("rag controls", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          available_models: ["gemma3:4b", "gemma3:12b"],
+          available_models: ["gemma4:latest", "gemma3:12b"],
         }),
       });
     });
@@ -114,7 +114,7 @@ test.describe("rag controls", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          available_models: ["gemma3:4b"],
+          available_models: ["gemma4:latest"],
         }),
       });
     });

@@ -37,6 +37,7 @@ class AiAssistant:
         self.expected_llm_models = self.get_available_ollama_models()
         self.set_assistant_model(
             inference_model_name=self.inference_model_name)
+        self.internal_process_llm = ChatOllama(model="gemma4:latest")
         # Dealing with history of conversation
         HISTORY_SUMMARY_PROMPT = ChatPromptTemplate.from_messages([
             (
@@ -57,11 +58,10 @@ class AiAssistant:
                 "Garanta que a sua resposta seja somente o resumo atualizado, sem nenhuma explicação ou etapa de raciocínio."
             ),
         ])
-        self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.llm
+        self.history_summarizer = HISTORY_SUMMARY_PROMPT | self.internal_process_llm
         self.history_summary = ""
         self.last_context_string = ""
         # Query improvement stage
-        self.query_improvement_llm = ChatOllama(model="gemma3:4b")
         QUERY_IMPROVEMENT_PROMPT = ChatPromptTemplate.from_messages([
             (
                 "system",
@@ -80,7 +80,7 @@ class AiAssistant:
                 "Pergunta original: {input}""",
             ),
         ])
-        self.query_improver = QUERY_IMPROVEMENT_PROMPT | self.query_improvement_llm
+        self.query_improver = QUERY_IMPROVEMENT_PROMPT | self.internal_process_llm
         # Initialize the prompt templates for rag
         DOCUMENT_PROMPT_TEMPLATE = """
         --- CHUNK DE CONTEXTO ---
@@ -187,13 +187,13 @@ class AiAssistant:
     def close_assistant(self) -> None:
         """Closes the assistant and performs any necessary cleanup, especially in the models."""
         subprocess.run(["ollama", "stop", self.inference_model_name])
-        if self.inference_model_name != "gemma3:4b":
-            subprocess.run(["ollama", "stop", "gemma3:4b"])
+        if self.inference_model_name != "gemma4:latest":
+            subprocess.run(["ollama", "stop", "gemma4:latest"])
         print("Assistant closed and resources cleaned up.")
 
     def get_available_ollama_models(self, base_url: str = "http://127.0.0.1:11434", timeout: int = 5) -> List[str]:
         """
-        Returns a list of available Ollama model names (e.g. gemma3:4b).
+        Returns a list of available Ollama model names (e.g. gemma4:latest).
 
         Args:
             base_url (str): The base URL of the Ollama API.

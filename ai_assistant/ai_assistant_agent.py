@@ -1,4 +1,5 @@
 import argparse
+import time
 from fastapi import FastAPI, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from contextlib import asynccontextmanager
@@ -181,45 +182,23 @@ def create_agent(config: AppConfig) -> FastAPI:
             """
             # Create a queue to communicate between the main thread and the worker thread
             q = queue.Queue()
-
-            def inference_worker():
-                try:
-                    # Treat the requested model and switch if it's different from the current one
-                    requested_model_name = payload.inference_model_name
-                    if requested_model_name != app.state.ai_assistant.get_inference_model_name():
-                        app.state.ai_assistant.switch_assistant_model(
-                            inference_model_name=requested_model_name)
-                    # Set the conversation history for the user session
-                    app.state.ai_assistant.set_assistant_conversation_summary(
-                        summary=payload.conversation_summary
-                    )
-                    # Stream inference chunks
-                    for response_chunk in app.state.ai_assistant.run_inference_pipeline(
-                            user_query=payload.query,
-                            collection_name=payload.collection_name):
-                        if response_chunk == "[END_OF_RESPONSE]":
-                            q.put({"type": "end"})
-                        elif isinstance(response_chunk, dict):
-                            q.put(response_chunk)
-                        else:
-                            q.put({"type": "chunk", "data": response_chunk})
-                except Exception as e:
-                    q.put({"type": "error", "error": str(e)})
             # Create and start the worker thread
-            thread = threading.Thread(target=inference_worker)
-            thread.start()
+            inference_thread = threading.Thread(target=inference_worker, kwargs={
+                                      "inference_payload": payload, "queue": q})
+            inference_thread.start()
             # List to store response chunks
             response_chunks = []
             while True:
                 try:
                     # Wait up to 2 seconds for a chunk
                     msg = q.get(timeout=2.0)
+                    assistant_status = app.state.ai_assistant.get_assistant_status()
                     # Check what to do based on the message type
                     if msg["type"] == "end":
                         status_data = {
                             "type": "status",
-                            "status": msg.get("data", app.state.ai_assistant.get_assistant_status()),
-                            "data": msg.get("data", app.state.ai_assistant.get_assistant_status())
+                            "status": msg.get("data", assistant_status),
+                            "data": msg.get("data", assistant_status)
                         }
                         yield json.dumps(status_data) + "\n"
                         break
@@ -236,14 +215,14 @@ def create_agent(config: AppConfig) -> FastAPI:
                         chunk_data = {
                             "type": "chunk",
                             "data": msg["data"],
-                            "status": app.state.ai_assistant.get_assistant_status()
+                            "status": assistant_status
                         }
                         yield json.dumps(chunk_data) + "\n"
                     elif msg["type"] == "status":
                         status_data = {
                             "type": "status",
-                            "status": msg.get("data", app.state.ai_assistant.get_assistant_status()),
-                            "data": msg.get("data", app.state.ai_assistant.get_assistant_status())
+                            "status": msg.get("data", assistant_status),
+                            "data": msg.get("data", assistant_status)
                         }
                         yield json.dumps(status_data) + "\n"
                     else:
@@ -255,14 +234,25 @@ def create_agent(config: AppConfig) -> FastAPI:
                         "status": app.state.ai_assistant.get_assistant_status()
                     }
                     yield json.dumps(keep_alive_data) + "\n"
-
-            # After streaming is complete, update history and send final response
+            inference_thread.join()
+            # Start thread to update conversation history summary without blocking the main thread
             full_response = "".join(response_chunks)
-            app.state.ai_assistant.update_conversation_history_summary(
-                user_query=payload.query,
-                context_string=app.state.ai_assistant.get_context_string(),
-                assistant_response=full_response,
-            )
+            history_thread = threading.Thread(target=history_update_worker, kwargs={
+                "user_query": payload.query,
+                "context_string": app.state.ai_assistant.get_context_string(),
+                "assistant_response": full_response
+            })
+            history_thread.start()
+            assistant_status = app.state.ai_assistant.get_assistant_status()
+            while history_thread.is_alive():
+                # While waiting for the history update to finish, we can yield keep-alive status updates
+                keep_alive_data = {
+                    "type": "status",
+                    "status": assistant_status
+                }
+                yield json.dumps(keep_alive_data) + "\n"
+                time.sleep(2)
+            history_thread.join()
             # Send final status update
             final_data = {
                 "type": "complete",
@@ -278,6 +268,56 @@ def create_agent(config: AppConfig) -> FastAPI:
 
     # endregion
     # region Background tasks
+
+    def inference_worker(inference_payload: AiAssistantInferenceRequest, queue: queue.Queue) -> None:
+        """
+        Worker to deal with inference thread stream
+
+        Args:
+            inference_payload (AiAssistantInferenceRequest): user payload for the inference request
+            queue (queue.Queue): Queue to put inference results into
+        """
+        try:
+            # Treat the requested model and switch if it's different from the current one
+            requested_model_name = inference_payload.inference_model_name
+            if requested_model_name != app.state.ai_assistant.get_inference_model_name():
+                app.state.ai_assistant.switch_assistant_model(
+                    inference_model_name=requested_model_name)
+            # Set the conversation history for the user session
+            app.state.ai_assistant.set_assistant_conversation_summary(
+                summary=inference_payload.conversation_summary
+            )
+            # Stream inference chunks
+            for response_chunk in app.state.ai_assistant.run_inference_pipeline(
+                    user_query=inference_payload.query,
+                    collection_name=inference_payload.collection_name):
+                if response_chunk == "[END_OF_RESPONSE]":
+                    queue.put({"type": "end"})
+                elif isinstance(response_chunk, dict):
+                    queue.put(response_chunk)
+                else:
+                    queue.put({"type": "chunk", "data": response_chunk})
+        except Exception as e:
+            queue.put({"type": "error", "error": str(e)})
+
+    def history_update_worker(user_query: str, context_string: str, assistant_response: str) -> None:
+        """
+        Worker to update the agent conversation history in a separate thread
+
+        Args:
+            user_query (str): The user's query that was sent for inference
+            context_string (str): The context string that was used for the inference
+            assistant_response (str): The response generated by the assistant for the given query and context
+        """
+        try:
+            app.state.ai_assistant.update_conversation_history_summary(
+                user_query=user_query,
+                context_string=context_string,
+                assistant_response=assistant_response,
+            )
+        except Exception as e:
+            print(
+                f"Error updating conversation history summary: {str(e)}")
 
     def run_ai_assistant_inference(job_id: str, inferece_payload: AiAssistantInferenceRequest, app: FastAPI) -> None:
         """

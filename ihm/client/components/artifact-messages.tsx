@@ -3,7 +3,10 @@ import equal from "fast-deep-equal";
 import { motion } from "framer-motion";
 import { memo } from "react";
 import { useMessages } from "@/hooks/use-messages";
-import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
+import {
+  getEffectiveAssistantStatusMessage,
+  shouldShowAssistantActivity,
+} from "@/lib/assistant-activity";
 import type { ChatMessage } from "@/lib/types";
 import type { UIArtifact } from "./artifact";
 import { PreviewMessage, ThinkingMessage } from "./message";
@@ -39,6 +42,13 @@ function PureArtifactMessages({
   const showAssistantActivity = shouldShowAssistantActivity({
     messages,
     status,
+    statusMessage,
+  });
+
+  const assistantActivityLabel = getEffectiveAssistantStatusMessage({
+    messages,
+    status,
+    statusMessage,
   });
 
   return (
@@ -61,7 +71,7 @@ function PureArtifactMessages({
       ))}
 
       {showAssistantActivity && (
-        <ThinkingMessage statusMessage={statusMessage} />
+        <ThinkingMessage statusMessage={assistantActivityLabel} />
       )}
 
       <motion.div

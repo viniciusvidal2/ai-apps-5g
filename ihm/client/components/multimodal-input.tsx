@@ -23,6 +23,7 @@ import { SelectItem } from "@/components/ui/select";
 import { chatModels } from "@/lib/ai/models";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
+import { getEffectiveAssistantStatusMessage } from "@/lib/assistant-activity";
 import { cn } from "@/lib/utils";
 import { Context } from "./elements/context";
 import {
@@ -56,6 +57,7 @@ function PureMultimodalInput({
   input,
   setInput,
   status,
+  statusMessage,
   stop,
   attachments,
   setAttachments,
@@ -78,6 +80,7 @@ function PureMultimodalInput({
   input: string;
   setInput: Dispatch<SetStateAction<string>>;
   status: UseChatHelpers<ChatMessage>["status"];
+  statusMessage?: string;
   stop: () => void;
   attachments: Attachment[];
   setAttachments: Dispatch<SetStateAction<Attachment[]>>;
@@ -100,9 +103,14 @@ function PureMultimodalInput({
   const { width } = useWindowSize();
 
   const isProcessing = status !== "ready";
+  const trimmedStatusMessage = getEffectiveAssistantStatusMessage({
+    messages,
+    status,
+    statusMessage,
+  })?.trim();
 
   const placeholderText = isProcessing
-    ? "Aguardando resposta..."
+    ? trimmedStatusMessage || "Aguardando resposta..."
     : messages.length > 0
       ? "Escreva sua mensagem aqui..."
       : "Envie uma mensagem...";

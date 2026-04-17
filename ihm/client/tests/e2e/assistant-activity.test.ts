@@ -8,6 +8,7 @@ const MOCK_CHAT_STREAM = [
   'data: {"type":"text-delta","id":"assistant-activity-test","delta":"Resposta "}',
   'data: {"type":"text-delta","id":"assistant-activity-test","delta":"final "}',
   'data: {"type":"text-end","id":"assistant-activity-test"}',
+  'data: {"type":"data-statusMessage","data":"Resposta pronta. Salvando contexto da conversa..."}',
   'data: {"type":"finish-step"}',
   'data: {"type":"finish"}',
   "data: [DONE]",
@@ -40,16 +41,24 @@ test.describe("assistant activity", () => {
 
     await chatPage.sendUserMessage("Quero ver o status da inferência");
 
+    await expect(page.getByTestId("message-assistant-loading")).toHaveCount(1);
     await expect(page.getByTestId("message-assistant-loading")).toBeVisible();
     await expect(page.getByTestId("assistant-activity-text")).toContainText(
-      "Pensando..."
+      "Recuperando documentos relevantes da base de dados."
     );
+    await expect(page.getByTestId("assistant-activity-shimmer")).toBeVisible();
+    await expect(page.getByTestId("assistant-activity-text")).toContainText(
+      "Resposta pronta. Salvando contexto da conversa..."
+    );
+    await expect(
+      page.getByTestId("assistant-activity-persistence-hint")
+    ).toBeVisible();
 
     await chatPage.isGenerationComplete();
 
     await expect(
       page.getByTestId("message-assistant-loading")
-    ).not.toBeVisible();
+    ).not.toBeVisible({ timeout: 3000 });
 
     const assistantMessage = await chatPage.getRecentAssistantMessage();
     expect(assistantMessage?.content).toContain("Resposta final");

@@ -3,7 +3,10 @@ import equal from "fast-deep-equal";
 import { ArrowDownIcon } from "lucide-react";
 import { memo, useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
-import { shouldShowAssistantActivity } from "@/lib/assistant-activity";
+import {
+  getEffectiveAssistantStatusMessage,
+  shouldShowAssistantActivity,
+} from "@/lib/assistant-activity";
 import type { ChatMessage } from "@/lib/types";
 import { useDataStream } from "./data-stream-provider";
 import { Conversation, ConversationContent } from "./elements/conversation";
@@ -28,6 +31,7 @@ function PureMessages({
   setMessages,
   regenerate,
   isReadonly,
+  isArtifactVisible,
   selectedModelId,
 }: MessagesProps) {
   const {
@@ -56,9 +60,18 @@ function PureMessages({
     }
   }, [status, messagesContainerRef]);
 
-  const showAssistantActivity = shouldShowAssistantActivity({
+  const showAssistantActivity =
+    !isArtifactVisible &&
+    shouldShowAssistantActivity({
+      messages,
+      status,
+      statusMessage,
+    });
+
+  const assistantActivityLabel = getEffectiveAssistantStatusMessage({
     messages,
     status,
+    statusMessage,
   });
 
   return (
@@ -88,7 +101,7 @@ function PureMessages({
           ))}
 
           {showAssistantActivity && (
-            <ThinkingMessage statusMessage={statusMessage} />
+            <ThinkingMessage statusMessage={assistantActivityLabel} />
           )}
 
           <div
@@ -132,6 +145,9 @@ export const Messages = memo(PureMessages, (prevProps, nextProps) => {
   if (!equal(prevProps.messages, nextProps.messages)) {
     return false;
   }
+  if (prevProps.isReadonly !== nextProps.isReadonly) {
+    return false;
+  }
 
-  return false;
+  return true;
 });

@@ -446,7 +446,6 @@ export function Chat({
       }
     },
     onFinish: () => {
-      setBackendStatusMessage("");
       mutate(unstable_serialize(getChatHistoryPaginationKey));
     },
     onError: (error) => {
@@ -471,6 +470,23 @@ export function Chat({
   const query = searchParams.get("query");
 
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
+
+  useEffect(() => {
+    if (status === "submitted") {
+      setBackendStatusMessage("");
+    }
+
+    if (status !== "ready") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setBackendStatusMessage("");
+    }, 800);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [status]);
 
   useEffect(() => {
     if (query && !hasAppendedQuery) {
@@ -528,6 +544,7 @@ export function Chat({
               setInput={setInput}
               setMessages={setMessages}
               status={status}
+              statusMessage={backendStatusMessage}
               stop={stop}
               usage={usage}
               ragParams={ragParams}

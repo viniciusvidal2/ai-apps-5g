@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
+  DEFAULT_ASSISTANT_ACTIVITY_LABEL,
   getAssistantActivityLabel,
+  getEffectiveAssistantStatusMessage,
   hasRenderableAssistantContent,
   shouldShowAssistantActivity,
 } from "@/lib/assistant-activity";
@@ -23,9 +25,17 @@ test.describe("assistant activity helpers", () => {
     ).toBe("Preparando resposta...");
   });
 
-  test("falls back to the default label when backend status is empty", () => {
-    expect(getAssistantActivityLabel("   ")).toBe("Pensando...");
-    expect(getAssistantActivityLabel(undefined)).toBe("Pensando...");
+  test("keeps explicit finalization status messages visible", () => {
+    expect(
+      getAssistantActivityLabel(
+        "Resposta pronta. Salvando contexto da conversa..."
+      )
+    ).toBe("Resposta pronta. Salvando contexto da conversa...");
+  });
+
+  test("returns undefined when backend status is empty", () => {
+    expect(getAssistantActivityLabel("   ")).toBeUndefined();
+    expect(getAssistantActivityLabel(undefined)).toBeUndefined();
   });
 
   test("detects renderable assistant content only when something visible exists", () => {
@@ -82,6 +92,7 @@ test.describe("assistant activity helpers", () => {
       shouldShowAssistantActivity({
         messages: [userMessage],
         status: "submitted",
+        statusMessage: "Preparando a inferência",
       })
     ).toBeTruthy();
 
@@ -89,6 +100,7 @@ test.describe("assistant activity helpers", () => {
       shouldShowAssistantActivity({
         messages: [userMessage, emptyAssistantMessage],
         status: "streaming",
+        statusMessage: "Gerando resposta",
       })
     ).toBeTruthy();
 
@@ -96,7 +108,120 @@ test.describe("assistant activity helpers", () => {
       shouldShowAssistantActivity({
         messages: [userMessage, finalAssistantMessage],
         status: "streaming",
+        statusMessage: "Gerando resposta",
       })
     ).toBeFalsy();
+
+    expect(
+      shouldShowAssistantActivity({
+        messages: [userMessage, finalAssistantMessage],
+        status: "streaming",
+        statusMessage: "Resposta pronta. Salvando contexto da conversa...",
+      })
+    ).toBeTruthy();
+
+    expect(
+      shouldShowAssistantActivity({
+        messages: [userMessage],
+        status: "submitted",
+        statusMessage: undefined,
+      })
+    ).toBeTruthy();
+
+    expect(
+      getEffectiveAssistantStatusMessage({
+        messages: [userMessage],
+        status: "submitted",
+        statusMessage: undefined,
+      })
+    ).toBe(DEFAULT_ASSISTANT_ACTIVITY_LABEL);
+  });
+
+  test("shows assistant activity briefly after stream ends while finalization status is visible", () => {
+    const userMessage = createMessage({
+      id: "user-1",
+      role: "user",
+      parts: [{ type: "text", text: "Oi" }],
+    });
+
+    const finalAssistantMessage = createMessage({
+      id: "assistant-final",
+      role: "assistant",
+      parts: [{ type: "text", text: "Resposta final" }],
+    });
+
+    expect(
+      shouldShowAssistantActivity({
+        messages: [userMessage, finalAssistantMessage],
+        status: "ready",
+        statusMessage: "Resposta pronta. Salvando contexto da conversa...",
+      })
+    ).toBeTruthy();
+  });
+
+  test("replaces stale preflight status while assistant text is already visible", () => {
+    const userMessage = createMessage({
+      id: "user-1",
+      role: "user",
+      parts: [{ type: "text", text: "Oi" }],
+    });
+
+    const finalAssistantMessage = createMessage({
+      id: "assistant-final",
+      role: "assistant",
+      parts: [{ type: "text", text: "Resposta final" }],
+    });
+
+    expect(
+      getEffectiveAssistantStatusMessage({
+        messages: [userMessage, finalAssistantMessage],
+        status: "streaming",
+        statusMessage: "Enviando consulta para o AI Assistant...",
+      })
+    ).toBe("Gerando resposta...");
+  });
+
+  test("replaces short AI Assistant preflight while assistant text is already visible", () => {
+    const userMessage = createMessage({
+      id: "user-1",
+      role: "user",
+      parts: [{ type: "text", text: "Oi" }],
+    });
+
+    const finalAssistantMessage = createMessage({
+      id: "assistant-final",
+      role: "assistant",
+      parts: [{ type: "text", text: "Resposta final" }],
+    });
+
+    expect(
+      getEffectiveAssistantStatusMessage({
+        messages: [userMessage, finalAssistantMessage],
+        status: "streaming",
+        statusMessage: "AI Assistant",
+      })
+    ).toBe("Gerando resposta...");
+  });
+
+  test("keeps finalization status when assistant message is complete", () => {
+    const userMessage = createMessage({
+      id: "user-1",
+      role: "user",
+      parts: [{ type: "text", text: "Oi" }],
+    });
+
+    const finalAssistantMessage = createMessage({
+      id: "assistant-final",
+      role: "assistant",
+      parts: [{ type: "text", text: "Resposta final" }],
+    });
+
+    expect(
+      getEffectiveAssistantStatusMessage({
+        messages: [userMessage, finalAssistantMessage],
+        status: "streaming",
+        statusMessage: "Resposta pronta. Salvando contexto da conversa...",
+      })
+    ).toBe("Resposta pronta. Salvando contexto da conversa...");
   });
 });

@@ -1,7 +1,11 @@
 import type { ChatMessage } from "./types";
 
 const PREPARING_RESPONSE_MESSAGE = "Preparando resposta...";
-const FALLBACK_ACTIVITY_MESSAGE = "Pensando...";
+
+const STREAMING_FALLBACK_LABEL = "Gerando resposta...";
+
+/** Shown while the request is in flight and no backend status line arrived yet. */
+export const DEFAULT_ASSISTANT_ACTIVITY_LABEL = "AI Assistant";
 
 const foldStatusMessage = (value: string) =>
   value
@@ -9,6 +13,27 @@ const foldStatusMessage = (value: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
+
+/** Backend still reports early preflight while tokens are already visible in the assistant bubble. */
+export function isStalePreflightAssistantStatus(statusMessage: string) {
+  const folded = foldStatusMessage(statusMessage);
+  return (
+    folded.includes("enviando consulta") ||
+    folded === "ai assistant" ||
+    folded.includes("sending query to") ||
+    folded.includes("sending query")
+  );
+}
+
+/** Next.js route emits this while persisting messages / summary; input stays disabled until the stream closes. */
+export function isFinalizationPhaseStatus(statusMessage: string) {
+  const folded = foldStatusMessage(statusMessage);
+  return (
+    folded.includes("salvando contexto") ||
+    folded.includes("saving context") ||
+    folded.includes("salvando o contexto")
+  );
+}
 
 export function normalizeAssistantStatusMessage(statusMessage?: string) {
   const trimmedMessage = statusMessage?.trim();
@@ -34,7 +59,55 @@ export function normalizeAssistantStatusMessage(statusMessage?: string) {
 }
 
 export function getAssistantActivityLabel(statusMessage?: string) {
-  return normalizeAssistantStatusMessage(statusMessage) ?? FALLBACK_ACTIVITY_MESSAGE;
+  return normalizeAssistantStatusMessage(statusMessage);
+}
+
+/**
+ * Maps misleading backend labels to clearer UI copy while the assistant message already shows streamed text,
+ * and keeps finalization messages intact for the post-response persistence phase.
+ */
+export function getEffectiveAssistantStatusMessage({
+  messages,
+  status,
+  statusMessage,
+}: {
+  messages: ChatMessage[];
+  status: string;
+  statusMessage?: string;
+}): string | undefined {
+  const normalized = normalizeAssistantStatusMessage(statusMessage);
+
+  const lastMessage = messages.at(-1);
+  const assistantHasRenderableText =
+    lastMessage?.role === "assistant" &&
+    hasRenderableAssistantContent(lastMessage);
+
+  if (status === "ready") {
+    if (normalized && isFinalizationPhaseStatus(normalized)) {
+      return normalized;
+    }
+    return undefined;
+  }
+
+  if (status !== "submitted" && status !== "streaming") {
+    return undefined;
+  }
+
+  const baseLabel = normalized ?? DEFAULT_ASSISTANT_ACTIVITY_LABEL;
+
+  if (!assistantHasRenderableText) {
+    return baseLabel;
+  }
+
+  if (isStalePreflightAssistantStatus(baseLabel)) {
+    return STREAMING_FALLBACK_LABEL;
+  }
+
+  if (normalized === PREPARING_RESPONSE_MESSAGE) {
+    return STREAMING_FALLBACK_LABEL;
+  }
+
+  return baseLabel;
 }
 
 export function hasRenderableAssistantContent(message?: ChatMessage) {
@@ -56,10 +129,26 @@ export function hasRenderableAssistantContent(message?: ChatMessage) {
 export function shouldShowAssistantActivity({
   messages,
   status,
+  statusMessage,
 }: {
   messages: ChatMessage[];
   status: string;
+  statusMessage?: string;
 }) {
+  const effective = getEffectiveAssistantStatusMessage({
+    messages,
+    status,
+    statusMessage,
+  });
+
+  if (!effective?.trim()) {
+    return false;
+  }
+
+  if (status === "ready") {
+    return isFinalizationPhaseStatus(effective);
+  }
+
   if (status !== "submitted" && status !== "streaming") {
     return false;
   }
@@ -72,6 +161,14 @@ export function shouldShowAssistantActivity({
 
   if (lastMessage.role === "user") {
     return true;
+  }
+
+  if (lastMessage.role === "assistant") {
+    if (!hasRenderableAssistantContent(lastMessage)) {
+      return true;
+    }
+
+    return isFinalizationPhaseStatus(effective);
   }
 
   return !hasRenderableAssistantContent(lastMessage);

@@ -337,6 +337,7 @@ function PureArtifact({
                     className="bg-background dark:bg-muted"
                     input={input}
                     messages={messages}
+                    statusMessage={statusMessage}
                     selectedModelId={selectedModelId}
                     selectedVisibilityType={selectedVisibilityType}
                     sendMessage={sendMessage}

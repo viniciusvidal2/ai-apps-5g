@@ -126,6 +126,7 @@ export async function POST(request: Request) {
     const { ReadableStream } = await import("stream/web");
     const reader = stream.getReader();
     const decoder = new TextDecoder();
+    const encoder = new TextEncoder();
 
     let assistantResponse = "";
     let latestConversationSummary = conversationSummary;
@@ -174,6 +175,17 @@ export async function POST(request: Request) {
                 for (const line of sseBuffer.split("\n")) {
                   processSseLine(line);
                 }
+              }
+
+              if (!isClosed) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "data-statusMessage",
+                      data: "Resposta pronta. Salvando contexto da conversa...",
+                    })}\n\n`
+                  )
+                );
               }
 
               if (assistantResponse.trim()) {

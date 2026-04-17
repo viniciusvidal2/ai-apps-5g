@@ -312,7 +312,7 @@ async def _build_ai_assistant_stream(
             yield format_sse_event(
                 {
                     "type": "data-statusMessage",
-                    "data": "Enviando consulta para o AI Assistant...",
+                    "data": "AI Assistant",
                 }
             )
 

@@ -43,7 +43,7 @@ export async function POST(request: Request) {
 
     const session = await auth();
     if (!session?.user) {
-      return new ChatSDKError("unauthorized").toResponse();
+      return new ChatSDKError("unauthorized:chat").toResponse();
     }
 
     const userId = session.user.id;
@@ -123,7 +123,6 @@ export async function POST(request: Request) {
       throw new Error("No response body from backend");
     }
 
-    const { ReadableStream } = await import("stream/web");
     const reader = stream.getReader();
     const decoder = new TextDecoder();
     const encoder = new TextEncoder();
@@ -182,7 +181,7 @@ export async function POST(request: Request) {
                   encoder.encode(
                     `data: ${JSON.stringify({
                       type: "data-statusMessage",
-                      data: "Resposta pronta. Salvando contexto da conversa...",
+                      data: "Salvando hist\u00f3rico da conversa...",
                     })}\n\n`
                   )
                 );

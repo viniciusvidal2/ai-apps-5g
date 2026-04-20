@@ -1,11 +1,57 @@
-import type { ChatMessage } from "./types";
+type AssistantActivityMessage = {
+  role: string;
+  parts?: Array<{
+    type: string;
+    text?: string;
+  }>;
+};
 
-const PREPARING_RESPONSE_MESSAGE = "Preparando resposta...";
-
-const STREAMING_FALLBACK_LABEL = "Gerando resposta...";
+const PREPARING_RESPONSE_LABEL = "Preparando sua resposta...";
+const STREAMING_RESPONSE_LABEL = "Aguardando resposta completa...";
+const FINALIZATION_RESPONSE_LABEL = "Salvando hist\u00f3rico da conversa...";
 
 /** Shown while the request is in flight and no backend status line arrived yet. */
-export const DEFAULT_ASSISTANT_ACTIVITY_LABEL = "AI Assistant";
+export const DEFAULT_ASSISTANT_ACTIVITY_LABEL = PREPARING_RESPONSE_LABEL;
+
+const TECHNICAL_STATUS_PATTERNS = [
+  "ai assistant",
+  "enviando consulta",
+  "sending query",
+  "construindo o prompt",
+  "building prompt",
+  "building rag prompt",
+  "melhorando a formulacao da consulta",
+  "improving query formulation",
+  "recuperando documentos",
+  "retrieving relevant documents",
+  "consulta sem rag",
+  "extraindo contexto",
+  "extracting relevant context",
+  "preenchendo o prompt",
+  "filling the rag prompt",
+  "executando inferencia",
+  "running inference",
+  "resposta gerada",
+  "pronto para atualizar o resumo",
+  "updating the conversation summary",
+  "concluida com sucesso",
+  "concluida",
+  "completed successfully",
+  "ready to process messages",
+  "pronto para processar mensagens",
+];
+
+const FINALIZATION_STATUS_PATTERNS = [
+  "salvando contexto",
+  "saving context",
+  "salvando o contexto",
+  "salvando historico",
+  "salvando histórico",
+  "saving history",
+  "gravando a mensagem",
+  "updating the summary",
+  "atualizando o resumo",
+];
 
 const foldStatusMessage = (value: string) =>
   value
@@ -14,52 +60,53 @@ const foldStatusMessage = (value: string) =>
     .toLowerCase()
     .trim();
 
-/** Backend still reports early preflight while tokens are already visible in the assistant bubble. */
-export function isStalePreflightAssistantStatus(statusMessage: string) {
+function hasMatchingPattern(statusMessage: string, patterns: string[]) {
   const folded = foldStatusMessage(statusMessage);
-  return (
-    folded.includes("enviando consulta") ||
-    folded === "ai assistant" ||
-    folded.includes("sending query to") ||
-    folded.includes("sending query")
-  );
+  return patterns.some((pattern) => folded.includes(pattern));
+}
+
+/** Backend still reports internal steps while tokens are already visible in the assistant bubble. */
+export function isStalePreflightAssistantStatus(statusMessage: string) {
+  return hasMatchingPattern(statusMessage, TECHNICAL_STATUS_PATTERNS);
 }
 
 /** Next.js route emits this while persisting messages / summary; input stays disabled until the stream closes. */
 export function isFinalizationPhaseStatus(statusMessage: string) {
-  const folded = foldStatusMessage(statusMessage);
-  return (
-    folded.includes("salvando contexto") ||
-    folded.includes("saving context") ||
-    folded.includes("salvando o contexto")
-  );
+  return hasMatchingPattern(statusMessage, FINALIZATION_STATUS_PATTERNS);
 }
 
 export function normalizeAssistantStatusMessage(statusMessage?: string) {
-  const trimmedMessage = statusMessage?.trim();
-
-  if (!trimmedMessage) {
-    return undefined;
-  }
-
-  const foldedMessage = foldStatusMessage(trimmedMessage);
-
-  const isTerminalStatus =
-    foldedMessage.includes("concluida com sucesso") ||
-    foldedMessage.includes("concluida") ||
-    foldedMessage.includes("completed successfully") ||
-    foldedMessage.includes("ready to process messages") ||
-    foldedMessage.includes("pronto para processar mensagens");
-
-  if (isTerminalStatus) {
-    return PREPARING_RESPONSE_MESSAGE;
-  }
-
-  return trimmedMessage;
+  return statusMessage?.trim() || undefined;
 }
 
 export function getAssistantActivityLabel(statusMessage?: string) {
   return normalizeAssistantStatusMessage(statusMessage);
+}
+
+function getPhaseLabel({
+  assistantHasRenderableText,
+  normalizedStatusMessage,
+}: {
+  assistantHasRenderableText: boolean;
+  normalizedStatusMessage?: string;
+}) {
+  if (!normalizedStatusMessage) {
+    return assistantHasRenderableText
+      ? STREAMING_RESPONSE_LABEL
+      : PREPARING_RESPONSE_LABEL;
+  }
+
+  if (isFinalizationPhaseStatus(normalizedStatusMessage)) {
+    return FINALIZATION_RESPONSE_LABEL;
+  }
+
+  if (isStalePreflightAssistantStatus(normalizedStatusMessage)) {
+    return assistantHasRenderableText
+      ? STREAMING_RESPONSE_LABEL
+      : PREPARING_RESPONSE_LABEL;
+  }
+
+  return normalizedStatusMessage;
 }
 
 /**
@@ -71,11 +118,11 @@ export function getEffectiveAssistantStatusMessage({
   status,
   statusMessage,
 }: {
-  messages: ChatMessage[];
+  messages: AssistantActivityMessage[];
   status: string;
   statusMessage?: string;
 }): string | undefined {
-  const normalized = normalizeAssistantStatusMessage(statusMessage);
+  const normalizedStatusMessage = normalizeAssistantStatusMessage(statusMessage);
 
   const lastMessage = messages.at(-1);
   const assistantHasRenderableText =
@@ -83,8 +130,11 @@ export function getEffectiveAssistantStatusMessage({
     hasRenderableAssistantContent(lastMessage);
 
   if (status === "ready") {
-    if (normalized && isFinalizationPhaseStatus(normalized)) {
-      return normalized;
+    if (
+      normalizedStatusMessage &&
+      isFinalizationPhaseStatus(normalizedStatusMessage)
+    ) {
+      return FINALIZATION_RESPONSE_LABEL;
     }
     return undefined;
   }
@@ -93,24 +143,13 @@ export function getEffectiveAssistantStatusMessage({
     return undefined;
   }
 
-  const baseLabel = normalized ?? DEFAULT_ASSISTANT_ACTIVITY_LABEL;
-
-  if (!assistantHasRenderableText) {
-    return baseLabel;
-  }
-
-  if (isStalePreflightAssistantStatus(baseLabel)) {
-    return STREAMING_FALLBACK_LABEL;
-  }
-
-  if (normalized === PREPARING_RESPONSE_MESSAGE) {
-    return STREAMING_FALLBACK_LABEL;
-  }
-
-  return baseLabel;
+  return getPhaseLabel({
+    assistantHasRenderableText,
+    normalizedStatusMessage,
+  });
 }
 
-export function hasRenderableAssistantContent(message?: ChatMessage) {
+export function hasRenderableAssistantContent(message?: AssistantActivityMessage) {
   if (!message || message.role !== "assistant") {
     return false;
   }
@@ -119,7 +158,7 @@ export function hasRenderableAssistantContent(message?: ChatMessage) {
 
   return parts.some((part) => {
     if (part.type === "text" || part.type === "reasoning") {
-      return part.text?.trim().length > 0;
+      return (part.text?.trim().length ?? 0) > 0;
     }
 
     return part.type.startsWith("tool-");
@@ -131,7 +170,7 @@ export function shouldShowAssistantActivity({
   status,
   statusMessage,
 }: {
-  messages: ChatMessage[];
+  messages: AssistantActivityMessage[];
   status: string;
   statusMessage?: string;
 }) {
@@ -146,7 +185,7 @@ export function shouldShowAssistantActivity({
   }
 
   if (status === "ready") {
-    return isFinalizationPhaseStatus(effective);
+    return effective === FINALIZATION_RESPONSE_LABEL;
   }
 
   if (status !== "submitted" && status !== "streaming") {

@@ -64,7 +64,9 @@ function PureArtifactMessages({
           message={message}
           regenerate={regenerate}
           requiresScrollPadding={
-            hasSentMessage && index === messages.length - 1
+            status === "streaming" &&
+            hasSentMessage &&
+            index === messages.length - 1
           }
           setMessages={setMessages}
         />

@@ -73,7 +73,8 @@ const PurePreviewMessage = ({
             "gap-2 md:gap-4": message.parts?.some(
               (p) => p.type === "text" && p.text?.trim()
             ),
-            "min-h-96": message.role === "assistant" && requiresScrollPadding,
+            "pb-24 md:pb-32":
+              message.role === "assistant" && requiresScrollPadding,
             "w-full":
               (message.role === "assistant" &&
                 message.parts?.some(

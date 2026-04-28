@@ -21,11 +21,12 @@ import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { chatModels } from "@/lib/ai/models";
+import { INITIAL_ASSISTANT_STATUS_LABEL } from "@/lib/assistant-activity";
 import { ChatSDKError } from "@/lib/errors";
+import { useSessionId } from "@/lib/session-context";
 import type { Attachment, ChatMessage } from "@/lib/types";
 import type { AppUsage } from "@/lib/usage";
 import { fetchWithErrorHandlers, generateUUID } from "@/lib/utils";
-import { useSessionId } from "@/lib/session-context";
 import { Artifact } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { Messages } from "./messages";
@@ -473,7 +474,7 @@ export function Chat({
 
   useEffect(() => {
     if (status === "submitted") {
-      setBackendStatusMessage("");
+      setBackendStatusMessage(INITIAL_ASSISTANT_STATUS_LABEL);
     }
 
     if (status !== "ready") {

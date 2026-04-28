@@ -290,11 +290,27 @@ async def _build_ai_assistant_stream(
             {
                 "type": "data-statusMessage",
                 "data": "Aguardando outra inferencia em andamento...",
+                "transient": True,
             }
         )
 
     try:
         async with state.inference_lock:
+            startup_status = "Iniciando o AI Assistant e verificando serviços."
+            logger.info(
+                "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
+                inference_request.session_id,
+                inference_request.user_id,
+                startup_status,
+            )
+            yield format_sse_event(
+                {
+                    "type": "data-statusMessage",
+                    "data": startup_status,
+                    "transient": True,
+                }
+            )
+
             await ensure_services_ready(
                 user_id=inference_request.user_id,
                 session_id=inference_request.session_id,
@@ -309,10 +325,18 @@ async def _build_ai_assistant_stream(
                 "session_id": inference_request.session_id,
             }
 
+            ready_status = "Serviços prontos. Enviando consulta ao AI Assistant."
+            logger.info(
+                "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
+                inference_request.session_id,
+                inference_request.user_id,
+                ready_status,
+            )
             yield format_sse_event(
                 {
                     "type": "data-statusMessage",
-                    "data": "AI Assistant",
+                    "data": ready_status,
+                    "transient": True,
                 }
             )
 
@@ -333,15 +357,35 @@ async def _build_ai_assistant_stream(
                 elif msg_type == "status":
                     status_text = str(msg.get("status") or msg.get("data", "")).strip()
                     if status_text:
+                        logger.info(
+                            "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
+                            inference_request.session_id,
+                            inference_request.user_id,
+                            status_text,
+                        )
                         yield format_sse_event(
-                            {"type": "data-statusMessage", "data": status_text}
+                            {
+                                "type": "data-statusMessage",
+                                "data": status_text,
+                                "transient": True,
+                            }
                         )
 
                 elif msg_type == "complete":
                     status_text = str(msg.get("status", "")).strip()
                     if status_text:
+                        logger.info(
+                            "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
+                            inference_request.session_id,
+                            inference_request.user_id,
+                            status_text,
+                        )
                         yield format_sse_event(
-                            {"type": "data-statusMessage", "data": status_text}
+                            {
+                                "type": "data-statusMessage",
+                                "data": status_text,
+                                "transient": True,
+                            }
                         )
                     latest_summary = await get_ai_assistant_conversation_summary()
                     yield format_sse_event(
@@ -351,7 +395,11 @@ async def _build_ai_assistant_stream(
                 elif msg_type == "error":
                     error_text = str(msg.get("error", "Erro desconhecido na inferencia"))
                     yield format_sse_event(
-                        {"type": "data-statusMessage", "data": f"Erro: {error_text}"}
+                        {
+                            "type": "data-statusMessage",
+                            "data": f"Erro: {error_text}",
+                            "transient": True,
+                        }
                     )
                     yield format_sse_event(
                         {"type": "text-delta", "id": message_id, "delta": error_text}
@@ -371,7 +419,11 @@ async def _build_ai_assistant_stream(
             message_started = True
 
         yield format_sse_event(
-            {"type": "data-statusMessage", "data": f"Erro durante inferencia: {error_text}"}
+            {
+                "type": "data-statusMessage",
+                "data": f"Erro durante inferencia: {error_text}",
+                "transient": True,
+            }
         )
         yield format_sse_event({"type": "text-delta", "id": message_id, "delta": error_text})
 
@@ -389,7 +441,11 @@ async def _build_ai_assistant_stream(
             message_started = True
 
         yield format_sse_event(
-            {"type": "data-statusMessage", "data": "Erro inesperado durante inferencia"}
+            {
+                "type": "data-statusMessage",
+                "data": "Erro inesperado durante inferencia",
+                "transient": True,
+            }
         )
         yield format_sse_event({"type": "text-delta", "id": message_id, "delta": error_text})
 

@@ -6,40 +6,12 @@ type AssistantActivityMessage = {
   }>;
 };
 
-const PREPARING_RESPONSE_LABEL = "Preparando sua resposta...";
-const STREAMING_RESPONSE_LABEL = "Aguardando resposta completa...";
+export const INITIAL_ASSISTANT_STATUS_LABEL =
+  "Iniciando o AI Assistant e verificando serviços.";
 const FINALIZATION_RESPONSE_LABEL = "Salvando hist\u00f3rico da conversa...";
 
 /** Shown while the request is in flight and no backend status line arrived yet. */
-export const DEFAULT_ASSISTANT_ACTIVITY_LABEL = PREPARING_RESPONSE_LABEL;
-
-const TECHNICAL_STATUS_PATTERNS = [
-  "ai assistant",
-  "enviando consulta",
-  "sending query",
-  "construindo o prompt",
-  "building prompt",
-  "building rag prompt",
-  "melhorando a formulacao da consulta",
-  "improving query formulation",
-  "recuperando documentos",
-  "retrieving relevant documents",
-  "consulta sem rag",
-  "extraindo contexto",
-  "extracting relevant context",
-  "preenchendo o prompt",
-  "filling the rag prompt",
-  "executando inferencia",
-  "running inference",
-  "resposta gerada",
-  "pronto para atualizar o resumo",
-  "updating the conversation summary",
-  "concluida com sucesso",
-  "concluida",
-  "completed successfully",
-  "ready to process messages",
-  "pronto para processar mensagens",
-];
+export const DEFAULT_ASSISTANT_ACTIVITY_LABEL = INITIAL_ASSISTANT_STATUS_LABEL;
 
 const FINALIZATION_STATUS_PATTERNS = [
   "salvando contexto",
@@ -65,11 +37,6 @@ function hasMatchingPattern(statusMessage: string, patterns: string[]) {
   return patterns.some((pattern) => folded.includes(pattern));
 }
 
-/** Backend still reports internal steps while tokens are already visible in the assistant bubble. */
-export function isStalePreflightAssistantStatus(statusMessage: string) {
-  return hasMatchingPattern(statusMessage, TECHNICAL_STATUS_PATTERNS);
-}
-
 /** Next.js route emits this while persisting messages / summary; input stays disabled until the stream closes. */
 export function isFinalizationPhaseStatus(statusMessage: string) {
   return hasMatchingPattern(statusMessage, FINALIZATION_STATUS_PATTERNS);
@@ -84,34 +51,24 @@ export function getAssistantActivityLabel(statusMessage?: string) {
 }
 
 function getPhaseLabel({
-  assistantHasRenderableText,
   normalizedStatusMessage,
 }: {
-  assistantHasRenderableText: boolean;
   normalizedStatusMessage?: string;
 }) {
   if (!normalizedStatusMessage) {
-    return assistantHasRenderableText
-      ? STREAMING_RESPONSE_LABEL
-      : PREPARING_RESPONSE_LABEL;
+    return INITIAL_ASSISTANT_STATUS_LABEL;
   }
 
   if (isFinalizationPhaseStatus(normalizedStatusMessage)) {
     return FINALIZATION_RESPONSE_LABEL;
   }
 
-  if (isStalePreflightAssistantStatus(normalizedStatusMessage)) {
-    return assistantHasRenderableText
-      ? STREAMING_RESPONSE_LABEL
-      : PREPARING_RESPONSE_LABEL;
-  }
-
   return normalizedStatusMessage;
 }
 
 /**
- * Maps misleading backend labels to clearer UI copy while the assistant message already shows streamed text,
- * and keeps finalization messages intact for the post-response persistence phase.
+ * Keeps backend activity labels visible while the request is active, and keeps
+ * finalization messages intact for the post-response persistence phase.
  */
 export function getEffectiveAssistantStatusMessage({
   messages,
@@ -123,11 +80,6 @@ export function getEffectiveAssistantStatusMessage({
   statusMessage?: string;
 }): string | undefined {
   const normalizedStatusMessage = normalizeAssistantStatusMessage(statusMessage);
-
-  const lastMessage = messages.at(-1);
-  const assistantHasRenderableText =
-    lastMessage?.role === "assistant" &&
-    hasRenderableAssistantContent(lastMessage);
 
   if (status === "ready") {
     if (
@@ -144,7 +96,6 @@ export function getEffectiveAssistantStatusMessage({
   }
 
   return getPhaseLabel({
-    assistantHasRenderableText,
     normalizedStatusMessage,
   });
 }

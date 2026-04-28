@@ -160,6 +160,7 @@ export async function POST(request: Request) {
               latestConversationSummary = data.data;
               hasSummaryUpdate = true;
             }
+
           } catch {
             // Ignore non-JSON data lines.
           }
@@ -182,6 +183,7 @@ export async function POST(request: Request) {
                     `data: ${JSON.stringify({
                       type: "data-statusMessage",
                       data: "Salvando hist\u00f3rico da conversa...",
+                      transient: true,
                     })}\n\n`
                   )
                 );

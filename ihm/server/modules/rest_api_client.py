@@ -291,8 +291,15 @@ async def wait_for_ai_assistant_health(
 async def get_ai_assistant_health() -> Dict[str, Any]:
     """Return current health payload from AI Assistant."""
     health_url = f"{AI_ASSISTANT_API_URL}/health"
-    async with httpx.AsyncClient(timeout=5) as client:
-        response = await client.get(health_url)
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(health_url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI Assistant health endpoint unavailable: {exc}",
+        ) from exc
+
     if response.status_code != 200:
         raise HTTPException(
             status_code=503,

@@ -17,12 +17,14 @@ const createMessage = (
 ) => message as ChatMessage;
 
 test.describe("assistant activity helpers", () => {
-  test("normalizes terminal backend statuses to a neutral UI label", () => {
+  test("keeps backend status labels visible", () => {
     expect(
       getAssistantActivityLabel(
         "Inferência concluída com sucesso. Assistente está pronto para processar mensagens."
       )
-    ).toBe("Preparando resposta...");
+    ).toBe(
+      "Inferência concluída com sucesso. Assistente está pronto para processar mensagens."
+    );
   });
 
   test("keeps explicit finalization status messages visible", () => {
@@ -159,7 +161,7 @@ test.describe("assistant activity helpers", () => {
     ).toBeTruthy();
   });
 
-  test("replaces stale preflight status while assistant text is already visible", () => {
+  test("keeps agent pipeline status while assistant text is already visible", () => {
     const userMessage = createMessage({
       id: "user-1",
       role: "user",
@@ -178,10 +180,10 @@ test.describe("assistant activity helpers", () => {
         status: "streaming",
         statusMessage: "Enviando consulta para o AI Assistant...",
       })
-    ).toBe("Gerando resposta...");
+    ).toBe("Enviando consulta para o AI Assistant...");
   });
 
-  test("replaces short AI Assistant preflight while assistant text is already visible", () => {
+  test("keeps short AI Assistant status while assistant text is already visible", () => {
     const userMessage = createMessage({
       id: "user-1",
       role: "user",
@@ -200,7 +202,7 @@ test.describe("assistant activity helpers", () => {
         status: "streaming",
         statusMessage: "AI Assistant",
       })
-    ).toBe("Gerando resposta...");
+    ).toBe("AI Assistant");
   });
 
   test("keeps finalization status when assistant message is complete", () => {

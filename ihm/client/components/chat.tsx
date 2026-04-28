@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { ChatHeader } from "@/components/chat-header";
@@ -418,7 +419,7 @@ export function Chat({
   } = useChat<ChatMessage>({
     id,
     messages: initialMessages,
-    experimental_throttle: 100,
+    experimental_throttle: 50,
     generateId: generateUUID,
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -443,7 +444,12 @@ export function Chat({
         setUsage(dataPart.data);
       }
       if (dataPart.type === "data-statusMessage") {
-        setBackendStatusMessage(dataPart.data);
+        // flushSync forces an immediate React render so the status label
+        // is visible as soon as it arrives, even when many stream events
+        // are processed in the same microtask batch.
+        flushSync(() => {
+          setBackendStatusMessage(dataPart.data as string);
+        });
       }
     },
     onFinish: () => {

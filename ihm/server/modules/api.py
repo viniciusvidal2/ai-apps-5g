@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 """API routes for the AI Assistant server."""
+import asyncio
 import json
 import logging
 from typing import AsyncGenerator, Dict
@@ -353,6 +354,9 @@ async def _build_ai_assistant_stream(
                         yield format_sse_event(
                             {"type": "text-delta", "id": message_id, "delta": chunk_text}
                         )
+                        # Yield control back to the event loop so Uvicorn can
+                        # flush this chunk to the client before the next one.
+                        await asyncio.sleep(0)
 
                 elif msg_type == "status":
                     status_text = str(msg.get("status") or msg.get("data", "")).strip()

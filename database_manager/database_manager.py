@@ -167,7 +167,7 @@ def create_database() -> None:
     parser.add_argument(
         "--device", "-dev",
         type=str,
-        default="cuda",
+        default="cpu",
         help="Device to use for embedding (cpu or cuda) (default: cpu)"
     )
     args = parser.parse_args()

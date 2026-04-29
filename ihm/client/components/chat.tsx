@@ -216,7 +216,7 @@ export function Chat({
     }
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003";
     const abortController = new AbortController();
 
     setRAGOptionState(createInitialRAGOptionState());

@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:8003";
 
   try {
     const response = await fetch(`${backendUrl}/ai_assistant/status`, {

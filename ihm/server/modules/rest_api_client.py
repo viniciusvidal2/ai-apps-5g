@@ -308,6 +308,28 @@ async def get_ai_assistant_health() -> Dict[str, Any]:
     return response.json()
 
 
+async def get_ai_assistant_status() -> str:
+    """Fetch the current activity status from the AI Assistant agent."""
+    status_url = f"{AI_ASSISTANT_API_URL}/ai_assistant/status"
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(status_url)
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"AI Assistant status endpoint unavailable: {exc}",
+        ) from exc
+
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI Assistant status fetch failed ({response.status_code}): {response.text}",
+        )
+
+    data = response.json()
+    return str(data.get("status", "")).strip()
+
+
 async def submit_ai_assistant_inference(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Submit an inference request to AI Assistant."""
     inference_url = f"{AI_ASSISTANT_API_URL}/ai_assistant/inference"

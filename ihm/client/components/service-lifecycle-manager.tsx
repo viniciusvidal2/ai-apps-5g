@@ -27,7 +27,7 @@ export function ServiceLifecycleManager() {
       return;
     }
 
-    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003";
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const userId = session.user?.id || "00000000-0000-0000-0000-000000000001";
 
     const turnOnServices = async () => {
@@ -60,7 +60,7 @@ export function ServiceLifecycleManager() {
 
   // Store backend URL and session info in refs so they're accessible in cleanup
   const backendUrlRef = useRef<string>(
-    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003"
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
   );
   const userIdRef = useRef<string>(
     session?.user?.id || "00000000-0000-0000-0000-000000000001"
@@ -148,4 +148,3 @@ export function ServiceLifecycleManager() {
   // This component doesn't render anything
   return null;
 }
-

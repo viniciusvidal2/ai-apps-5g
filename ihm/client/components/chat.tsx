@@ -22,7 +22,6 @@ import { useArtifactSelector } from "@/hooks/use-artifact";
 import { useAutoResume } from "@/hooks/use-auto-resume";
 import { useChatVisibility } from "@/hooks/use-chat-visibility";
 import { chatModels } from "@/lib/ai/models";
-import { INITIAL_ASSISTANT_STATUS_LABEL } from "@/lib/assistant-activity";
 import { ChatSDKError } from "@/lib/errors";
 import { useSessionId } from "@/lib/session-context";
 import type { Attachment, ChatMessage } from "@/lib/types";
@@ -217,7 +216,7 @@ export function Chat({
     }
 
     const backendUrl =
-      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8003";
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const abortController = new AbortController();
 
     setRAGOptionState(createInitialRAGOptionState());
@@ -479,10 +478,6 @@ export function Chat({
   const [hasAppendedQuery, setHasAppendedQuery] = useState(false);
 
   useEffect(() => {
-    if (status === "submitted") {
-      setBackendStatusMessage(INITIAL_ASSISTANT_STATUS_LABEL);
-    }
-
     if (status !== "ready") {
       return;
     }
@@ -492,6 +487,41 @@ export function Chat({
     }, 800);
     return () => {
       window.clearTimeout(timeoutId);
+    };
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "submitted" && status !== "streaming") {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const refreshAssistantStatus = async () => {
+      try {
+        const response = await fetch("/api/ai-assistant/status", {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const nextStatus =
+          typeof data.status === "string" ? data.status.trim() : "";
+        if (nextStatus && !isCancelled) {
+          setBackendStatusMessage(nextStatus);
+        }
+      } catch {
+        // Keep the latest streamed status when the polling endpoint is unavailable.
+      }
+    };
+
+    refreshAssistantStatus();
+    const intervalId = window.setInterval(refreshAssistantStatus, 1000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [status]);
 

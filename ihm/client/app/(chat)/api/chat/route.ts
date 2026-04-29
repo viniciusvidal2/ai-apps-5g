@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     const collection_name = ragParams.collection_name ?? "none";
     const conversationSummary = existingChat?.conversationSummary ?? "";
 
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8003";
+    const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
     const backendResponse = await fetch(`${backendUrl}/inference`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

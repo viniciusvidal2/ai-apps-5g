@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { getAssistantActivityLabel } from "@/lib/assistant-activity";
 import { Shimmer } from "./elements/shimmer";
 import { SparklesIcon } from "./icons";
@@ -10,7 +11,45 @@ export function AssistantActivity({
 }: {
   statusMessage?: string;
 }) {
-  const activityLabel = getAssistantActivityLabel(statusMessage);
+  const [polledStatusMessage, setPolledStatusMessage] = useState(statusMessage);
+
+  useEffect(() => {
+    setPolledStatusMessage(statusMessage);
+  }, [statusMessage]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const refreshAssistantStatus = async () => {
+      try {
+        const response = await fetch("/api/ai-assistant/status", {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          return;
+        }
+        const data = await response.json();
+        const nextStatus =
+          typeof data.status === "string" ? data.status.trim() : "";
+        if (nextStatus && !isCancelled) {
+          setPolledStatusMessage(nextStatus);
+        }
+      } catch (error) {
+        console.warn("[AssistantActivity] status poll failed", error);
+        // Keep the latest visible status if the status endpoint is unavailable.
+      }
+    };
+
+    refreshAssistantStatus();
+    const intervalId = window.setInterval(refreshAssistantStatus, 1000);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const activityLabel = getAssistantActivityLabel(polledStatusMessage);
   if (!activityLabel) {
     return null;
   }

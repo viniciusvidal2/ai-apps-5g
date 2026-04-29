@@ -24,6 +24,7 @@ from ihm.server.modules.rest_api_client import (
     get_ai_assistant_collections,
     get_ai_assistant_conversation_summary,
     get_ai_assistant_health,
+    get_ai_assistant_status,
     stream_ai_assistant_inference,
 )
 from ihm.server.modules.services import (
@@ -87,6 +88,16 @@ def _runtime_request_context() -> tuple[str, str]:
     return (state.last_user_id or "1", "runtime-options")
 
 
+async def _latest_ai_assistant_status(fallback: str = "") -> str:
+    """Read the authoritative status from the AI Assistant agent when available."""
+    try:
+        status = await get_ai_assistant_status()
+        return status or fallback
+    except HTTPException as exc:
+        logger.warning("AI Assistant status fetch failed; using fallback: %s", exc.detail)
+        return fallback
+
+
 @router.get("/", response_model=HealthResponse)
 async def root() -> HealthResponse:
     """Return a simple response to confirm the server is alive."""
@@ -144,6 +155,15 @@ async def available_models() -> AvailableModelsResponse:
         if isinstance(model, str) and model.strip()
     ]
     return AvailableModelsResponse(available_models=models)
+
+
+@router.get("/ai_assistant/status")
+async def ai_assistant_status() -> Dict[str, str]:
+    """Proxy the current AI Assistant activity status from the agent on port 8001."""
+    if not USE_AI_ASSISTANT:
+        return {"status": "Modo mock ativo"}
+
+    return {"status": await get_ai_assistant_status()}
 
 
 @router.get(
@@ -326,7 +346,9 @@ async def _build_ai_assistant_stream(
                 "session_id": inference_request.session_id,
             }
 
-            ready_status = "Serviços prontos. Enviando consulta ao AI Assistant."
+            ready_status = await _latest_ai_assistant_status(
+                "Serviços prontos. Enviando consulta ao AI Assistant."
+            )
             logger.info(
                 "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
                 inference_request.session_id,
@@ -359,7 +381,9 @@ async def _build_ai_assistant_stream(
                         await asyncio.sleep(0)
 
                 elif msg_type == "status":
-                    status_text = str(msg.get("status") or msg.get("data", "")).strip()
+                    status_text = await _latest_ai_assistant_status(
+                        str(msg.get("status") or msg.get("data", "")).strip()
+                    )
                     if status_text:
                         logger.info(
                             "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",
@@ -376,7 +400,9 @@ async def _build_ai_assistant_stream(
                         )
 
                 elif msg_type == "complete":
-                    status_text = str(msg.get("status", "")).strip()
+                    status_text = await _latest_ai_assistant_status(
+                        str(msg.get("status", "")).strip()
+                    )
                     if status_text:
                         logger.info(
                             "INFERENCE STATUS OUT - session_id=%s user_id=%s status=%s",

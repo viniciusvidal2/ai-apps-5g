@@ -29,7 +29,10 @@ async def lifespan(app: FastAPI):
     sweeper_task: Optional[asyncio.Task[None]] = None
     try:
         if USE_AI_ASSISTANT:
-            await sweep_idle_sessions(source="startup_reconcile")
+            try:
+                await sweep_idle_sessions(source="startup_reconcile")
+            except Exception as exc:  # pragma: no cover - defensive startup
+                logger.warning("Startup AI Assistant reconciliation failed: %s", exc)
             sweeper_task = asyncio.create_task(_idle_session_sweeper())
         yield
     finally:

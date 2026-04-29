@@ -1,7 +1,6 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
-import equal from "fast-deep-equal";
 import { ArrowDownIcon } from "lucide-react";
-import { memo, useEffect } from "react";
+import { useEffect } from "react";
 import { useMessages } from "@/hooks/use-messages";
 import {
   getEffectiveAssistantStatusMessage,
@@ -103,7 +102,10 @@ function PureMessages({
           ))}
 
           {showAssistantActivity && (
-            <ThinkingMessage statusMessage={assistantActivityLabel} />
+            <ThinkingMessage
+              key={assistantActivityLabel}
+              statusMessage={assistantActivityLabel}
+            />
           )}
 
           <div
@@ -127,29 +129,4 @@ function PureMessages({
   );
 }
 
-export const Messages = memo(PureMessages, (prevProps, nextProps) => {
-  if (prevProps.isArtifactVisible && nextProps.isArtifactVisible) {
-    return true;
-  }
-
-  if (prevProps.status !== nextProps.status) {
-    return false;
-  }
-  if (prevProps.statusMessage !== nextProps.statusMessage) {
-    return false;
-  }
-  if (prevProps.selectedModelId !== nextProps.selectedModelId) {
-    return false;
-  }
-  if (prevProps.messages.length !== nextProps.messages.length) {
-    return false;
-  }
-  if (!equal(prevProps.messages, nextProps.messages)) {
-    return false;
-  }
-  if (prevProps.isReadonly !== nextProps.isReadonly) {
-    return false;
-  }
-
-  return true;
-});
+export const Messages = PureMessages;

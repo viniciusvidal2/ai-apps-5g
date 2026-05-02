@@ -15,7 +15,13 @@ logging.getLogger("ppocr").setLevel(logging.WARNING)
 
 class MedicalDocsOCR:
     def __init__(self, data_yaml_path: str) -> None:
-        """Class constructor to init the agent capabilities"""
+        """
+        Initializes the MedicalDocsOCR agent with OCR and classification capabilities.
+
+        Args:
+            data_yaml_path (str): Path to the YAML configuration file containing
+                the document class definitions.
+        """
         # Documents to be converted
         self.document_paths = []
         # Output folder for saving classified documents
@@ -38,10 +44,23 @@ class MedicalDocsOCR:
 
 
     def set_documents_to_process(self, document_paths: list) -> None:
+        """
+        Sets the list of document paths to be processed by the OCR pipeline.
+
+        Args:
+            document_paths (list): A list of file paths to the PDF documents to process.
+        """
         # Store the document paths for processing
         self.document_paths = document_paths
 
     def set_output_folder(self, output_folder: str) -> None:
+        """
+        Sets the output folder where classified documents will be saved.
+
+        Args:
+            output_folder (str): Path to the directory where classified documents
+                and their extracted text files will be written.
+        """
         # Store the output folder path for saving classified documents
         self.output_folder = output_folder
 
@@ -61,13 +80,31 @@ class MedicalDocsOCR:
 # region Internal methods
 
     def _read_yaml_into_classes(self, yaml_path: str) -> list:
+        """
+        Reads the YAML configuration file and extracts the document class names.
+
+        Args:
+            yaml_path (str): Path to the YAML file containing document class definitions.
+
+        Returns:
+            list: A list of document class name strings.
+        """
         # Read the yaml file and extract the document classes
         with open(yaml_path, "r") as file:
             data = yaml.safe_load(file)
             document_classes = data.get("document_classes", [])
             return [doc_class["name"] for doc_class in document_classes]
 
-    def _pdf_to_text_paddle(self, pages) -> list:
+    def _pdf_to_text_paddle(self, pages: list) -> list:
+        """
+        Extracts text from a list of page images using PaddleOCR.
+
+        Args:
+            pages (list): A list of PIL Image objects representing document pages.
+
+        Returns:
+            list: A list of strings, each containing the extracted text from one page.
+        """
         full_text = []
         for i, page in enumerate(pages):
             print(f"Processing page {i+1}/{len(pages)}")
@@ -84,7 +121,16 @@ class MedicalDocsOCR:
             full_text.append("\n".join(page_text))
         return full_text
 
-    def _pdf_to_text_llm(self, pages) -> list:
+    def _pdf_to_text_llm(self, pages: list) -> list:
+        """
+        Extracts text from a list of page images using the LLM-based OCR model.
+
+        Args:
+            pages (list): A list of PIL Image objects representing document pages.
+
+        Returns:
+            list: A list of strings, each containing the extracted text from one page.
+        """
         full_text = []
         for i, page in enumerate(pages):
             print(f"Processing page {i+1}/{len(pages)}")
@@ -111,11 +157,29 @@ class MedicalDocsOCR:
 
         return full_text
 
-    def _pdf_to_images(self, pdf_path) -> list:
+    def _pdf_to_images(self, pdf_path: str) -> list:
+        """
+        Converts a PDF file into a list of PIL Image objects, one per page.
+
+        Args:
+            pdf_path (str): Path to the PDF file to convert.
+
+        Returns:
+            list: A list of PIL Image objects representing each page of the PDF.
+        """
         # Convert PDF to a list of PIL images
         return convert_from_path(pdf_path, dpi=300)
 
     def _image_to_base64(self, img) -> str:
+        """
+        Converts a PIL Image to a base64-encoded JPEG string suitable for LLM API calls.
+
+        Args:
+            img: A PIL Image object to encode.
+
+        Returns:
+            str: A base64-encoded string of the image in JPEG format.
+        """
         img_np = np.array(img)
 
         # Ensure 3 channels (RGB)
@@ -136,6 +200,20 @@ class MedicalDocsOCR:
         return base64.b64encode(buffer).decode()
 
     def _improve_text_quality(self, paddle_text: str, llm_text: str) -> str:
+        """
+        Uses an LLM to merge and improve the text extracted by PaddleOCR and the LLM OCR.
+
+        Compares both extraction results, identifies discrepancies, and produces a
+        combined, higher-quality markdown version of the document text.
+
+        Args:
+            paddle_text (str): Text extracted by the PaddleOCR method.
+            llm_text (str): Text extracted by the LLM-based OCR method.
+
+        Returns:
+            str: The improved, merged text in markdown format. Falls back to the
+                longer of the two inputs if the LLM call fails.
+        """
         PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Voce é um assistente especializado em extrair texto de documentos médicos.\n"
              "Sua tarefa é analisar e comparar os resultados de extração de texto de dois métodos diferentes (Paddle OCR e LLM OCR) para o mesmo documento,"
@@ -169,6 +247,19 @@ class MedicalDocsOCR:
             return paddle_text if len(paddle_text) > len(llm_text) else llm_text
 
     def _classify_document(self, document_text: str) -> str:
+        """
+        Classifies a medical document based on its extracted text content.
+
+        Uses an LLM to analyse the document text and match it to one of the
+        configured document classes. Returns 'unknown' if no class matches or
+        if the LLM call fails.
+
+        Args:
+            document_text (str): The full extracted text of the document to classify.
+
+        Returns:
+            str: The matched document class name, or 'unknown' if unclassified.
+        """
         classes_prompt_section = "".join(
             [f"- {doc_class}\n" for doc_class in self.document_classes])
         # Placeholder for document classification logic (e.g., using an LLM or a trained classifier)
@@ -202,6 +293,13 @@ class MedicalDocsOCR:
             return "unknown"
 
     def _write_md_version(self, text: str, output_path: str) -> None:
+        """
+        Writes the provided text content to a markdown file at the specified path.
+
+        Args:
+            text (str): The text content to write to the file.
+            output_path (str): The full file path where the markdown file will be saved.
+        """
         # Write the improved text to a markdown file
         with open(output_path, "w") as file:
             file.write(text)
@@ -258,6 +356,19 @@ class MedicalDocsOCR:
         return documents_output
 
     def organize_documents(self, classified_documents: dict) -> None:
+        """
+        Organizes classified documents into subfolders based on their classification.
+
+        Creates a subfolder for each document class under the configured output folder,
+        copies each original PDF to the appropriate subfolder, and writes the extracted
+        text (paddle, LLM, and improved versions) as separate markdown files alongside it.
+        Unclassified documents are placed in an 'unclassified' subfolder.
+
+        Args:
+            classified_documents (dict): A dictionary mapping document names to their
+                classification results and extracted text, as returned by
+                :meth:`classify_documents`.
+        """
         # Create the subfolders for each class, if they are not there already
         print("Organizing documents into folders based on classification...")
         for document_class in self.document_classes:
@@ -302,7 +413,8 @@ class MedicalDocsOCR:
 # region Main execution
 
 
-def main():
+def main() -> None:
+    """Entry point demonstrating example usage of the MedicalDocsOCR pipeline."""
     # Example usage of the MedicalDocsOCR class
     ocr = MedicalDocsOCR(data_yaml_path=os.getenv(
         "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")

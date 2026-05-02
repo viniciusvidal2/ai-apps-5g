@@ -36,6 +36,7 @@ class MedicalDocsOCR:
 
 # region Sets
 
+
     def set_documents_to_process(self, document_paths: list) -> None:
         # Store the document paths for processing
         self.document_paths = document_paths
@@ -188,7 +189,8 @@ class MedicalDocsOCR:
         chain = PROMPT | self.classify_improve_llm
         try:
             print("Invoking LLM for document classification...")
-            response = chain.invoke({"text": document_text, "classes": classes_prompt_section})
+            response = chain.invoke(
+                {"text": document_text, "classes": classes_prompt_section})
             print(
                 f"LLM response received for document classification: {response.content}")
             for document_class in self.document_classes:
@@ -198,6 +200,11 @@ class MedicalDocsOCR:
         except Exception as e:
             print(f"Error classifying document with LLM: {e}")
             return "unknown"
+
+    def _write_md_version(self, text: str, output_path: str) -> None:
+        # Write the improved text to a markdown file
+        with open(output_path, "w") as file:
+            file.write(text)
 
 # endregion
 # region External methods
@@ -242,7 +249,9 @@ class MedicalDocsOCR:
             document_name = document_path.split("/")[-1]
             documents_output[document_name] = {
                 "classification": classification,
-                "extracted_text": improved_final_extracted_document_pages,
+                "extracted_text": improved_extracted_text,
+                "paddle_text": "\n".join(extracted_pages_paddle),
+                "llm_text": "\n".join(extracted_pages_llm),
                 "original_path": document_path
             }
 
@@ -276,6 +285,18 @@ class MedicalDocsOCR:
                 destination_folder = unknown_class_folder
             destination_path = os.path.join(destination_folder, document_name)
             shutil.copy2(original_path, destination_path)
+            # Also save the extracted text in markdown format in the same folder
+            md_paths_content = [
+                (os.path.join(destination_folder, document_name.replace(
+                    ".pdf", "_paddle.md")), info["paddle_text"]),
+                (os.path.join(destination_folder, document_name.replace(
+                    ".pdf", "_llm.md")), info["llm_text"]),
+                (os.path.join(destination_folder, document_name.replace(
+                    ".pdf", ".md")), info["extracted_text"]),
+            ]
+            for md_output_path, md_content in md_paths_content:
+                self._write_md_version(
+                    output_path=md_output_path, text=md_content)
 
 # endregion
 # region Main execution
@@ -287,11 +308,11 @@ def main():
         "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")
     # Set the documents to process (replace with actual paths)
     ocr.set_documents_to_process([
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_101607_fisioterapia.pdf",
-        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
+        #"/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102216_eletroencefalograma.pdf",
-        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
+        #"/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102937_psicosocial.pdf",
     ])
     ocr.set_output_folder(

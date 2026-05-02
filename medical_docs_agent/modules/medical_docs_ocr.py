@@ -140,7 +140,7 @@ class MedicalDocsOCR:
         Returns:
             list: A list of strings, each containing the extracted text from one page.
         """
-        full_text = []
+        retrieved_pages = []
         for i, page in enumerate(pages):
             print(f"Processing page {i+1}/{len(pages)}")
             # Convert PIL image to numpy array and predict text using Paddle OCR
@@ -153,8 +153,8 @@ class MedicalDocsOCR:
             for line in result[0]:
                 text = line[1][0]
                 page_text.append(text)
-            full_text.append("\n".join(page_text))
-        return full_text
+            retrieved_pages.append("\n".join(page_text))
+        return retrieved_pages
 
     def _pdf_to_text_llm(self, pages: list) -> list:
         """
@@ -166,7 +166,7 @@ class MedicalDocsOCR:
         Returns:
             list: A list of strings, each containing the extracted text from one page.
         """
-        full_text = []
+        retrieved_pages = []
         for i, page in enumerate(pages):
             print(f"Processing page {i+1}/{len(pages)}")
             # Convert PIL image to base64 string
@@ -185,12 +185,12 @@ class MedicalDocsOCR:
                         ]
                     }
                 ])
-                full_text.append(response.content)
+                retrieved_pages.append(response.content)
             except Exception as e:
                 print(f"Error processing page {i+1} with LLM OCR: {e}")
                 continue
 
-        return full_text
+        return retrieved_pages
 
     def _pdf_to_images(self, pdf_path: str) -> list:
         """

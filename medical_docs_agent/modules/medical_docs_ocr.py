@@ -38,10 +38,45 @@ class MedicalDocsOCR:
         self.classify_improve_llm = ChatOllama(model="gemma4:latest",
                                                base_url="http://localhost:11434",
                                                debug=False)
+        # Chain: merge and improve text extracted by both OCR methods
+        IMPROVE_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", "Voce é um assistente especializado em extrair texto de documentos médicos.\n"
+             "Sua tarefa é analisar e comparar os resultados de extração de texto de dois métodos diferentes (Paddle OCR e LLM OCR) para o mesmo documento,"
+             " identificar erros ou discrepâncias, e fornecer uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
+             " Não deixe faltar informações, e não as duplique.\n"
+             " Quando sentir que um dos documentos não está tão bem formatado quanto o outro para uma mesma versão, use a melhor formatação como saída.\n"
+             " A saída deve ser em formato markdown.\n"
+             " O objetivo é obter a versão mais precisa e completa possível do texto extraído do documento, corrigindo quaisquer erros e preenchendo as informações faltantes."),
+            ("user",
+             "Aqui estão os resultados de extração de texto para um documento médico:\n\n"
+             "Texto extraído pelo Paddle OCR:\n{paddle_text}\n\n"
+             "Texto extraído pelo LLM OCR:\n{llm_text}\n\n"
+             "Por favor, analise ambos os textos, identifique quaisquer erros ou discrepâncias, e forneça uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
+             "Certifique-se de não deixar faltar informações importantes e de não duplicar informações. \n"
+             "Use a melhor formatação disponível entre os dois métodos para a saída final. A saída deve ser em formato markdown.\n"
+             "NÃO RETORNE QUALQUER EXPLICAÇÃO OU PENSAMENTO, APENAS O TEXTO MELHORADO."
+             )
+        ])
+        self.improve_chain = IMPROVE_PROMPT | self.classify_improve_llm
+        # Chain: classify a document into one of the configured document classes
+        CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
+             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
+             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n"
+             "{classes_list}"
+             "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
+            ("user",
+             "Aqui está o texto extraído de um documento médico:\n\n"
+             "{text}\n\n"
+             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
+             "{classes_list}\n"
+             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
+             )
+        ])
+        self.classify_chain = CLASSIFY_PROMPT | self.classify_improve_llm
 
 
 # region Sets
-
 
     def set_documents_to_process(self, document_paths: list) -> None:
         """
@@ -185,7 +220,8 @@ class MedicalDocsOCR:
         if len(img_np.shape) == 2:
             img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2RGB)
         # Force consistent, reduced size
-        img_np = cv2.resize(img_np, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+        img_np = cv2.resize(img_np, None, fx=0.5, fy=0.5,
+                            interpolation=cv2.INTER_AREA)
         # Convert to BGR
         img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
         # Encode as JPEG (smaller + more stable)
@@ -208,28 +244,9 @@ class MedicalDocsOCR:
             str: The improved, merged text in markdown format. Falls back to the
                 longer of the two inputs if the LLM call fails.
         """
-        PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Voce é um assistente especializado em extrair texto de documentos médicos.\n"
-             "Sua tarefa é analisar e comparar os resultados de extração de texto de dois métodos diferentes (Paddle OCR e LLM OCR) para o mesmo documento,"
-             " identificar erros ou discrepâncias, e fornecer uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
-             " Não deixe faltar informações, e não as duplique.\n"
-             " Quando sentir que um dos documentos não está tão bem formatado quanto o outro para uma mesma versão, use a melhor formatação como saída.\n"
-             " A saída deve ser em formato markdown.\n"
-             " O objetivo é obter a versão mais precisa e completa possível do texto extraído do documento, corrigindo quaisquer erros e preenchendo as informações faltantes."),
-            ("user",
-             "Aqui estão os resultados de extração de texto para um documento médico:\n\n"
-             "Texto extraído pelo Paddle OCR:\n{paddle_text}\n\n"
-             "Texto extraído pelo LLM OCR:\n{llm_text}\n\n"
-             "Por favor, analise ambos os textos, identifique quaisquer erros ou discrepâncias, e forneça uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
-             "Certifique-se de não deixar faltar informações importantes e de não duplicar informações. \n"
-             "Use a melhor formatação disponível entre os dois métodos para a saída final. A saída deve ser em formato markdown.\n"
-             "NÃO RETORNE QUALQUER EXPLICAÇÃO OU PENSAMENTO, APENAS O TEXTO MELHORADO."
-             )
-        ])
-        chain = PROMPT | self.classify_improve_llm
         try:
             print("Invoking LLM to improve text quality...")
-            response = chain.invoke({
+            response = self.improve_chain.invoke({
                 "paddle_text": paddle_text,
                 "llm_text": llm_text
             })
@@ -254,28 +271,12 @@ class MedicalDocsOCR:
         Returns:
             str: The matched document class name, or 'unknown' if unclassified.
         """
-        classes_prompt_section = "".join(
-            [f"- {doc_class}\n" for doc_class in self.document_classes])
-        # Placeholder for document classification logic (e.g., using an LLM or a trained classifier)
-        PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
-             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
-             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n" +
-             "-" * 50 + "\n" + classes_prompt_section + "-" * 50 + "\n"
-             "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
-            ("user",
-             "Aqui está o texto extraído de um documento médico:\n\n"
-             "{text}\n\n"
-             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
-             "{classes}\n"
-             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
-             )
-        ])
-        chain = PROMPT | self.classify_improve_llm
+        classes_list = "-" * 50 + "\n" + "".join(
+            [f"- {doc_class}\n" for doc_class in self.document_classes]) + "-" * 50 + "\n"
         try:
             print("Invoking LLM for document classification...")
-            response = chain.invoke(
-                {"text": document_text, "classes": classes_prompt_section})
+            response = self.classify_chain.invoke(
+                {"text": document_text, "classes_list": classes_list})
             print(
                 f"LLM response received for document classification: {response.content}")
             for document_class in self.document_classes:
@@ -416,9 +417,9 @@ def main() -> None:
     ocr.set_documents_to_process([
         "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_101607_fisioterapia.pdf",
-        #"/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102216_eletroencefalograma.pdf",
-        #"/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
         # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102937_psicosocial.pdf",
     ])
     ocr.set_output_folder(

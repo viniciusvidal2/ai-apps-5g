@@ -181,22 +181,16 @@ class MedicalDocsOCR:
             str: A base64-encoded string of the image in JPEG format.
         """
         img_np = np.array(img)
-
         # Ensure 3 channels (RGB)
-        print(f"Original shape: {img_np.shape}")
         if len(img_np.shape) == 2:
             img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2RGB)
-
-        # Force consistent size (CRITICAL)
-        img_np = cv2.resize(img_np, (768, 768))
-
-        # Convert to BGR (OpenCV default)
+        # Force consistent, reduced size
+        img_np = cv2.resize(img_np, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_AREA)
+        # Convert to BGR
         img_np = cv2.cvtColor(img_np, cv2.COLOR_RGB2BGR)
-
         # Encode as JPEG (smaller + more stable)
         _, buffer = cv2.imencode(
             ".jpg", img_np, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-
         return base64.b64encode(buffer).decode()
 
     def _improve_text_quality(self, paddle_text: str, llm_text: str) -> str:

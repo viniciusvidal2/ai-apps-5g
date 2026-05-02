@@ -5,16 +5,23 @@ from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
 import numpy as np
 import base64
-import io
+import os
+import yaml
+import shutil
+import logging
 
-import requests
+logging.getLogger("ppocr").setLevel(logging.WARNING)
 
 
 class MedicalDocsOCR:
-    def __init__(self) -> None:
+    def __init__(self, data_yaml_path: str) -> None:
         """Class constructor to init the agent capabilities"""
         # Documents to be converted
         self.document_paths = []
+        # Output folder for saving classified documents
+        self.output_folder = ""
+        # Classes to classify the objects
+        self.document_classes = self._read_yaml_into_classes(data_yaml_path)
         # OCR model initialization
         self.ocr_paddle = PaddleOCR(use_angle_cls=True, lang='pt')
         # OCR using LLM model from ollama with langchain
@@ -33,6 +40,10 @@ class MedicalDocsOCR:
         # Store the document paths for processing
         self.document_paths = document_paths
 
+    def set_output_folder(self, output_folder: str) -> None:
+        # Store the output folder path for saving classified documents
+        self.output_folder = output_folder
+
 #  endregion
 # region Gets
 
@@ -48,6 +59,13 @@ class MedicalDocsOCR:
 # endregion
 # region Internal methods
 
+    def _read_yaml_into_classes(self, yaml_path: str) -> list:
+        # Read the yaml file and extract the document classes
+        with open(yaml_path, "r") as file:
+            data = yaml.safe_load(file)
+            document_classes = data.get("document_classes", [])
+            return [doc_class["name"] for doc_class in document_classes]
+
     def _pdf_to_text_paddle(self, pages) -> list:
         full_text = []
         for i, page in enumerate(pages):
@@ -55,7 +73,6 @@ class MedicalDocsOCR:
             # Convert PIL image to numpy array and predict text using Paddle OCR
             image = np.array(page)
             result = self.ocr_paddle.ocr(image)
-            print(f"OCR result for page {i+1}: {result}")
             if result[0] is None or len(result[0]) == 0:
                 print(f"No text found on page {i+1}")
                 continue
@@ -126,19 +143,23 @@ class MedicalDocsOCR:
              " Quando sentir que um dos documentos não está tão bem formatado quanto o outro para uma mesma versão, use a melhor formatação como saída.\n"
              " A saída deve ser em formato markdown.\n"
              " O objetivo é obter a versão mais precisa e completa possível do texto extraído do documento, corrigindo quaisquer erros e preenchendo as informações faltantes."),
-            ("user", PromptTemplate.from_template(
-                "Aqui estão os resultados de extração de texto para um documento médico:\n\n"
-                "Texto extraído pelo Paddle OCR:\n{paddle_text}\n\n"
-                "Texto extraído pelo LLM OCR:\n{llm_text}\n\n"
-                "Por favor, analise ambos os textos, identifique quaisquer erros ou discrepâncias, e forneça uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
-                "Certifique-se de não deixar faltar informações importantes e de não duplicar informações. \n"
-                "Use a melhor formatação disponível entre os dois métodos para a saída final. A saída deve ser em formato markdown.\n"
-                "NÃO RETORNE QUALQUER EXPLICAÇÃO OU PENSAMENTO, APENAS O TEXTO MELHORADO."
-            ).format(paddle_text=paddle_text, llm_text=llm_text))
+            ("user",
+             "Aqui estão os resultados de extração de texto para um documento médico:\n\n"
+             "Texto extraído pelo Paddle OCR:\n{paddle_text}\n\n"
+             "Texto extraído pelo LLM OCR:\n{llm_text}\n\n"
+             "Por favor, analise ambos os textos, identifique quaisquer erros ou discrepâncias, e forneça uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
+             "Certifique-se de não deixar faltar informações importantes e de não duplicar informações. \n"
+             "Use a melhor formatação disponível entre os dois métodos para a saída final. A saída deve ser em formato markdown.\n"
+             "NÃO RETORNE QUALQUER EXPLICAÇÃO OU PENSAMENTO, APENAS O TEXTO MELHORADO."
+             )
         ])
+        chain = PROMPT | self.classify_improve_llm
         try:
             print("Invoking LLM to improve text quality...")
-            response = self.classify_improve_llm.invoke(PROMPT)
+            response = chain.invoke({
+                "paddle_text": paddle_text,
+                "llm_text": llm_text
+            })
             print("LLM response received for text improvement.")
             return response.content
         except Exception as e:
@@ -146,27 +167,37 @@ class MedicalDocsOCR:
             # Fallback: return the longer text if there's an error
             return paddle_text if len(paddle_text) > len(llm_text) else llm_text
 
-    def _classify_document(self, text: str) -> str:
+    def _classify_document(self, document_text: str) -> str:
+        classes_prompt_section = "".join(
+            [f"- {doc_class}\n" for doc_class in self.document_classes])
         # Placeholder for document classification logic (e.g., using an LLM or a trained classifier)
         PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual. "
-             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele, como 'Relatório Médico', 'Prescrição', 'Laudo de Exame', etc. "
-             "Considere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
-            ("user", PromptTemplate.from_template(
-                "Aqui está o texto extraído de um documento médico:\n\n"
-                "{text}\n\n"
-                "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento (por exemplo, 'Relatório Médico', 'Prescrição', 'Laudo de Exame', etc.).\n"
-                "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
-            ).format(text=text))
+            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
+             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
+             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n" +
+             "-" * 50 + "\n" + classes_prompt_section + "-" * 50 + "\n"
+             "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
+            ("user",
+             "Aqui está o texto extraído de um documento médico:\n\n"
+             "{text}\n\n"
+             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
+             "{classes}\n"
+             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
+             )
         ])
+        chain = PROMPT | self.classify_improve_llm
         try:
             print("Invoking LLM for document classification...")
-            response = self.classify_improve_llm.invoke(PROMPT)
-            print("LLM response received for document classification.")
-            return response.content.strip()
+            response = chain.invoke({"text": document_text, "classes": classes_prompt_section})
+            print(
+                f"LLM response received for document classification: {response.content}")
+            for document_class in self.document_classes:
+                if document_class.lower() in response.content.lower():
+                    return document_class
+            return "unknown"
         except Exception as e:
             print(f"Error classifying document with LLM: {e}")
-            return "Classificação Desconhecida"
+            return "unknown"
 
 # endregion
 # region External methods
@@ -202,13 +233,9 @@ class MedicalDocsOCR:
                 print(f"Improving text quality for page {j+1}...")
                 improved_text = self._improve_text_quality(
                     paddle_text, llm_text)
-                print(
-                    f"Final extracted text for page {j+1}:\n{improved_text}\n")
                 improved_final_extracted_document_pages.append(improved_text)
             improved_extracted_text = "\n".join(
                 improved_final_extracted_document_pages)
-            print(
-                f"Final extracted text for document {i+1}:\n{improved_extracted_text}\n")
             # Run the classification model on the extracted text to get the document classification
             classification = self._classify_document(improved_extracted_text)
             # Create the output dictionary for the current document
@@ -221,18 +248,61 @@ class MedicalDocsOCR:
 
         return documents_output
 
+    def organize_documents(self, classified_documents: dict) -> None:
+        # Create the subfolders for each class, if they are not there already
+        print("Organizing documents into folders based on classification...")
+        for document_class in self.document_classes:
+            class_folder = os.path.join(
+                self.output_folder, document_class)
+            if not os.path.exists(class_folder):
+                os.makedirs(class_folder)
+        # Create a subfolder for unclassified documents, if it doesn't exist
+        unknown_class_folder = os.path.join(
+            self.output_folder, "unclassified")
+        if not os.path.exists(unknown_class_folder):
+            os.makedirs(unknown_class_folder)
+
+        # Move the documents to the respective folders according to their classification
+        print("Moving documents to respective folders...")
+        for document_name, info in classified_documents.items():
+            classification = info["classification"]
+            original_path = info["original_path"]
+            print(
+                f"Document: {document_name} | Classification: {classification}")
+            if classification in self.document_classes:
+                destination_folder = os.path.join(
+                    self.output_folder, classification)
+            else:
+                destination_folder = unknown_class_folder
+            destination_path = os.path.join(destination_folder, document_name)
+            shutil.copy2(original_path, destination_path)
+
 # endregion
+# region Main execution
 
 
 def main():
     # Example usage of the MedicalDocsOCR class
-    ocr = MedicalDocsOCR()
+    ocr = MedicalDocsOCR(data_yaml_path=os.getenv(
+        "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")
     # Set the documents to process (replace with actual paths)
-    ocr.set_documents_to_process(
-        ["/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf"])
+    ocr.set_documents_to_process([
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_101607_fisioterapia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102216_eletroencefalograma.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
+        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102937_psicosocial.pdf",
+    ])
+    ocr.set_output_folder(
+        "/home/vini/Desktop/5g_medical_docs/trials/classified_docs")
     # Classify the documents
-    ocr.classify_documents()
+    classified_documents = ocr.classify_documents()
+    # Organize the documents in folders according to their classes
+    ocr.organize_documents(classified_documents)
 
 
 if __name__ == "__main__":
     main()
+
+# endregion

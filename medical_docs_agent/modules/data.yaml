@@ -1,0 +1,13 @@
+document_classes:
+  - name: "fisioterapia"
+    description: "Documents related to physiotherapy, including patient records,
+      test results, and medical reports."
+  - name: "cardiologia"
+    description: "Documents related to cardiology, including patient records, test
+      results, and medical reports."
+  - name: "eletroencefalograma"
+    description: "Documents related to electrophysiology, including patient records,
+      test results, and medical reports."
+  - name: "psicosocial"
+    description: "Documents related to psicosocial, including patient records, test
+      results, and medical reports."

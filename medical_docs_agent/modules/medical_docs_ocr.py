@@ -1,9 +1,9 @@
-import cv2
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCRVL, PaddleOCR
 from pdf2image import convert_from_path
 from langchain_ollama import ChatOllama
-from langchain_core.prompts import ChatPromptTemplate, PromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 import numpy as np
+import cv2
 import base64
 import os
 import yaml
@@ -29,7 +29,13 @@ class MedicalDocsOCR:
         # Classes to classify the objects
         self.document_classes = self._read_yaml_into_classes(data_yaml_path)
         # OCR model initialization
-        self.ocr_paddle = PaddleOCR(use_angle_cls=True, lang='pt')
+        # self.ocr_paddle_vl = PaddleOCRVL(use_doc_orientation_classify=False,
+        #                                  use_doc_unwarping=False,
+        #                                  use_layout_detection=False)
+        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=False,
+                                          use_doc_unwarping=False,
+                                          use_textline_orientation=False,
+                                          lang="en")
         # OCR using LLM model from ollama with langchain
         self.ocr_llm = ChatOllama(model="glm-ocr:latest",
                                   base_url="http://localhost:11434",
@@ -130,31 +136,38 @@ class MedicalDocsOCR:
             document_classes = data.get("document_classes", [])
             return [doc_class["name"] for doc_class in document_classes]
 
-    def _pdf_to_text_paddle(self, pages: list) -> list:
+    def _pdf_to_text_paddle(self, images: list, type: str) -> list:
         """
         Extracts text from a list of page images using PaddleOCR.
 
         Args:
-            pages (list): A list of PIL Image objects representing document pages.
+            images (list): A list of PIL Image objects representing document pages.
+            type (str): The type of OCR to use. Either "paddle_vl" for the PaddleOCRVL model or "paddle_basic" for the basic PaddleOCR model.
 
         Returns:
             list: A list of strings, each containing the extracted text from one page.
         """
-        retrieved_pages = []
-        for i, page in enumerate(pages):
-            print(f"Processing page {i+1}/{len(pages)}")
-            # Convert PIL image to numpy array and predict text using Paddle OCR
-            image = np.array(page)
-            result = self.ocr_paddle.ocr(image)
-            if result[0] is None or len(result[0]) == 0:
-                print(f"No text found on page {i+1}")
-                continue
-            page_text = []
-            for line in result[0]:
-                text = line[1][0]
-                page_text.append(text)
-            retrieved_pages.append("\n".join(page_text))
-        return retrieved_pages
+        pages = []
+        for i, img in enumerate(images):
+            print(
+                f"Processing page {i+1}/{len(images)} with Paddle OCR ({type})...")
+            if type == "paddle_vl":
+                # ocr_result = self.ocr_paddle_vl.predict(input=img)
+                # pages_res = list(ocr_result)
+                # output = self.ocr_paddle_vl.restructure_pages(pages_res)
+                # pages.extend([page.markdown["markdown_texts"] for page in output])
+                pass
+            elif type == "paddle_basic":
+                ocr_result = self.ocr_paddle_basic.predict(img)
+                pages_texts = []
+                for page in ocr_result:
+                    page_text = "\n".join([line[1][0] for line in page])
+                    pages_texts.append(page_text)
+                pages.extend(pages_texts)
+            else:
+                raise ValueError(
+                    "Invalid OCR type specified. Use 'paddle_vl' or 'paddle_basic'.")
+        return pages
 
     def _pdf_to_text_llm(self, pages: list) -> list:
         """
@@ -189,33 +202,35 @@ class MedicalDocsOCR:
             except Exception as e:
                 print(f"Error processing page {i+1} with LLM OCR: {e}")
                 continue
-
         return retrieved_pages
 
     def _pdf_to_images(self, pdf_path: str) -> list:
         """
-        Converts a PDF file into a list of PIL Image objects, one per page.
+        Converts a PDF file into a list of numpy arrays, one per page.
 
         Args:
             pdf_path (str): Path to the PDF file to convert.
 
         Returns:
-            list: A list of PIL Image objects representing each page of the PDF.
+            list: A list of numpy arrays representing each page of the PDF.
         """
         # Convert PDF to a list of PIL images
-        return convert_from_path(pdf_path, dpi=300)
+        images_pil = convert_from_path(pdf_path, dpi=150)
+        # Convert PIL images to numpy arrays
+        images_np = [np.array(img) for img in images_pil]
+        return images_np
 
-    def _image_to_base64(self, img) -> str:
+    def _image_to_base64(self, img: np.ndarray) -> str:
         """
-        Converts a PIL Image to a base64-encoded JPEG string suitable for LLM API calls.
+        Converts a NumPy array representing an image to a base64-encoded JPEG string suitable for LLM API calls.
 
         Args:
-            img: A PIL Image object to encode.
+            img: A NumPy array representing the image to encode.
 
         Returns:
             str: A base64-encoded string of the image in JPEG format.
         """
-        img_np = np.array(img)
+        img_np = img.copy() if isinstance(img, np.ndarray) else np.array(img)
         # Ensure 3 channels (RGB)
         if len(img_np.shape) == 2:
             img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2RGB)
@@ -296,7 +311,7 @@ class MedicalDocsOCR:
             output_path (str): The full file path where the markdown file will be saved.
         """
         # Write the improved text to a markdown file
-        with open(output_path, "w") as file:
+        with open(output_path, "w", encoding="utf-8") as file:
             file.write(text)
 
 # endregion
@@ -315,14 +330,15 @@ class MedicalDocsOCR:
         # Process each document in the list of document paths
         documents_output = {}
         for i, document_path in enumerate(self.document_paths):
-            # Convert the PDF to images
             print(
                 f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
+            # Convert the PDF to images
             pages_images = self._pdf_to_images(document_path)
             # Extract text using the Paddle OCR method
             print(
                 f"Extracting text from {len(pages_images)} pages with paddle OCR...")
-            extracted_pages_paddle = self._pdf_to_text_paddle(pages_images)
+            extracted_pages_paddle = self._pdf_to_text_paddle(
+                pages_images, type="paddle_basic")
             # Extract text using the LLM-based OCR method
             print(
                 f"Extracting text from {len(pages_images)} pages with LLM OCR...")

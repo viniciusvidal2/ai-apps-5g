@@ -32,9 +32,9 @@ class MedicalDocsOCR:
         # self.ocr_paddle_vl = PaddleOCRVL(use_doc_orientation_classify=False,
         #                                  use_doc_unwarping=False,
         #                                  use_layout_detection=False)
-        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=False,
+        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=True,
                                           use_doc_unwarping=False,
-                                          use_textline_orientation=False,
+                                          use_textline_orientation=True,
                                           lang="en")
         # OCR using LLM model from ollama with langchain
         self.ocr_llm = ChatOllama(model="glm-ocr:latest",
@@ -159,11 +159,8 @@ class MedicalDocsOCR:
                 pass
             elif type == "paddle_basic":
                 ocr_result = self.ocr_paddle_basic.predict(img)
-                pages_texts = []
-                for page in ocr_result:
-                    page_text = "\n".join([line[1][0] for line in page])
-                    pages_texts.append(page_text)
-                pages.extend(pages_texts)
+                texts = ocr_result[0]['rec_texts']  # recognized text strings
+                pages.append("\n".join(texts) + "\n\n")
             else:
                 raise ValueError(
                     "Invalid OCR type specified. Use 'paddle_vl' or 'paddle_basic'.")

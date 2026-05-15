@@ -87,7 +87,7 @@ def test_job_status(job_id: str) -> None:
     print(f"Polling status for job ID: {job_id}")
     status = ""
     while status != "completed":
-        response = httpx.get(f"{BASE_URL}/ocr/status/{job_id}")
+        response = httpx.get(f"{BASE_URL}/ocr/status/{job_id}", timeout=20.0)
         assert response.status_code == 200
         data = response.json()
         

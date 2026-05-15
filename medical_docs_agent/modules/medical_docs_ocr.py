@@ -25,6 +25,7 @@ import base64
 import yaml
 import shutil
 import logging
+import threading
 
 logging.getLogger("ppocr").setLevel(logging.WARNING)
 
@@ -61,6 +62,9 @@ class MedicalDocsOCR:
         self.classifier_llm = ChatOllama(model="gemma4:e2b",
                                          base_url="http://localhost:11434",
                                          debug=False)
+        # Status and results for threaded execution
+        self.status = "idle"
+        self.results = {}
         # Chain: classify a document into one of the configured document classes
         CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
@@ -140,6 +144,24 @@ class MedicalDocsOCR:
              )
         ])
         self.classify_chain = CLASSIFY_PROMPT | self.classifier_llm
+
+    def get_status(self) -> str:
+        """
+        Returns the current status of the OCR and classification pipeline.
+
+        Returns:
+            str: The current status ("idle", "running", "completed", "failed").
+        """
+        return self.status
+
+    def get_results(self) -> dict:
+        """
+        Returns the classification results.
+
+        Returns:
+            dict: The classification results.
+        """
+        return self.results
 
 #  endregion
 # region Gets
@@ -321,50 +343,68 @@ class MedicalDocsOCR:
 
 # endregion
 # region External methods
-    def classify_documents(self) -> dict:
+    def classify_documents(self) -> None:
         """
-        Classifies the documents based on their content.
-
-        Returns:
-            dict: A dictionary containing the classification results for each document.
+        Starts the classification process in a separate thread.
+        Sets the status to 'running'.
         """
         if not self.document_paths:
             print("No documents to process.")
-            return {}
+            self.status = "idle"
+            return
 
-        # Process each document in the list of document paths
-        documents_output = {}
-        for i, document_path in enumerate(self.document_paths):
-            print(
-                f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
-            # Convert the PDF to images
-            pages_images = self._pdf_to_images(document_path)
+        self.status = "running"
+        self.results = {}
+        
+        # Start the worker thread
+        worker_thread = threading.Thread(target=self._run_classification_worker)
+        worker_thread.start()
+        print("Classification worker started in a separate thread.")
 
-            extracted_text = ""
-            if self.ocr_method == "paddle":
+    def _run_classification_worker(self) -> None:
+        """
+        The actual worker function that runs the OCR and classification pipeline.
+        Updates self.status and self.results upon completion or failure.
+        """
+        try:
+            # Process each document in the list of document paths
+            documents_output = {}
+            for i, document_path in enumerate(self.document_paths):
                 print(
-                    f"Extracting text from {len(pages_images)} pages with paddle OCR...")
-                extracted_pages = self._pdf_to_text_paddle(
-                    pages_images, type="paddle_basic")
-                extracted_text = "\n".join(extracted_pages)
-            elif self.ocr_method == "llm":
-                print(
-                    f"Extracting text from {len(pages_images)} pages with LLM OCR...")
-                extracted_pages = self._pdf_to_text_llm(pages_images)
-                extracted_text = "\n".join(extracted_pages)
+                    f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
+                # Convert the PDF to images
+                pages_images = self._pdf_to_images(document_path)
 
-            # Run the classification model on the extracted text
-            classification = self._classify_document(extracted_text)
+                extracted_text = ""
+                if self.ocr_method == "paddle":
+                    print(
+                        f"Extracting text from {len(pages_images)} pages with paddle OCR...")
+                    extracted_pages = self._pdf_to_text_paddle(
+                        pages_images, type="paddle_basic")
+                    extracted_text = "\n".join(extracted_pages)
+                elif self.ocr_method == "llm":
+                    print(
+                        f"Extracting text from {len(pages_images)} pages with LLM OCR...")
+                    extracted_pages = self._pdf_to_text_llm(pages_images)
+                    extracted_text = "\n".join(extracted_pages)
 
-            # Create the output dictionary for the current document
-            document_name = document_path.split("/")[-1]
-            documents_output[document_name] = {
-                "classification": classification,
-                "extracted_text": extracted_text,
-                "original_path": document_path
-            }
+                # Run the classification model on the extracted text
+                classification = self._classify_document(extracted_text)
 
-        return documents_output
+                # Create the output dictionary for the current document
+                document_name = document_path.split("/")[-1]
+                documents_output[document_name] = {
+                    "classification": classification,
+                    "extracted_text": extracted_text,
+                    "original_path": document_path
+                }
+
+            self.results = documents_output
+            self.status = "completed"
+            print("Classification worker finished successfully.")
+        except Exception as e:
+            print(f"Classification worker failed: {e}")
+            self.status = "failed"
 
     def organize_documents(self, classified_documents: dict) -> None:
         """
@@ -439,10 +479,19 @@ def main() -> None:
         "/home/vini/Desktop/5g_medical_docs/trials/classified_docs")
 
     # Classify the documents
-    classified_documents = ocr.classify_documents()
+    ocr.classify_documents()
     
-    # Organize the documents in folders according to their classes
-    ocr.organize_documents(classified_documents)
+    # Wait for the classification to finish
+    import time
+    while ocr.get_status() == "running":
+        print(f"Waiting for classification... Status: {ocr.get_status()}")
+        time.sleep(2)
+    
+    if ocr.get_status() == "completed":
+        # Organize the documents in folders according to their classes
+        ocr.organize_documents(ocr.get_results())
+    else:
+        print(f"Classification failed with status: {ocr.get_status()}")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from fastapi import FastAPI, BackgroundTasks, Request
 from contextlib import asynccontextmanager
 import uvicorn
 from uuid import uuid4
+import time
 from modules.medical_docs_ocr import MedicalDocsOCR
 from schemas import AppConfig, MedicalDocsInferenceRequest
 
@@ -98,6 +99,13 @@ def create_agent(config: AppConfig) -> FastAPI:
         """
         try:
             agent = app.state.ocr_agent
+            
+            # Ensure the agent is not already busy
+            if agent.get_status() == "running":
+                print(f"Job {job_id}: Agent is already busy. Waiting for previous job to finish...")
+                while agent.get_status() == "running":
+                    time.sleep(2)
+
             # Update agent settings based on payload
             if payload.ocr_method:
                 agent.set_ocr_method(payload.ocr_method)
@@ -106,19 +114,35 @@ def create_agent(config: AppConfig) -> FastAPI:
             
             agent.set_documents_to_process(payload.document_paths)
             
-            # Step 1: Classify documents
-            print(f"Job {job_id}: Starting classification...")
-            results = agent.classify_documents()
+            # Step 1: Start classification (now runs in its own internal thread)
+            print(f"Job {job_id}: Starting classification worker...")
+            agent.classify_documents()
             
-            # Step 2: Organize documents in folders
-            print(f"Job {job_id}: Organizing documents...")
-            agent.organize_documents(results)
+            # Step 2: Poll agent status constantly
+            while True:
+                current_status = agent.get_status()
+                app.state.job_store[job_id]["status"] = current_status
+                
+                if current_status == "completed":
+                    print(f"Job {job_id}: Classification completed.")
+                    results = agent.get_results()
+                    
+                    # Step 3: Organize documents in folders
+                    print(f"Job {job_id}: Organizing documents...")
+                    agent.organize_documents(results)
+                    
+                    # Update job store with final results
+                    app.state.job_store[job_id].update({
+                        "status": "completed",
+                        "results": results
+                    })
+                    break
+                elif current_status == "failed":
+                    raise Exception("Classification worker failed internally.")
+                
+                # Keep polling
+                time.sleep(1)
             
-            # Update job store with results
-            app.state.job_store[job_id].update({
-                "status": "completed",
-                "results": results
-            })
             print(f"Job {job_id}: Finished successfully.")
             
         except Exception as e:

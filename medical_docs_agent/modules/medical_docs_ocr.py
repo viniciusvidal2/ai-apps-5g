@@ -1,11 +1,27 @@
-from paddleocr import PaddleOCRVL, PaddleOCR
+import os
+
+
+# MUST come before importing paddle/paddleocr
+os.environ["FLAGS_enable_pir_api"] = "0"
+os.environ["FLAGS_enable_pir_in_executor"] = "0"
+os.environ["FLAGS_use_pir_api"] = "0"
+os.environ["FLAGS_use_cinn"] = "0"
+os.environ["FLAGS_use_mkldnn"] = "0"
+
+# Optional but helps
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+
+import paddle
+paddle.enable_static()
+
+from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 import numpy as np
 import cv2
 import base64
-import os
 import yaml
 import shutil
 import logging
@@ -29,41 +45,22 @@ class MedicalDocsOCR:
         # Classes to classify the objects
         self.document_classes = self._read_yaml_into_classes(data_yaml_path)
         # OCR model initialization
-        # self.ocr_paddle_vl = PaddleOCRVL(use_doc_orientation_classify=False,
-        #                                  use_doc_unwarping=False,
-        #                                  use_layout_detection=False)
-        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=True,
+        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=False,
                                           use_doc_unwarping=False,
-                                          use_textline_orientation=True,
-                                          lang="en")
+                                          use_textline_orientation=False,
+                                          lang="en",
+                                          enable_mkldnn=False,
+                                          device="cpu")
         # OCR using LLM model from ollama with langchain
         self.ocr_llm = ChatOllama(model="glm-ocr:latest",
                                   base_url="http://localhost:11434",
                                   debug=False)
+        # Default OCR method
+        self.ocr_method = "paddle"  # options: "paddle", "llm"
         # Document classification model from ollama with langchain
-        self.classify_improve_llm = ChatOllama(model="gemma4:latest",
-                                               base_url="http://localhost:11434",
-                                               debug=False)
-        # Chain: merge and improve text extracted by both OCR methods
-        IMPROVE_PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Voce é um assistente especializado em extrair texto de documentos médicos.\n"
-             "Sua tarefa é analisar e comparar os resultados de extração de texto de dois métodos diferentes (Paddle OCR e LLM OCR) para o mesmo documento,"
-             " identificar erros ou discrepâncias, e fornecer uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
-             " Não deixe faltar informações, e não as duplique.\n"
-             " Quando sentir que um dos documentos não está tão bem formatado quanto o outro para uma mesma versão, use a melhor formatação como saída.\n"
-             " A saída deve ser em formato markdown.\n"
-             " O objetivo é obter a versão mais precisa e completa possível do texto extraído do documento, corrigindo quaisquer erros e preenchendo as informações faltantes."),
-            ("user",
-             "Aqui estão os resultados de extração de texto para um documento médico:\n\n"
-             "Texto extraído pelo Paddle OCR:\n{paddle_text}\n\n"
-             "Texto extraído pelo LLM OCR:\n{llm_text}\n\n"
-             "Por favor, analise ambos os textos, identifique quaisquer erros ou discrepâncias, e forneça uma versão melhorada do texto extraído que combine os pontos fortes de ambos os métodos.\n"
-             "Certifique-se de não deixar faltar informações importantes e de não duplicar informações. \n"
-             "Use a melhor formatação disponível entre os dois métodos para a saída final. A saída deve ser em formato markdown.\n"
-             "NÃO RETORNE QUALQUER EXPLICAÇÃO OU PENSAMENTO, APENAS O TEXTO MELHORADO."
-             )
-        ])
-        self.improve_chain = IMPROVE_PROMPT | self.classify_improve_llm
+        self.classifier_llm = ChatOllama(model="gemma4:e2b",
+                                         base_url="http://localhost:11434",
+                                         debug=False)
         # Chain: classify a document into one of the configured document classes
         CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
@@ -79,7 +76,7 @@ class MedicalDocsOCR:
              "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
              )
         ])
-        self.classify_chain = CLASSIFY_PROMPT | self.classify_improve_llm
+        self.classify_chain = CLASSIFY_PROMPT | self.classifier_llm
 
 
 # region Sets
@@ -104,6 +101,45 @@ class MedicalDocsOCR:
         """
         # Store the output folder path for saving classified documents
         self.output_folder = output_folder
+
+    def set_ocr_method(self, method: str) -> None:
+        """
+        Sets the OCR method to be used.
+
+        Args:
+            method (str): The OCR method to use. Either "paddle" or "llm".
+        """
+        if method not in ["paddle", "llm"]:
+            raise ValueError("Invalid OCR method. Use 'paddle' or 'llm'.")
+        self.ocr_method = method
+
+    def set_classification_model(self, model_name: str) -> None:
+        """
+        Sets the LLM model to be used for document classification.
+
+        Args:
+            model_name (str): The name of the LLM model to use for classification.
+                This should correspond to a model available in the Ollama server.
+        """
+        self.classifier_llm = ChatOllama(model=model_name,
+                                         base_url="http://localhost:11434",
+                                         debug=False)
+        # Update the classify chain with the new model
+        CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
+             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
+             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n"
+             "{classes_list}"
+             "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
+            ("user",
+             "Aqui está o texto extraído de um documento médico:\n\n"
+             "{text}\n\n"
+             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
+             "{classes_list}\n"
+             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
+             )
+        ])
+        self.classify_chain = CLASSIFY_PROMPT | self.classifier_llm
 
 #  endregion
 # region Gets
@@ -241,34 +277,6 @@ class MedicalDocsOCR:
             ".jpg", img_np, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
         return base64.b64encode(buffer).decode()
 
-    def _improve_text_quality(self, paddle_text: str, llm_text: str) -> str:
-        """
-        Uses an LLM to merge and improve the text extracted by PaddleOCR and the LLM OCR.
-
-        Compares both extraction results, identifies discrepancies, and produces a
-        combined, higher-quality markdown version of the document text.
-
-        Args:
-            paddle_text (str): Text extracted by the PaddleOCR method.
-            llm_text (str): Text extracted by the LLM-based OCR method.
-
-        Returns:
-            str: The improved, merged text in markdown format. Falls back to the
-                longer of the two inputs if the LLM call fails.
-        """
-        try:
-            print("Invoking LLM to improve text quality...")
-            response = self.improve_chain.invoke({
-                "paddle_text": paddle_text,
-                "llm_text": llm_text
-            })
-            print("LLM response received for text improvement.")
-            return response.content
-        except Exception as e:
-            print(f"Error improving text quality with LLM: {e}")
-            # Fallback: return the longer text if there's an error
-            return paddle_text if len(paddle_text) > len(llm_text) else llm_text
-
     def _classify_document(self, document_text: str) -> str:
         """
         Classifies a medical document based on its extracted text content.
@@ -331,33 +339,28 @@ class MedicalDocsOCR:
                 f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
             # Convert the PDF to images
             pages_images = self._pdf_to_images(document_path)
-            # Extract text using the Paddle OCR method
-            print(
-                f"Extracting text from {len(pages_images)} pages with paddle OCR...")
-            extracted_pages_paddle = self._pdf_to_text_paddle(
-                pages_images, type="paddle_basic")
-            # Extract text using the LLM-based OCR method
-            print(
-                f"Extracting text from {len(pages_images)} pages with LLM OCR...")
-            extracted_pages_llm = self._pdf_to_text_llm(pages_images)
-            # Pass the text for each extracted page to the improvement/merger model
-            improved_final_extracted_document_pages = []
-            for j, (paddle_text, llm_text) in enumerate(zip(extracted_pages_paddle, extracted_pages_llm)):
-                print(f"Improving text quality for page {j+1}...")
-                improved_text = self._improve_text_quality(
-                    paddle_text, llm_text)
-                improved_final_extracted_document_pages.append(improved_text)
-            improved_extracted_text = "\n".join(
-                improved_final_extracted_document_pages)
-            # Run the classification model on the extracted text to get the document classification
-            classification = self._classify_document(improved_extracted_text)
+
+            extracted_text = ""
+            if self.ocr_method == "paddle":
+                print(
+                    f"Extracting text from {len(pages_images)} pages with paddle OCR...")
+                extracted_pages = self._pdf_to_text_paddle(
+                    pages_images, type="paddle_basic")
+                extracted_text = "\n".join(extracted_pages)
+            elif self.ocr_method == "llm":
+                print(
+                    f"Extracting text from {len(pages_images)} pages with LLM OCR...")
+                extracted_pages = self._pdf_to_text_llm(pages_images)
+                extracted_text = "\n".join(extracted_pages)
+
+            # Run the classification model on the extracted text
+            classification = self._classify_document(extracted_text)
+
             # Create the output dictionary for the current document
             document_name = document_path.split("/")[-1]
             documents_output[document_name] = {
                 "classification": classification,
-                "extracted_text": improved_extracted_text,
-                "paddle_text": "\n".join(extracted_pages_paddle),
-                "llm_text": "\n".join(extracted_pages_llm),
+                "extracted_text": extracted_text,
                 "original_path": document_path
             }
 
@@ -405,17 +408,10 @@ class MedicalDocsOCR:
             destination_path = os.path.join(destination_folder, document_name)
             shutil.copy2(original_path, destination_path)
             # Also save the extracted text in markdown format in the same folder
-            md_paths_content = [
-                (os.path.join(destination_folder, document_name.replace(
-                    ".pdf", "_paddle.md")), info["paddle_text"]),
-                (os.path.join(destination_folder, document_name.replace(
-                    ".pdf", "_llm.md")), info["llm_text"]),
-                (os.path.join(destination_folder, document_name.replace(
-                    ".pdf", ".md")), info["extracted_text"]),
-            ]
-            for md_output_path, md_content in md_paths_content:
-                self._write_md_version(
-                    output_path=md_output_path, text=md_content)
+            md_output_path = os.path.join(
+                destination_folder, document_name.replace(".pdf", ".md"))
+            self._write_md_version(
+                output_path=md_output_path, text=info["extracted_text"])
 
 # endregion
 # region Main execution
@@ -426,6 +422,10 @@ def main() -> None:
     # Example usage of the MedicalDocsOCR class
     ocr = MedicalDocsOCR(data_yaml_path=os.getenv(
         "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")
+
+    # Set OCR method (optional, default is "paddle")
+    ocr.set_ocr_method("paddle")
+
     # Set the documents to process (replace with actual paths)
     ocr.set_documents_to_process([
         "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
@@ -437,8 +437,10 @@ def main() -> None:
     ])
     ocr.set_output_folder(
         "/home/vini/Desktop/5g_medical_docs/trials/classified_docs")
+
     # Classify the documents
     classified_documents = ocr.classify_documents()
+    
     # Organize the documents in folders according to their classes
     ocr.organize_documents(classified_documents)
 

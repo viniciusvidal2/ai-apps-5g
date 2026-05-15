@@ -45,9 +45,9 @@ class MedicalDocsOCR:
         # Classes to classify the objects
         self.document_classes = self._read_yaml_into_classes(data_yaml_path)
         # OCR model initialization
-        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=False,
+        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=True,
                                           use_doc_unwarping=False,
-                                          use_textline_orientation=False,
+                                          use_textline_orientation=True,
                                           lang="en",
                                           enable_mkldnn=False,
                                           device="cpu")

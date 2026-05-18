@@ -17,6 +17,9 @@ paddle.enable_static()
 
 from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
+from enum import Enum
+from typing import List
+from pydantic import BaseModel, Field
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 import numpy as np
@@ -45,6 +48,12 @@ class MedicalDocsOCR:
         self.output_folder = ""
         # Classes to classify the objects
         self.document_classes = self._read_yaml_into_classes(data_yaml_path)
+        if not "unknown" in self.document_classes:
+            self.document_classes.append("unknown")
+        ClassificationEnum = Enum(
+            "ClassificationEnum",
+            {c: c for c in self.document_classes}
+        )
         # OCR model initialization
         self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=True,
                                           use_doc_unwarping=False,
@@ -59,28 +68,34 @@ class MedicalDocsOCR:
         # Default OCR method
         self.ocr_method = "paddle"  # options: "paddle", "llm"
         # Document classification model from ollama with langchain
-        self.classifier_llm = ChatOllama(model="gemma4:e2b",
+        self.classifier_llm = ChatOllama(model="gemma4:latest",
                                          base_url="http://localhost:11434",
                                          debug=False)
         # Status and results for threaded execution
         self.status = "idle"
         self.results = {}
         # Chain: classify a document into one of the configured document classes
-        CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
+        self.CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
              "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
-             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n"
+             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, CLASSIFIQUE COMO 'unknown'.\n"
              "{classes_list}"
              "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
             ("user",
              "Aqui está o texto extraído de um documento médico:\n\n"
              "{text}\n\n"
-             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
-             "{classes_list}\n"
-             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
+             "Por favor, analise o conteúdo do texto e forneça as classificações mais apropriadas para este documento usando a ferramenta fornecida, respeitando as classes:\n"
+             "{classes_list}"
              )
         ])
-        self.classify_chain = CLASSIFY_PROMPT | self.classifier_llm
+        
+        class ClassificationOutput(BaseModel):
+            classifications: List[ClassificationEnum] = Field(
+                description="List of classifications"
+            )
+        
+        structured_llm = self.classifier_llm.with_structured_output(ClassificationOutput)
+        self.classify_chain = self.CLASSIFY_PROMPT | structured_llm
 
 
 # region Sets
@@ -128,22 +143,7 @@ class MedicalDocsOCR:
         self.classifier_llm = ChatOllama(model=model_name,
                                          base_url="http://localhost:11434",
                                          debug=False)
-        # Update the classify chain with the new model
-        CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
-            ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
-             "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
-             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, RESPONDA COM 'unknown'.\n"
-             "{classes_list}"
-             "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
-            ("user",
-             "Aqui está o texto extraído de um documento médico:\n\n"
-             "{text}\n\n"
-             "Por favor, analise o conteúdo do texto e forneça a classificação mais apropriada para este documento, respeitando as classes:\n"
-             "{classes_list}\n"
-             "Em sua resposta, forneça apenas a classificação do documento, sem explicações adicionais ou informações extras."
-             )
-        ])
-        self.classify_chain = CLASSIFY_PROMPT | self.classifier_llm
+        self.classify_chain = self.CLASSIFY_PROMPT | self.classifier_llm
 
     def get_status(self) -> str:
         """
@@ -192,7 +192,7 @@ class MedicalDocsOCR:
         with open(yaml_path, "r") as file:
             data = yaml.safe_load(file)
             document_classes = data.get("document_classes", [])
-            return [doc_class["name"] for doc_class in document_classes]
+            return [doc_class["name"].lower() for doc_class in document_classes]
 
     def _pdf_to_text_paddle(self, images: list, type: str) -> list:
         """
@@ -319,12 +319,9 @@ class MedicalDocsOCR:
             print("Invoking LLM for document classification...")
             response = self.classify_chain.invoke(
                 {"text": document_text, "classes_list": classes_list})
-            print(
-                f"LLM response received for document classification: {response.content}")
-            for document_class in self.document_classes:
-                if document_class.lower() in response.content.lower():
-                    return document_class
-            return "unknown"
+            classification_value = response.classifications[0].value if response.classifications else "unknown"
+            print(f"LLM classification result: {classification_value}")
+            return classification_value
         except Exception as e:
             print(f"Error classifying document with LLM: {e}")
             return "unknown"

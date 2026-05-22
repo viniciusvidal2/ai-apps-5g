@@ -31,8 +31,8 @@ def generate_evaluation_report(
     doc_details = []
 
     for doc_name, info in documents_output.items():
-        gt = info.get("ground_truth", "unknown").lower()
-        pred = info.get("classification", "unknown").lower()
+        gt = info.get("ground_truth", "unclassified").lower()
+        pred = info.get("classification", "unclassified").lower()
         ground_truths.append(gt)
         predictions.append(pred)
         doc_details.append({

@@ -53,8 +53,8 @@ class MedicalDocsOCR:
         self.output_folder = ""
         # Classes to classify the objects
         self.document_classes = self._read_yaml_into_classes(data_yaml_path)
-        if not "unknown" in self.document_classes:
-            self.document_classes.append("unknown")
+        if not "unclassified" in self.document_classes:
+            self.document_classes.append("unclassified")
         ClassificationEnum = Enum(
             "ClassificationEnum",
             {c: c for c in self.document_classes}
@@ -83,7 +83,7 @@ class MedicalDocsOCR:
         self.CLASSIFY_PROMPT = ChatPromptTemplate.from_messages([
             ("system", "Você é um assistente especializado em classificar documentos médicos com base em seu conteúdo textual.\n"
              "Sua tarefa é analisar o texto extraído de um documento médico e determinar a classificação mais apropriada para ele.\n"
-             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, CLASSIFIQUE COMO 'unknown'.\n"
+             " IMPORTANTE: SE ATENHA SOMENTE AS CLASSES DESCRITAS ABAIXO PONTUADAS, ENTRE O TRECHO TRACEJADO. CASO NAO CONSIDERE QUE SEJA NENHUMA DAS CLASSES, CLASSIFIQUE COMO 'unclassified'.\n"
              "{classes_list}"
              "\nConsidere as informações presentes no texto, como termos médicos, estrutura do documento e contexto geral para fazer a classificação."),
             ("user",
@@ -104,6 +104,16 @@ class MedicalDocsOCR:
         
         structured_llm = self.classifier_llm.with_structured_output(self.ClassificationOutput)
         self.classify_chain = self.CLASSIFY_PROMPT | structured_llm
+        
+        # Chain: improve the document text
+        self.IMPROVE_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", "Você é um assistente especializado em limpar e aprimorar textos extraídos de documentos médicos via OCR.\n"
+             "Sua tarefa é analisar o texto extraído, remover qualquer seção que pareça lixo, ruído de leitura de imagem, ou excesso de campos de exames vazios e repetitivos.\n"
+             "Preserve apenas as informações textuais relevantes, cabeçalhos úteis, diagnósticos, observações clínicas, e termos médicos importantes que ajudem a identificar claramente a especialidade ou classe do documento.\n"
+             "Retorne apenas o texto limpo e aprimorado, sem introduções ou explicações adicionais."),
+            ("user", "Aqui está o texto bruto extraído do documento médico:\n\n{text}")
+        ])
+        self.improve_chain = self.IMPROVE_PROMPT | self.classifier_llm
 
 
 # region Sets
@@ -153,6 +163,7 @@ class MedicalDocsOCR:
                                          debug=False)
         structured_llm = self.classifier_llm.with_structured_output(self.ClassificationOutput)
         self.classify_chain = self.CLASSIFY_PROMPT | structured_llm
+        self.improve_chain = self.IMPROVE_PROMPT | self.classifier_llm
 
     def get_status(self) -> str:
         """
@@ -313,14 +324,14 @@ class MedicalDocsOCR:
         Classifies a medical document based on its extracted text content.
 
         Uses an LLM to analyse the document text and match it to one of the
-        configured document classes. Returns 'unknown' if no class matches or
+        configured document classes. Returns 'unclassified' if no class matches or
         if the LLM call fails.
 
         Args:
             document_text (str): The full extracted text of the document to classify.
 
         Returns:
-            str: The matched document class name, or 'unknown' if unclassified.
+            str: The matched document class name, or 'unclassified' if unclassified.
         """
         classes_list = "-" * 50 + "\n" + "".join(
             [f"- {doc_class}\n" for doc_class in self.document_classes]) + "-" * 50 + "\n"
@@ -328,12 +339,12 @@ class MedicalDocsOCR:
             print("Invoking LLM for document classification...")
             response = self.classify_chain.invoke(
                 {"text": document_text, "classes_list": classes_list})
-            classification_value = response.classifications[0].value if response.classifications else "unknown"
+            classification_value = response.classifications[0].value if response.classifications else "unclassified"
             print(f"LLM classification result: {classification_value}")
             return classification_value
         except Exception as e:
             print(f"Error classifying document with LLM: {e}")
-            return "unknown"
+            return "unclassified"
 
     def _write_md_version(self, text: str, output_path: str) -> None:
         """
@@ -398,8 +409,29 @@ class MedicalDocsOCR:
                     extracted_pages = self._pdf_to_text_llm(pages_images)
                     extracted_text = "\n".join(extracted_pages)
 
-                # Run the classification model on the extracted text
-                classification = self._classify_document(extracted_text)
+                # Run the classification model, improving text iteratively up to 3 times if unclassified
+                current_text = extracted_text
+                classification = "unclassified"
+                
+                for attempt in range(3):
+                    print(f"Classification attempt {attempt + 1}/3...")
+                    classification = self._classify_document(current_text)
+                    
+                    if classification != "unclassified":
+                        # Found a valid class, stop iterating
+                        break
+                        
+                    if attempt < 2:
+                        print("Document was unclassified. Invoking LLM to improve text quality and remove noise...")
+                        try:
+                            response = self.improve_chain.invoke({"text": current_text})
+                            improved_text = response.content if hasattr(response, "content") else str(response)
+                            if improved_text.strip():
+                                current_text = improved_text
+                            else:
+                                print("Improved text was empty. Retaining previous text version.")
+                        except Exception as e:
+                            print(f"Error improving text with LLM: {e}")
 
                 doc_end_time = time.time()
                 doc_elapsed_time = doc_end_time - doc_start_time
@@ -413,7 +445,7 @@ class MedicalDocsOCR:
                 # Create the output dictionary for the current document
                 documents_output[document_name] = {
                     "classification": classification,
-                    "extracted_text": extracted_text,
+                    "extracted_text": current_text,
                     "original_path": document_path,
                     "ground_truth": ground_truth,
                     "time_taken": doc_elapsed_time,

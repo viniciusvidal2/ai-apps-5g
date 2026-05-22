@@ -29,6 +29,11 @@ import yaml
 import shutil
 import logging
 import threading
+import time
+try:
+    from report_generator import generate_evaluation_report
+except ImportError:
+    from .report_generator import generate_evaluation_report
 
 logging.getLogger("ppocr").setLevel(logging.WARNING)
 
@@ -89,12 +94,15 @@ class MedicalDocsOCR:
              )
         ])
         
+        self.ClassificationEnum = ClassificationEnum
+        
         class ClassificationOutput(BaseModel):
             classifications: List[ClassificationEnum] = Field(
                 description="List of classifications"
             )
+        self.ClassificationOutput = ClassificationOutput
         
-        structured_llm = self.classifier_llm.with_structured_output(ClassificationOutput)
+        structured_llm = self.classifier_llm.with_structured_output(self.ClassificationOutput)
         self.classify_chain = self.CLASSIFY_PROMPT | structured_llm
 
 
@@ -143,7 +151,8 @@ class MedicalDocsOCR:
         self.classifier_llm = ChatOllama(model=model_name,
                                          base_url="http://localhost:11434",
                                          debug=False)
-        self.classify_chain = self.CLASSIFY_PROMPT | self.classifier_llm
+        structured_llm = self.classifier_llm.with_structured_output(self.ClassificationOutput)
+        self.classify_chain = self.CLASSIFY_PROMPT | structured_llm
 
     def get_status(self) -> str:
         """
@@ -364,11 +373,15 @@ class MedicalDocsOCR:
         Updates self.status and self.results upon completion or failure.
         """
         try:
+            total_start_time = time.time()
             # Process each document in the list of document paths
             documents_output = {}
             for i, document_path in enumerate(self.document_paths):
                 print(
                     f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
+                
+                doc_start_time = time.time()
+                
                 # Convert the PDF to images
                 pages_images = self._pdf_to_images(document_path)
 
@@ -388,13 +401,34 @@ class MedicalDocsOCR:
                 # Run the classification model on the extracted text
                 classification = self._classify_document(extracted_text)
 
-                # Create the output dictionary for the current document
+                doc_end_time = time.time()
+                doc_elapsed_time = doc_end_time - doc_start_time
+
+                # Extract ground truth from the document name
+                # (last part of name, after '_' and before '.pdf')
                 document_name = document_path.split("/")[-1]
+                name_without_ext = os.path.splitext(document_name)[0]
+                ground_truth = name_without_ext.split("_")[-1].lower()
+
+                # Create the output dictionary for the current document
                 documents_output[document_name] = {
                     "classification": classification,
                     "extracted_text": extracted_text,
-                    "original_path": document_path
+                    "original_path": document_path,
+                    "ground_truth": ground_truth,
+                    "time_taken": doc_elapsed_time,
+                    "pages": len(pages_images)
                 }
+
+            total_elapsed_time = time.time() - total_start_time
+
+            # Generate the evaluation report at the end of the execution
+            generate_evaluation_report(
+                documents_output=documents_output,
+                total_elapsed_time=total_elapsed_time,
+                document_classes=self.document_classes,
+                output_folder=self.output_folder
+            )
 
             self.results = documents_output
             self.status = "completed"
@@ -437,7 +471,7 @@ class MedicalDocsOCR:
             original_path = info["original_path"]
             print(
                 f"Document: {document_name} | Classification: {classification}")
-            if classification in self.document_classes:
+            if classification in self.document_classes and classification != "unknown":
                 destination_folder = os.path.join(
                     self.output_folder, classification)
             else:
@@ -461,16 +495,25 @@ def main() -> None:
         "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")
 
     # Set OCR method (optional, default is "paddle")
-    ocr.set_ocr_method("paddle")
+    ocr.set_ocr_method("llm")
 
     # Set the documents to process (replace with actual paths)
     ocr.set_documents_to_process([
         "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_101607_fisioterapia.pdf",
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102216_eletroencefalograma.pdf",
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
-        # "/home/vini/Desktop/5g_medical_docs/trials/20251127_102937_psicosocial.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_100732_cardiologia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_101002_cardiologia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_101120_odontologico.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_101320_ergonomia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_101607_fisioterapia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_101814_pulmonar_eletroencefalograma_psicosocial.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102005_cardiologia.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102059_hemograma_psicosocial.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102150_psicosocial.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102216_eletroencefalograma.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102651_eletroencefalograma.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_102937_psicosocial.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_103103_pulmonar.pdf",
+        "/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf",
     ])
     ocr.set_output_folder(
         "/home/vini/Desktop/5g_medical_docs/trials/classified_docs")

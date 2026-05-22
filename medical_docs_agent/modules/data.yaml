@@ -11,3 +11,15 @@ document_classes:
   - name: "psicosocial"
     description: "Documents related to psicosocial, including patient records, test
       results, and medical reports."
+  - name: "pulmonar"
+    description: "Documents related to pulmonary system, including patient records,
+      test results, and medical reports."
+  - name: "ergonomia"
+    description: "Documents related to ergonomics, including patient records,
+      test results, and medical reports."
+  - name: "hemograma"
+    description: "Documents related to hemogram (blood test), including patient records,
+      test results, and medical reports."
+  - name: "odontologico"
+    description: "Documents related to odontological (dental) care, including patient
+      records, test results, and medical reports."

@@ -37,6 +37,8 @@ except ImportError:
 
 logging.getLogger("ppocr").setLevel(logging.WARNING)
 
+logger = logging.getLogger(__name__)
+
 
 class MedicalDocsOCR:
     def __init__(self, data_yaml_path: str) -> None:
@@ -187,22 +189,22 @@ class MedicalDocsOCR:
         """
         Stops the OCR classification process and kills the running Ollama models.
         """
-        print("Stopping/killing running Ollama models...")
+        logger.info("Stopping/killing running Ollama models...")
         import subprocess
         
         try:
-            print("Stopping model 'glm-ocr:latest'...")
+            logger.info("Stopping model 'glm-ocr:latest'...")
             subprocess.run(["ollama", "stop", "glm-ocr:latest"], check=False)
         except Exception as e:
-            print(f"Error stopping glm-ocr:latest: {e}")
+            logger.error(f"Error stopping glm-ocr:latest: {e}")
             
         try:
-            print("Stopping model 'gemma4:latest'...")
+            logger.info("Stopping model 'gemma4:latest'...")
             subprocess.run(["ollama", "stop", "gemma4:latest"], check=False)
         except Exception as e:
-            print(f"Error stopping gemma4:latest: {e}")
+            logger.error(f"Error stopping gemma4:latest: {e}")
             
-        print("Ollama models stop signals sent successfully.")
+        logger.info("Ollama models stop signals sent successfully.")
 
 #  endregion
 # region Gets
@@ -248,8 +250,7 @@ class MedicalDocsOCR:
         """
         pages = []
         for i, img in enumerate(images):
-            print(
-                f"Processing page {i+1}/{len(images)} with Paddle OCR ({type})...")
+            logger.info(f"Processing page {i+1}/{len(images)} with Paddle OCR ({type})...")
             if type == "paddle_vl":
                 # ocr_result = self.ocr_paddle_vl.predict(input=img)
                 # pages_res = list(ocr_result)
@@ -277,7 +278,7 @@ class MedicalDocsOCR:
         """
         retrieved_pages = []
         for i, page in enumerate(pages):
-            print(f"Processing page {i+1}/{len(pages)}")
+            logger.info(f"Processing page {i+1}/{len(pages)}")
             # Convert PIL image to base64 string
             image_base64 = self._image_to_base64(page)
             # Create the prompt for the LLM and call it
@@ -296,7 +297,7 @@ class MedicalDocsOCR:
                 ])
                 retrieved_pages.append(response.content)
             except Exception as e:
-                print(f"Error processing page {i+1} with LLM OCR: {e}")
+                logger.error(f"Error processing page {i+1} with LLM OCR: {e}")
                 continue
         return retrieved_pages
 
@@ -357,14 +358,14 @@ class MedicalDocsOCR:
         classes_list = "-" * 50 + "\n" + "".join(
             [f"- {doc_class}\n" for doc_class in self.document_classes]) + "-" * 50 + "\n"
         try:
-            print("Invoking LLM for document classification...")
+            logger.info("Invoking LLM for document classification...")
             response = self.classify_chain.invoke(
                 {"text": document_text, "classes_list": classes_list})
             classification_value = response.classifications[0].value if response.classifications else "unclassified"
-            print(f"LLM classification result: {classification_value}")
+            logger.info(f"LLM classification result: {classification_value}")
             return classification_value
         except Exception as e:
-            print(f"Error classifying document with LLM: {e}")
+            logger.error(f"Error classifying document with LLM: {e}")
             return "unclassified"
 
     def _write_md_version(self, text: str, output_path: str) -> None:
@@ -387,7 +388,7 @@ class MedicalDocsOCR:
         Sets the status to 'running'.
         """
         if not self.document_paths:
-            print("No documents to process.")
+            logger.info("No documents to process.")
             self.status = "idle"
             return
 
@@ -397,7 +398,7 @@ class MedicalDocsOCR:
         # Start the worker thread
         worker_thread = threading.Thread(target=self._run_classification_worker)
         worker_thread.start()
-        print("Classification worker started in a separate thread.")
+        logger.info("Classification worker started in a separate thread.")
 
     def _run_classification_worker(self) -> None:
         """
@@ -409,8 +410,7 @@ class MedicalDocsOCR:
             # Process each document in the list of document paths
             documents_output = {}
             for i, document_path in enumerate(self.document_paths):
-                print(
-                    f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
+                logger.info(f"Processing document: {document_path} | {i+1} out of {len(self.document_paths)}")
                 
                 doc_start_time = time.time()
                 
@@ -419,14 +419,12 @@ class MedicalDocsOCR:
 
                 extracted_text = ""
                 if self.ocr_method == "paddle":
-                    print(
-                        f"Extracting text from {len(pages_images)} pages with paddle OCR...")
+                    logger.info(f"Extracting text from {len(pages_images)} pages with paddle OCR...")
                     extracted_pages = self._pdf_to_text_paddle(
                         pages_images, type="paddle_basic")
                     extracted_text = "\n".join(extracted_pages)
                 elif self.ocr_method == "llm":
-                    print(
-                        f"Extracting text from {len(pages_images)} pages with LLM OCR...")
+                    logger.info(f"Extracting text from {len(pages_images)} pages with LLM OCR...")
                     extracted_pages = self._pdf_to_text_llm(pages_images)
                     extracted_text = "\n".join(extracted_pages)
 
@@ -435,7 +433,7 @@ class MedicalDocsOCR:
                 classification = "unclassified"
                 
                 for attempt in range(3):
-                    print(f"Classification attempt {attempt + 1}/3...")
+                    logger.info(f"Classification attempt {attempt + 1}/3...")
                     classification = self._classify_document(current_text)
                     
                     if classification != "unclassified":
@@ -443,16 +441,16 @@ class MedicalDocsOCR:
                         break
                         
                     if attempt < 2:
-                        print("Document was unclassified. Invoking LLM to improve text quality and remove noise...")
+                        logger.info("Document was unclassified. Invoking LLM to improve text quality and remove noise...")
                         try:
                             response = self.improve_chain.invoke({"text": current_text})
                             improved_text = response.content if hasattr(response, "content") else str(response)
                             if improved_text.strip():
                                 current_text = improved_text
                             else:
-                                print("Improved text was empty. Retaining previous text version.")
+                                logger.info("Improved text was empty. Retaining previous text version.")
                         except Exception as e:
-                            print(f"Error improving text with LLM: {e}")
+                            logger.error(f"Error improving text with LLM: {e}")
 
                 doc_end_time = time.time()
                 doc_elapsed_time = doc_end_time - doc_start_time
@@ -485,9 +483,9 @@ class MedicalDocsOCR:
 
             self.results = documents_output
             self.status = "completed"
-            print("Classification worker finished successfully.")
+            logger.info("Classification worker finished successfully.")
         except Exception as e:
-            print(f"Classification worker failed: {e}")
+            logger.error(f"Classification worker failed: {e}")
             self.status = "failed"
 
     def organize_documents(self, classified_documents: dict) -> None:
@@ -505,7 +503,7 @@ class MedicalDocsOCR:
                 :meth:`classify_documents`.
         """
         # Create the subfolders for each class, if they are not there already
-        print("Organizing documents into folders based on classification...")
+        logger.info("Organizing documents into folders based on classification...")
         for document_class in self.document_classes:
             class_folder = os.path.join(
                 self.output_folder, document_class)
@@ -518,12 +516,11 @@ class MedicalDocsOCR:
             os.makedirs(unknown_class_folder)
 
         # Move the documents to the respective folders according to their classification
-        print("Moving documents to respective folders...")
+        logger.info("Moving documents to respective folders...")
         for document_name, info in classified_documents.items():
             classification = info["classification"]
             original_path = info["original_path"]
-            print(
-                f"Document: {document_name} | Classification: {classification}")
+            logger.info(f"Document: {document_name} | Classification: {classification}")
             if classification in self.document_classes and classification != "unknown":
                 destination_folder = os.path.join(
                     self.output_folder, classification)
@@ -577,14 +574,14 @@ def main() -> None:
     # Wait for the classification to finish
     import time
     while ocr.get_status() == "running":
-        print(f"Waiting for classification... Status: {ocr.get_status()}")
+        logger.info(f"Waiting for classification... Status: {ocr.get_status()}")
         time.sleep(2)
     
     if ocr.get_status() == "completed":
         # Organize the documents in folders according to their classes
         ocr.organize_documents(ocr.get_results())
     else:
-        print(f"Classification failed with status: {ocr.get_status()}")
+        logger.error(f"Classification failed with status: {ocr.get_status()}")
 
 
 if __name__ == "__main__":

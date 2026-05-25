@@ -5,6 +5,16 @@ import time
 import argparse
 import yaml
 import traceback
+import logging
+
+# ── Logging setup ──────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
+logger = logging.getLogger(__name__)
 
 # ── Path Resolution & Imports ──────────────────────────────────────────────────
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -52,24 +62,20 @@ class MedicalDocsFolderManager:
         # Load existing state from yaml
         self.load_state()
 
-    def get_time_str(self) -> str:
-        """Helper to get formatted local time string."""
-        return time.strftime("%Y-%m-%d %H:%M:%S")
-
     def load_state(self) -> None:
         """
         Loads state from the YAML file if it exists. 
         It expects a root list of dictionaries and retrieves the state matching our input folder.
         """
         if os.path.exists(self.state_yaml_path):
-            print(f"[{self.get_time_str()}] Loading existing folder states from '{self.state_yaml_path}'...")
+            logger.info(f"Loading existing folder states from '{self.state_yaml_path}'...")
             try:
                 with open(self.state_yaml_path, "r", encoding="utf-8") as f:
                     loaded_list = yaml.safe_load(f)
                 
                 # Normalize loaded data to a list of dicts
                 if not isinstance(loaded_list, list):
-                    print(f"[{self.get_time_str()}] Warning: YAML root was not a list. Initializing fresh list.")
+                    logger.warning("YAML root was not a list. Initializing fresh list.")
                     loaded_list = []
 
                 # Search for our input folder in the loaded list
@@ -83,23 +89,25 @@ class MedicalDocsFolderManager:
                     self.state["output_folder"] = found_entry.get("output_folder", self.output_folder)
                     self.state["last_checked_files"] = found_entry.get("last_checked_files", [])
                     self.state["processed_files"] = found_entry.get("processed_files", [])
-                    print(f"[{self.get_time_str()}] State matched for folder '{self.input_folder}': "
-                          f"{len(self.state['processed_files'])} processed, "
-                          f"{len(self.state['last_checked_files'])} last checked.")
+                    logger.info(
+                        f"State matched for folder '{self.input_folder}': "
+                        f"{len(self.state['processed_files'])} processed, "
+                        f"{len(self.state['last_checked_files'])} last checked."
+                    )
                 else:
-                    print(f"[{self.get_time_str()}] Input folder '{self.input_folder}' not tracked yet. Appending new entry.")
+                    logger.info(f"Input folder '{self.input_folder}' not tracked yet. Appending new entry.")
                     self.save_state()
             except Exception as e:
-                print(f"[{self.get_time_str()}] Error loading state from YAML: {e}. Starting fresh for this folder.")
+                logger.error(f"Error loading state from YAML: {e}. Starting fresh for this folder.")
         else:
-            print(f"[{self.get_time_str()}] No existing folder state found at '{self.state_yaml_path}'. A new one will be created.")
+            logger.info(f"No existing folder state found at '{self.state_yaml_path}'. A new one will be created.")
             self.save_state()
 
     def save_state(self) -> None:
         """
         Saves/updates the state of the current folder inside the root list of the YAML file.
         """
-        print(f"[{self.get_time_str()}] Saving state for '{self.input_folder}' to '{self.state_yaml_path}'...")
+        logger.info(f"Saving state for '{self.input_folder}' to '{self.state_yaml_path}'...")
         try:
             # Ensure configs directory exists
             os.makedirs(os.path.dirname(self.state_yaml_path), exist_ok=True)
@@ -130,15 +138,15 @@ class MedicalDocsFolderManager:
             # Dump the root list of dictionaries back to the state YAML
             with open(self.state_yaml_path, "w", encoding="utf-8") as f:
                 yaml.dump(loaded_list, f, default_flow_style=False, allow_unicode=True)
-            print(f"[{self.get_time_str()}] State saved successfully.")
+            logger.info("State saved successfully.")
         except Exception as e:
-            print(f"[{self.get_time_str()}] Error saving state to YAML: {e}")
+            logger.error(f"Error saving state to YAML: {e}")
 
     def inspect_folder(self) -> list[str]:
         """Inspects the input folder for PDF files and returns their absolute paths."""
-        print(f"[{self.get_time_str()}] Inspecting input folder: '{self.input_folder}'...")
+        logger.info(f"Inspecting input folder: '{self.input_folder}'...")
         if not os.path.exists(self.input_folder):
-            print(f"[{self.get_time_str()}] Warning: Input folder '{self.input_folder}' does not exist. Creating it now...")
+            logger.warning(f"Input folder '{self.input_folder}' does not exist. Creating it now...")
             os.makedirs(self.input_folder, exist_ok=True)
             return []
 
@@ -148,18 +156,18 @@ class MedicalDocsFolderManager:
                 pdf_files.append(os.path.abspath(entry.path))
 
         pdf_files.sort()
-        print(f"[{self.get_time_str()}] Found {len(pdf_files)} PDF file(s) in input folder.")
+        logger.info(f"Found {len(pdf_files)} PDF file(s) in input folder.")
         return pdf_files
 
     def process_files(self, file_paths: list[str]) -> None:
         """Processes the list of files using MedicalDocsOCR."""
-        print(f"[{self.get_time_str()}] Initializing MedicalDocsOCR...")
+        logger.info("Initializing MedicalDocsOCR...")
         # Auto-detect location of configs/document_classes.yaml configuration
         data_yaml_path = os.path.join(CURRENT_DIR, "modules", "configs", "document_classes.yaml")
         if not os.path.exists(data_yaml_path):
             data_yaml_path = os.path.expanduser("~") + "/ai-apps-5g/medical_docs_agent/modules/configs/document_classes.yaml"
 
-        print(f"[{self.get_time_str()}] Using document classes config from: '{data_yaml_path}'")
+        logger.info(f"Using document classes config from: '{data_yaml_path}'")
         
         # Instantiate and store the OCR agent in self.ocr
         self.ocr = MedicalDocsOCR(data_yaml_path=data_yaml_path)
@@ -167,17 +175,17 @@ class MedicalDocsFolderManager:
         self.ocr.set_documents_to_process(file_paths)
         self.ocr.set_output_folder(self.output_folder)
 
-        print(f"[{self.get_time_str()}] Starting classification of {len(file_paths)} file(s)...")
+        logger.info(f"Starting classification of {len(file_paths)} file(s)...")
         self.ocr.classify_documents()
 
         # Monitor the threaded processing progress
         while self.ocr.get_status() == "running":
-            print(f"[{self.get_time_str()}] Waiting for classification thread... Status: {self.ocr.get_status()}")
+            logger.info(f"Waiting for classification thread... Status: {self.ocr.get_status()}")
             time.sleep(2)
 
         status = self.ocr.get_status()
         if status == "completed":
-            print(f"[{self.get_time_str()}] Classification completed successfully. Organizing files...")
+            logger.info("Classification completed successfully. Organizing files...")
             results = self.ocr.get_results()
             self.ocr.organize_documents(results)
 
@@ -186,27 +194,27 @@ class MedicalDocsFolderManager:
                 if f not in self.state["processed_files"]:
                     self.state["processed_files"].append(f)
             self.save_state()
-            print(f"[{self.get_time_str()}] Successfully processed, organized, and tracked {len(file_paths)} document(s).")
+            logger.info(f"Successfully processed, organized, and tracked {len(file_paths)} document(s).")
         else:
-            print(f"[{self.get_time_str()}] Classification completed with non-success status: {status}")
+            logger.warning(f"Classification completed with non-success status: {status}")
 
     def stop_ocr(self) -> None:
         """Calls the stop function of the MedicalDocsOCR class to clean up running models."""
         if self.ocr is not None:
-            print(f"[{self.get_time_str()}] Calling stop() on MedicalDocsOCR to kill running models...")
+            logger.info("Calling stop() on MedicalDocsOCR to kill running models...")
             self.ocr.stop()
         else:
-            print(f"[{self.get_time_str()}] MedicalDocsOCR was not active. Killing any running Ollama models directly...")
+            logger.info("MedicalDocsOCR was not active. Killing any running Ollama models directly...")
             import subprocess
             try:
                 subprocess.run(["ollama", "stop", "glm-ocr:latest"], check=False)
                 subprocess.run(["ollama", "stop", "gemma4:latest"], check=False)
             except Exception as e:
-                print(f"[{self.get_time_str()}] Error executing direct stop commands: {e}")
+                logger.error(f"Error executing direct stop commands: {e}")
 
     def run_cycle(self) -> None:
         """Runs a single folder inspection and processing cycle."""
-        print(f"\n[{self.get_time_str()}] ─── Starting Folder Inspection Cycle ───")
+        logger.info("─── Starting Folder Inspection Cycle ───")
         current_files = self.inspect_folder()
 
         # Update variable and YAML file with the last checked files snapshot
@@ -217,28 +225,28 @@ class MedicalDocsFolderManager:
         unprocessed_files = [f for f in current_files if f not in self.state["processed_files"]]
 
         if not unprocessed_files:
-            print(f"[{self.get_time_str()}] All discovered files have already been processed. Nothing to do.")
+            logger.info("All discovered files have already been processed. Nothing to do.")
             return
 
-        print(f"[{self.get_time_str()}] Discovered {len(unprocessed_files)} unprocessed file(s):")
+        logger.info(f"Discovered {len(unprocessed_files)} unprocessed file(s):")
         for f in unprocessed_files:
-            print(f"  * {os.path.basename(f)}")
+            logger.info(f"  * {os.path.basename(f)}")
 
         # Process only the unprocessed files
         self.process_files(unprocessed_files)
 
     def start_loop(self) -> None:
         """Starts the main periodic loop to inspect the folder."""
-        print(f"[{self.get_time_str()}] Starting periodic folder inspection loop.")
-        print(f"[{self.get_time_str()}] Input Folder: '{self.input_folder}'")
-        print(f"[{self.get_time_str()}] Output Folder: '{self.output_folder}'")
-        print(f"[{self.get_time_str()}] Inspection Interval: {self.interval_minutes} minute(s)")
+        logger.info("Starting periodic folder inspection loop.")
+        logger.info(f"Input Folder:  '{self.input_folder}'")
+        logger.info(f"Output Folder: '{self.output_folder}'")
+        logger.info(f"Interval:      {self.interval_minutes} minute(s)")
 
         interval_seconds = self.interval_minutes * 60.0
 
         while True:
             self.run_cycle()
-            print(f"[{self.get_time_str()}] Sleeping for {self.interval_minutes} minute(s) before next check...")
+            logger.info(f"Sleeping for {self.interval_minutes} minute(s) before next check...")
             
             # Sleep in short increments to remain highly responsive to Ctrl+C
             slept = 0.0
@@ -285,16 +293,16 @@ def main() -> None:
     try:
         manager.start_loop()
     except KeyboardInterrupt:
-        print(f"\n[{manager.get_time_str()}] KeyboardInterrupt (Ctrl+C) detected! Stopping Medical Docs Agent...")
+        logger.info("KeyboardInterrupt (Ctrl+C) detected! Stopping Medical Docs Agent...")
         manager.stop_ocr()
-        print(f"[{manager.get_time_str()}] Shutdown complete. Exiting.")
+        logger.info("Shutdown complete. Exiting.")
         sys.exit(0)
     except Exception as e:
-        print(f"\n[{manager.get_time_str()}] Unexpected exception occurred: {e}")
+        logger.error(f"Unexpected exception occurred: {e}")
         traceback.print_exc()
-        print(f"[{manager.get_time_str()}] Stopping Medical Docs Agent to release resources...")
+        logger.error("Stopping Medical Docs Agent to release resources...")
         manager.stop_ocr()
-        print(f"[{manager.get_time_str()}] Shutdown complete. Exiting with error.")
+        logger.error("Shutdown complete. Exiting with error.")
         sys.exit(1)
 
 

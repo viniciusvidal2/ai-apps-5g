@@ -1,0 +1,6 @@
+- input_folder: /home/vini/Desktop/5g_medical_docs/automatic
+  last_checked_files:
+  - /home/vini/Desktop/5g_medical_docs/automatic/20251127_102937_psicosocial.pdf
+  - /home/vini/Desktop/5g_medical_docs/automatic/20251127_103128_cardiologia.pdf
+  output_folder: /home/vini/Desktop/5g_medical_docs/automatic/output
+  processed_files: []

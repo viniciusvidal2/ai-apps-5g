@@ -20,6 +20,9 @@ RUN apt-get update && apt-get install -y \
   git \
   nano \
   zstd \
+  poppler-utils \
+  libgl1-mesa-glx \
+  libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
@@ -39,7 +42,7 @@ RUN mkdir -p /app/ollama_models
 # Python deps
 # ------------------------
 RUN pip install --no-cache-dir setuptools==75.1.0
-COPY ai_assistant/requirements.txt /app/requirements.txt
+COPY medical_docs_agent/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --timeout=100 --retries=100 \
   -r /app/requirements.txt
 ENV PYTHONUNBUFFERED=1
@@ -69,33 +72,34 @@ RUN if [ -n "$OLLAMA_MODELS_TO_PULL" ]; then \
   echo "No Ollama models requested at build time" ; \
   fi
 
-# Huggingface embedding model cache
-ENV HF_HOME=/opt/hf
-RUN mkdir -p /opt/hf
-COPY ai_assistant/modules/download_models.py /app/ai_assistant/modules/download_models.py
-RUN python3 /app/ai_assistant/modules/download_models.py
-
 # ------------------------
 # App files
 # ------------------------
-RUN mkdir -p /app/ai_assistant/modules
-COPY ai_assistant/modules/ai_assistant.py /app/ai_assistant/modules/ai_assistant.py
-COPY ai_assistant/modules/web_content_extractor.py /app/ai_assistant/modules/web_content_extractor.py
-COPY ai_assistant/modules/__init__.py /app/ai_assistant/modules/__init__.py
-COPY ai_assistant/schemas.py /app/ai_assistant/schemas.py
-COPY ai_assistant/ai_assistant_agent.py /app/ai_assistant/ai_assistant_agent.py
-COPY ai_assistant/start_ai_assistant_docker.sh /app/ai_assistant/start_ai_assistant_docker.sh
+RUN mkdir -p /app/medical_docs_agent/modules/configs
+
+COPY medical_docs_agent/modules/configs/document_classes.yaml /app/medical_docs_agent/modules/configs/document_classes.yaml
+COPY medical_docs_agent/modules/configs/folder_manager_state.yaml /app/medical_docs_agent/modules/configs/folder_manager_state.yaml
+COPY medical_docs_agent/modules/medical_docs_ocr.py /app/medical_docs_agent/modules/medical_docs_ocr.py
+COPY medical_docs_agent/modules/report_generator.py /app/medical_docs_agent/modules/report_generator.py
+COPY medical_docs_agent/modules/__init__.py /app/medical_docs_agent/modules/__init__.py
+COPY medical_docs_agent/schemas.py /app/medical_docs_agent/schemas.py
+COPY medical_docs_agent/medical_docs_agent.py /app/medical_docs_agent/medical_docs_agent.py
+COPY medical_docs_agent/medical_docs_agent_interface.py /app/medical_docs_agent/medical_docs_agent_interface.py
+COPY medical_docs_agent/medical_docs_agent_folder_management.py /app/medical_docs_agent/medical_docs_agent_folder_management.py
+COPY medical_docs_agent/start_medical_docs_docker.sh /app/medical_docs_agent/start_medical_docs_docker.sh
+
 RUN chmod +x \
-  /app/ai_assistant/modules/ai_assistant.py \
-  /app/ai_assistant/modules/web_content_extractor.py \
-  /app/ai_assistant/modules/__init__.py \
-  /app/ai_assistant/schemas.py \
-  /app/ai_assistant/ai_assistant_agent.py \
-  /app/ai_assistant/start_ai_assistant_docker.sh
+  /app/medical_docs_agent/modules/medical_docs_ocr.py \
+  /app/medical_docs_agent/modules/report_generator.py \
+  /app/medical_docs_agent/modules/__init__.py \
+  /app/medical_docs_agent/schemas.py \
+  /app/medical_docs_agent/medical_docs_agent.py \
+  /app/medical_docs_agent/medical_docs_agent_interface.py \
+  /app/medical_docs_agent/medical_docs_agent_folder_management.py \
+  /app/medical_docs_agent/start_medical_docs_docker.sh
 
 # ------------------------
 # Runtime
 # ------------------------
 EXPOSE 11434
-EXPOSE 8001
-ENTRYPOINT ["/app/ai_assistant/start_ai_assistant_docker.sh"]
+ENTRYPOINT ["/app/medical_docs_agent/start_medical_docs_docker.sh"]

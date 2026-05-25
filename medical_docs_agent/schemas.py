@@ -12,5 +12,5 @@ class AppConfig:
 class MedicalDocsInferenceRequest(BaseModel):
     """Input data for a medical document classification request."""
     document_paths: List[str]
-    ocr_method: Optional[str] = "paddle"
+    ocr_method: Optional[str] = "llm"
     classification_model: Optional[str] = "gemma4:e2b"

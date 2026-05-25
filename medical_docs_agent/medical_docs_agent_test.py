@@ -45,23 +45,20 @@ def test_root():
     print("Response:", response.json(), "\n")
 
 
-def test_classify(document_paths: list, ocr_method: str = "paddle", 
-                  classification_model: str = "gemma4:e2b") -> str:
+def test_classify(document_paths: list, classification_model: str = "gemma4:e2b") -> str:
     """
     Test the document classification endpoint.
 
     Args:
         document_paths (list): List of paths to PDF documents.
-        ocr_method (str): OCR method to use ("paddle" or "llm").
         classification_model (str): LLM model name for classification.
 
     Returns:
         str: The job ID.
     """
-    print(f"Testing POST /ocr/classify with method: {ocr_method}")
+    print(f"Testing POST /ocr/classify")
     payload = MedicalDocsInferenceRequest(
         document_paths=document_paths,
-        ocr_method=ocr_method,
         classification_model=classification_model
     )
     response = httpx.post(
@@ -119,8 +116,8 @@ def main():
     parser.add_argument("--document_paths", type=str, nargs="+", 
                         default=["/home/vini/Desktop/5g_medical_docs/trials/20251127_103128_cardiologia.pdf"],
                         help="List of PDF paths to process")
-    parser.add_argument("--ocr_method", type=str, default="paddle",
-                        help="OCR method: 'paddle' or 'llm'")
+    parser.add_argument("--ocr_method", type=str, default="llm",
+                        help="OCR method: only 'llm' is supported")
     parser.add_argument("--model", type=str, default="gemma4:e2b",
                         help="Classification model name")
     
@@ -131,13 +128,9 @@ def main():
     wait_for_api()
     test_root()
     
-    # Test with PaddleOCR
-    job_id_paddle = test_classify(args.document_paths, ocr_method="paddle", classification_model=args.model)
-    test_job_status(job_id_paddle)
-    
-    # Test with LLM OCR (Optional/Uncomment if needed)
-    # job_id_llm = test_classify(args.document_paths, ocr_method="llm", classification_model=args.model)
-    # test_job_status(job_id_llm)
+    # Run classification with LLM OCR
+    job_id = test_classify(args.document_paths, classification_model=args.model)
+    test_job_status(job_id)
 
     print("All tests passed! ✅")
 

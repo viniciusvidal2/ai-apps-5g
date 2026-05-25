@@ -1,21 +1,5 @@
 import os
 
-
-# MUST come before importing paddle/paddleocr
-os.environ["FLAGS_enable_pir_api"] = "0"
-os.environ["FLAGS_enable_pir_in_executor"] = "0"
-os.environ["FLAGS_use_pir_api"] = "0"
-os.environ["FLAGS_use_cinn"] = "0"
-os.environ["FLAGS_use_mkldnn"] = "0"
-
-# Optional but helps
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-
-import paddle
-paddle.enable_static()
-
-from paddleocr import PaddleOCR
 from pdf2image import convert_from_path
 from enum import Enum
 from typing import List
@@ -34,8 +18,6 @@ try:
     from report_generator import generate_evaluation_report
 except ImportError:
     from .report_generator import generate_evaluation_report
-
-logging.getLogger("ppocr").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 
@@ -61,19 +43,10 @@ class MedicalDocsOCR:
             "ClassificationEnum",
             {c: c for c in self.document_classes}
         )
-        # OCR model initialization
-        self.ocr_paddle_basic = PaddleOCR(use_doc_orientation_classify=True,
-                                          use_doc_unwarping=False,
-                                          use_textline_orientation=True,
-                                          lang="en",
-                                          enable_mkldnn=False,
-                                          device="cpu")
         # OCR using LLM model from ollama with langchain
         self.ocr_llm = ChatOllama(model="glm-ocr:latest",
                                   base_url="http://localhost:11434",
                                   debug=False)
-        # Default OCR method
-        self.ocr_method = "paddle"  # options: "paddle", "llm"
         # Document classification model from ollama with langchain
         self.classifier_llm = ChatOllama(model="gemma4:latest",
                                          base_url="http://localhost:11434",
@@ -140,17 +113,6 @@ class MedicalDocsOCR:
         """
         # Store the output folder path for saving classified documents
         self.output_folder = output_folder
-
-    def set_ocr_method(self, method: str) -> None:
-        """
-        Sets the OCR method to be used.
-
-        Args:
-            method (str): The OCR method to use. Either "paddle" or "llm".
-        """
-        if method not in ["paddle", "llm"]:
-            raise ValueError("Invalid OCR method. Use 'paddle' or 'llm'.")
-        self.ocr_method = method
 
     def set_classification_model(self, model_name: str) -> None:
         """
@@ -236,35 +198,6 @@ class MedicalDocsOCR:
             data = yaml.safe_load(file)
             document_classes = data.get("document_classes", [])
             return [doc_class["name"].lower() for doc_class in document_classes]
-
-    def _pdf_to_text_paddle(self, images: list, type: str) -> list:
-        """
-        Extracts text from a list of page images using PaddleOCR.
-
-        Args:
-            images (list): A list of PIL Image objects representing document pages.
-            type (str): The type of OCR to use. Either "paddle_vl" for the PaddleOCRVL model or "paddle_basic" for the basic PaddleOCR model.
-
-        Returns:
-            list: A list of strings, each containing the extracted text from one page.
-        """
-        pages = []
-        for i, img in enumerate(images):
-            logger.info(f"Processing page {i+1}/{len(images)} with Paddle OCR ({type})...")
-            if type == "paddle_vl":
-                # ocr_result = self.ocr_paddle_vl.predict(input=img)
-                # pages_res = list(ocr_result)
-                # output = self.ocr_paddle_vl.restructure_pages(pages_res)
-                # pages.extend([page.markdown["markdown_texts"] for page in output])
-                pass
-            elif type == "paddle_basic":
-                ocr_result = self.ocr_paddle_basic.predict(img)
-                texts = ocr_result[0]['rec_texts']  # recognized text strings
-                pages.append("\n".join(texts) + "\n\n")
-            else:
-                raise ValueError(
-                    "Invalid OCR type specified. Use 'paddle_vl' or 'paddle_basic'.")
-        return pages
 
     def _pdf_to_text_llm(self, pages: list) -> list:
         """
@@ -418,15 +351,9 @@ class MedicalDocsOCR:
                 pages_images = self._pdf_to_images(document_path)
 
                 extracted_text = ""
-                if self.ocr_method == "paddle":
-                    logger.info(f"Extracting text from {len(pages_images)} pages with paddle OCR...")
-                    extracted_pages = self._pdf_to_text_paddle(
-                        pages_images, type="paddle_basic")
-                    extracted_text = "\n".join(extracted_pages)
-                elif self.ocr_method == "llm":
-                    logger.info(f"Extracting text from {len(pages_images)} pages with LLM OCR...")
-                    extracted_pages = self._pdf_to_text_llm(pages_images)
-                    extracted_text = "\n".join(extracted_pages)
+                logger.info(f"Extracting text from {len(pages_images)} pages with LLM OCR...")
+                extracted_pages = self._pdf_to_text_llm(pages_images)
+                extracted_text = "\n".join(extracted_pages)
 
                 # Run the classification model, improving text iteratively up to 3 times if unclassified
                 current_text = extracted_text
@@ -543,9 +470,6 @@ def main() -> None:
     # Example usage of the MedicalDocsOCR class
     ocr = MedicalDocsOCR(data_yaml_path=os.getenv(
         "HOME") + "/ai-apps-5g/medical_docs_agent/modules/configs/document_classes.yaml")
-
-    # Set OCR method (optional, default is "paddle")
-    ocr.set_ocr_method("llm")
 
     # Set the documents to process (replace with actual paths)
     ocr.set_documents_to_process([

@@ -293,14 +293,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.markdown('<p class="section-title">⚙️ OCR Options</p>', unsafe_allow_html=True)
 
-ocr_method = st.radio(
-    "OCR Engine",
-    options=["paddle", "llm"],
-    index=0,
-    horizontal=True,
-    key="ocr_method",
-    help="'paddle' uses PaddleOCR (fast, CPU). 'llm' uses the GLM vision model (slower, more accurate).",
-)
+st.info("OCR is performed using the **GLM vision model** (`glm-ocr:latest`) via Ollama.", icon="🤖")
 
 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -322,7 +315,6 @@ if st.button("▶️ Start Processing", key="btn_run",
     st.session_state.process_results = {}
 
     ocr = load_ocr_agent()
-    ocr.set_ocr_method(ocr_method)
     ocr.set_documents_to_process([st.session_state.uploaded_path])
     ocr.set_output_folder(st.session_state.output_folder)
 

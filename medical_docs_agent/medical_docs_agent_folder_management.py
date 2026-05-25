@@ -171,7 +171,6 @@ class MedicalDocsFolderManager:
         
         # Instantiate and store the OCR agent in self.ocr
         self.ocr = MedicalDocsOCR(data_yaml_path=data_yaml_path)
-        self.ocr.set_ocr_method("llm")
         self.ocr.set_documents_to_process(file_paths)
         self.ocr.set_output_folder(self.output_folder)
 

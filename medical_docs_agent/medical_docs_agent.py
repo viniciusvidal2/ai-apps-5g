@@ -107,8 +107,6 @@ def create_agent(config: AppConfig) -> FastAPI:
                     time.sleep(2)
 
             # Update agent settings based on payload
-            if payload.ocr_method:
-                agent.set_ocr_method(payload.ocr_method)
             if payload.classification_model:
                 agent.set_classification_model(payload.classification_model)
             

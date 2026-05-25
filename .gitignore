@@ -191,3 +191,4 @@ mcp.json
 .cursorignore
 q_and_a_ai_assistant.md
 .vscode
+medical_docs_agent/modules/configs/folder_manager_state.yaml

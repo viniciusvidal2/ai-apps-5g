@@ -183,6 +183,27 @@ class MedicalDocsOCR:
         """
         return self.results
 
+    def stop(self) -> None:
+        """
+        Stops the OCR classification process and kills the running Ollama models.
+        """
+        print("Stopping/killing running Ollama models...")
+        import subprocess
+        
+        try:
+            print("Stopping model 'glm-ocr:latest'...")
+            subprocess.run(["ollama", "stop", "glm-ocr:latest"], check=False)
+        except Exception as e:
+            print(f"Error stopping glm-ocr:latest: {e}")
+            
+        try:
+            print("Stopping model 'gemma4:latest'...")
+            subprocess.run(["ollama", "stop", "gemma4:latest"], check=False)
+        except Exception as e:
+            print(f"Error stopping gemma4:latest: {e}")
+            
+        print("Ollama models stop signals sent successfully.")
+
 #  endregion
 # region Gets
 
@@ -524,7 +545,7 @@ def main() -> None:
     """Entry point demonstrating example usage of the MedicalDocsOCR pipeline."""
     # Example usage of the MedicalDocsOCR class
     ocr = MedicalDocsOCR(data_yaml_path=os.getenv(
-        "HOME") + "/ai-apps-5g/medical_docs_agent/modules/data.yaml")
+        "HOME") + "/ai-apps-5g/medical_docs_agent/modules/configs/document_classes.yaml")
 
     # Set OCR method (optional, default is "paddle")
     ocr.set_ocr_method("llm")

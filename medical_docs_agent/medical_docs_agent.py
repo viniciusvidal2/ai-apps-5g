@@ -162,7 +162,7 @@ def main():
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8002)
     parser.add_argument("--data_yaml_path", type=str, 
-                        default=os.path.join(os.getenv("HOME", ""), "ai-apps-5g/medical_docs_agent/modules/data.yaml"))
+                        default=os.path.join(os.getenv("HOME", ""), "ai-apps-5g/medical_docs_agent/modules/configs/document_classes.yaml"))
     parser.add_argument("--output_folder", type=str, 
                         default=os.path.join(os.getenv("HOME", ""), "Desktop/5g_medical_docs/trials/classified_docs"))
     

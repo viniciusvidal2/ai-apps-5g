@@ -17,7 +17,7 @@ st.set_page_config(
 # ── Paths ─────────────────────────────────────────────────────────────────────
 AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODULES_DIR = os.path.join(AGENT_DIR, "modules")
-YAML_PATH = os.path.join(MODULES_DIR, "data.yaml")
+YAML_PATH = os.path.join(MODULES_DIR, "configs", "document_classes.yaml")
 
 # ── Lazy-load the heavy OCR module so the UI renders fast ─────────────────────
 @st.cache_resource(show_spinner="🔄 Loading OCR and classification models…")
